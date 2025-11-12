@@ -124,7 +124,7 @@ export function SearchBar({ propertyTypes }: HeroSearchCardProps) {
         {/* 2.3. Botón de Búsqueda */}
         <Button
           type="submit"
-          className="md:col-span-1 h-14 text-base bg-gray-900 hover:bg-gray-900/90 cursor-pointer"
+          className="md:col-span-1 h-14 text-base bg-foreground hover:bg-foreground/90 cursor-pointer"
         >
           Buscar
         </Button>

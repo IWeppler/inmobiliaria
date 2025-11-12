@@ -5,7 +5,7 @@ import { MapPin, Phone, Mail, Facebook, Instagram } from "lucide-react";
 export const Footer = () => {
   return (
     // Usamos 'bg-foreground' y texto claro como en tu original
-    <footer className="bg-foreground text-gray-300 rounded-t-lg mt-auto">
+    <footer className="bg-foreground text-gray-300 rounded-t-4xl mt-auto">
       <div className="w-full max-w-7xl mx-auto p-8 md:py-12">
         
         {/* Sección Superior - Grilla de 4 columnas */}

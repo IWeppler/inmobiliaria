@@ -51,8 +51,8 @@ export default async function DashboardPage() {
   const { agentName, properties } = await getDashboardData();
 
   return (
-    <div className="flex min-h-screen items-start justify-center font-sans">
-      <main className="w-full max-w-6xl p-4 md:p-8">
+    <div className="flex min-h-screen items-start justify-center">
+      <main className="w-full p-4 md:p-8">
       {/* Encabezado y Saludo */}
       <div className="flex items-center justify-between space-y-8">
         <div>

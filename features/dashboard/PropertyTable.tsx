@@ -1,12 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { createClientBrowser } from "@/lib/supabase-browser";
 import type { PropertyWithDetails } from "@/app/types/entities";
 import { toast } from "sonner";
-import { MoreHorizontal, Edit, Trash } from "lucide-react";
+import { MoreHorizontal, Edit, Trash, ArrowUpDown } from "lucide-react";
 
 // Importaciones de Shadcn
 import {
@@ -36,6 +36,14 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/shared/components/ui/alert-dialog";
+import { Input } from "@/shared/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/shared/components/ui/select";
 
 // Props que recibe el componente
 type PropertyTableProps = {
@@ -50,6 +58,8 @@ export function PropertyTable({ initialProperties }: PropertyTableProps) {
   const [isDeleting, setIsDeleting] = useState(false);
   const [propertyToDelete, setPropertyToDelete] =
     useState<PropertyWithDetails | null>(null);
+  const [filterText, setFilterText] = useState("");
+  const [sortBy, setSortBy] = useState("created_at_desc");
 
   const statusColors: { [key: string]: string } = {
     EN_VENTA: "bg-emerald-500 hover:bg-emerald-600 text-white",
@@ -66,6 +76,41 @@ export function PropertyTable({ initialProperties }: PropertyTableProps) {
     VENDIDO: "Vendido",
     ALQUILADO: "Alquilado",
   };
+
+  const filteredAndSortedProperties = useMemo(() => {
+    const lowerFilter = filterText.toLowerCase();
+
+    // 1. Filtrar
+    const filtered = properties.filter(
+      (prop) =>
+        prop.title?.toLowerCase().includes(lowerFilter) ||
+        prop.street_address?.toLowerCase().includes(lowerFilter) ||
+        prop.city?.toLowerCase().includes(lowerFilter)
+    );
+
+    // 2. Ordenar
+    switch (sortBy) {
+      case "price_asc":
+        filtered.sort((a, b) => (a.price || 0) - (b.price || 0));
+        break;
+      case "price_desc":
+        filtered.sort((a, b) => (b.price || 0) - (a.price || 0));
+        break;
+
+      case "city_asc":
+        filtered.sort((a, b) => (a.city || "").localeCompare(b.city || ""));
+        break;
+      case "created_at_desc":
+      default:
+        filtered.sort(
+          (a, b) =>
+            new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+        );
+        break;
+    }
+
+    return filtered;
+  }, [properties, filterText, sortBy]);
 
   // --- Lógica de Borrado ---
   const handleDeleteProperty = async () => {
@@ -88,27 +133,45 @@ export function PropertyTable({ initialProperties }: PropertyTableProps) {
       }
     }
 
-    // 2. Borrar registros de 'property_images' (si RLS lo permite)
-    // 3. Borrar la propiedad de 'properties'
-  const { error } = await supabase
-    .from("properties")
-    .delete()
-    .eq("id", propertyToDelete.id);
+    const { error } = await supabase
+      .from("properties")
+      .delete()
+      .eq("id", propertyToDelete.id);
 
-  setIsDeleting(false);
+    setIsDeleting(false);
 
-  if (error) {
-    toast.error(`Error al eliminar: ${error.message}`, { id: toastId });
-  } else {
+    if (error) {
+      toast.error(`Error al eliminar: ${error.message}`, { id: toastId });
+    } else {
       toast.success("Propiedad eliminada con éxito.", { id: toastId });
       setProperties((prev) => prev.filter((p) => p.id !== propertyToDelete.id));
-      // router.refresh();
     }
     setPropertyToDelete(null);
   };
 
   return (
     <>
+      <div className="flex flex-col md:flex-row items-center gap-4 mb-6">
+        <Input
+          placeholder="Buscar por título, dirección o ciudad..."
+          value={filterText}
+          onChange={(e) => setFilterText(e.target.value)}
+          className="flex-1"
+        />
+        <Select value={sortBy} onValueChange={setSortBy}>
+          <SelectTrigger className="w-full md:w-[220px]">
+            <ArrowUpDown className="mr-2 h-4 w-4" />
+            <SelectValue placeholder="Ordenar por..." />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="created_at_desc">Más Recientes</SelectItem>
+            <SelectItem value="price_desc">Precio: Más Caro</SelectItem>
+            <SelectItem value="price_asc">Precio: Más Barato</SelectItem>
+            <SelectItem value="city_asc">Ciudad (A-Z)</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
       <div className="rounded-lg border shadow-sm">
         <Table>
           <TableHeader>
@@ -116,6 +179,7 @@ export function PropertyTable({ initialProperties }: PropertyTableProps) {
               <TableHead className="w-20">Imagen</TableHead>
               <TableHead>Título</TableHead>
               <TableHead className="hidden md:table-cell">Dirección</TableHead>
+              <TableHead className="hidden sm:table-cell">Ciudad</TableHead>
               <TableHead className="hidden lg:table-cell">Operación</TableHead>
               <TableHead>Estado</TableHead>
               <TableHead>Precio</TableHead>
@@ -123,8 +187,17 @@ export function PropertyTable({ initialProperties }: PropertyTableProps) {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {properties.map((property) => {
+            {filteredAndSortedProperties.map((property) => {
               const mainImage = property.property_images?.[0]?.image_url;
+
+              // --- Formateo de precio ---
+              const hasPrice =
+                typeof property.price === "number" && property.price > 0;
+              const formattedPrice = hasPrice
+                ? new Intl.NumberFormat("es-AR", { style: "decimal" }).format(
+                    property.price as number
+                  )
+                : "N/A";
               return (
                 <TableRow key={property.id}>
                   <TableCell>
@@ -141,9 +214,8 @@ export function PropertyTable({ initialProperties }: PropertyTableProps) {
                     />
                   </TableCell>
                   <TableCell className="font-medium">
-                    {/* El título es clickeable para ver/editar */}
                     <Link
-                      href={`/dashboard/propiedades/editar/${property.id}`} // Futura ruta de edición
+                      href={`/dashboard/propiedades/editar/${property.id}`}
                       className="hover:underline"
                     >
                       {property.title}
@@ -151,6 +223,9 @@ export function PropertyTable({ initialProperties }: PropertyTableProps) {
                   </TableCell>
                   <TableCell className="hidden md:table-cell text-muted-foreground">
                     {property.street_address || "Sin dirección"}
+                  </TableCell>
+                  <TableCell className="hidden sm:table-cell text-muted-foreground">
+                    {property.city || "N/A"}
                   </TableCell>
                   <TableCell className="hidden lg:table-cell capitalize text-muted-foreground">
                     {property.operation_type}
@@ -167,7 +242,9 @@ export function PropertyTable({ initialProperties }: PropertyTableProps) {
                     </Badge>
                   </TableCell>
                   <TableCell className="font-semibold">
-                    {property.currency} ${property.price}
+                    {hasPrice
+                      ? `${property.currency} $${formattedPrice}`
+                      : "Consultar"}
                   </TableCell>
                   <TableCell>
                     <DropdownMenu>
@@ -203,7 +280,6 @@ export function PropertyTable({ initialProperties }: PropertyTableProps) {
         </Table>
       </div>
 
-      {/* --- Diálogo de Confirmación de Borrado --- */}
       <AlertDialog
         open={!!propertyToDelete}
         onOpenChange={() => setPropertyToDelete(null)}

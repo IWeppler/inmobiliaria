@@ -7,16 +7,11 @@
 @custom-variant dark (&:is(.dark *));
 /* @import "tw-animate-css"; */
 
-/* 
-
-
-*/
-
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-main: #004fbe;
-  --color-accent: #c4171d;
+  --color-main-red: #c4171d;
   
   
   --font-stackSans: "Stack Sans Text", sans-serif;

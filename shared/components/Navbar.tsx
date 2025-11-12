@@ -14,7 +14,7 @@ export function Navbar() {
   const navLinks = [
     { href: "/propiedades?tipo=venta", label: "Comprar" },
     { href: "/propiedades?tipo=alquiler", label: "Alquilar" },
-    { href: "/tasar", label: "Vender" },
+    { href: "/tasar", label: "Tasar mi propiedad" },
     { href: "/contacto", label: "Contacto" },
   ];
 
