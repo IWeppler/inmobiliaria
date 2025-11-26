@@ -55,7 +55,7 @@ export function ImageGallery({ images }: ImageGalleryProps) {
             alt="Imagen principal de la propiedad"
             fill
             style={{ objectFit: "cover" }}
-            priority
+            priority={true}
             className="transition-transform duration-300 group-hover:scale-105"
           />
         </div>
@@ -74,6 +74,7 @@ export function ImageGallery({ images }: ImageGalleryProps) {
                 alt={`Galería de propiedad ${index + 1}`}
                 fill
                 style={{ objectFit: "cover" }}
+                priority={true}
                 className="transition-transform duration-300 group-hover:scale-105"
               />
               <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity" />
@@ -91,6 +92,7 @@ export function ImageGallery({ images }: ImageGalleryProps) {
                 alt={`Galería de propiedad 4`}
                 fill
                 style={{ objectFit: "cover" }}
+                priority={true}
                 className="transition-transform duration-300 group-hover:scale-105"
               />
 

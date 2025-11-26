@@ -1,5 +1,5 @@
 import Image from "next/image";
-import { MessageCircle, Phone, Mail } from "lucide-react";
+import { Phone } from "lucide-react";
 import { Button } from "@/shared/components/ui/button";
 import { Input } from "@/shared/components/ui/input";
 import { Textarea } from "@/shared/components/ui/textarea";
@@ -7,12 +7,14 @@ import Link from "next/link";
 
 type AgentCardProps = {
   agent: {
+    id: string; 
     full_name: string | null;
     phone: string | null;
     email: string | null;
     avatar_url: string | null;
   } | null;
   propertyTitle: string;
+  propertyId: string; 
 };
 
 export function AgentCard({ agent, propertyTitle }: AgentCardProps) {
@@ -23,8 +25,6 @@ export function AgentCard({ agent, propertyTitle }: AgentCardProps) {
     avatar_url: null,
   };
 
-  // Limpiar número para link de WhatsApp (quitar espacios, guiones, +)
-  // Limpiar número para link de WhatsApp (quitar espacios, guiones, +)
   const cleanPhone = (displayAgent.phone || "").replace(/[^0-9]/g, "");
 
   // Mensaje predeterminado
@@ -139,7 +139,7 @@ export function AgentCard({ agent, propertyTitle }: AgentCardProps) {
             className="bg-zinc-50 border-zinc-200 min-h-[100px]"
           />
         </div>
-        <Button type="submit" className="w-full cursor-pointer bg-foreground hover:bg-foreground/90">
+        <Button type="submit" className="w-full cursor-pointer bg-foreground">
           Enviar Consulta
         </Button>
       </form>
