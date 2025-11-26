@@ -13,7 +13,7 @@ async function getDashboardData() {
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (!user) return null; 
+  if (!user) return null;
 
   const { data: agent } = await supabase
     .from("agents")
@@ -28,7 +28,8 @@ async function getDashboardData() {
       *,
       property_types ( name ),
       property_images ( image_url ),
-      agents ( full_name ) 
+      agents ( full_name )
+      views_count
     `
     )
     .order("created_at", { ascending: false });

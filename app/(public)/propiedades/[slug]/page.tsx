@@ -1,5 +1,6 @@
 import { createClientServer } from "@/lib/supabase";
 import { notFound } from "next/navigation";
+import { Metadata, ResolvingMetadata } from "next";
 import {
   MapPin,
   Bath,
@@ -10,11 +11,11 @@ import {
   CheckCircle,
 } from "lucide-react";
 
-// Componentes Cliente que crearemos
 import { ClientPropertyMap } from "@/features/properties/ClientPropertyMap";
 import { ImageGallery } from "@/features/properties/ImageGallery";
 import { DescriptionWithReadMore } from "@/features/properties/DescriptionReadMore";
 import { AgentCard } from "@/features/public/AgentCard";
+import { ViewCounter } from "@/features/public/ViewCounter";
 
 // --- Tipos ---
 type Amenity = { amenities: { name: string } | null };
@@ -51,9 +52,8 @@ type PropertyFullDetails = {
     email: string | null;
   } | null;
 };
-// ---
 
-// --- Carga de Datos ---
+// --- Carga de Datos Principal ---
 async function getPropertyDetails(
   slug: string
 ): Promise<PropertyFullDetails | null> {
@@ -81,7 +81,67 @@ async function getPropertyDetails(
   return data as unknown as PropertyFullDetails;
 }
 
-// --- Componentes de UI Helpers ---
+// --- 2. NUEVA FUNCIÓN: GENERACIÓN DE METADATA (SEO) ---
+export async function generateMetadata(
+  { params }: { params: Promise<{ slug: string }> },
+  parent: ResolvingMetadata
+): Promise<Metadata> {
+  const { slug } = await params;
+  
+  const supabase = await createClientServer();
+
+  const { data: property } = await supabase
+    .from("properties")
+    .select("title, description, price, currency, property_images(image_url)")
+    .eq("id", slug)
+    .single();
+
+  if (!property) {
+    return {
+      title: "Propiedad no encontrada | TerraNova",
+    };
+  }
+
+  // Imagen Principal (Open Graph)
+  const previousImages = (await parent).openGraph?.images || [];
+  const mainImage = property.property_images?.[0]?.image_url 
+    || "https://inmobiliaria-pi.vercel.app/og-default.jpg";
+
+  let priceText = "";
+  if (property.price) {
+     priceText = `| ${property.currency} $${property.price.toLocaleString('es-AR')}`;
+  }
+
+  return {
+    title: `${property.title} ${priceText}`,
+    description: property.description?.substring(0, 160) || "Consultá por esta propiedad en TerraNova.",
+    openGraph: {
+      title: property.title,
+      description: property.description?.substring(0, 160),
+      url: `/propiedades/${slug}`,
+      siteName: 'TerraNova Inmobiliaria',
+      images: [
+        {
+          url: mainImage,
+          width: 1200,
+          height: 630,
+          alt: property.title,
+        },
+        ...previousImages,
+      ],
+      locale: 'es_AR',
+      type: 'website',
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title: property.title,
+      description: property.description?.substring(0, 160),
+      images: [mainImage],
+    },
+  };
+}
+
+// --- Componentes de UI Helpers (Sin cambios) ---
 function AspectItem({
   icon: Icon,
   label,
@@ -106,7 +166,6 @@ function AspectItem({
   );
 }
 
-// Un helper para la tabla de "Aspectos Técnicos"
 function TechSpecItem({
   label,
   value,
@@ -116,14 +175,14 @@ function TechSpecItem({
 }) {
   if (!value) return null;
   return (
-    <div className="flex justify-between py-3 border-b">
+    <div className="flex justify-between py-3 border-b last:border-0">
       <dt className="text-zinc-600">{label}</dt>
-      <dd className="font-medium">{value}</dd>
+      <dd className="font-medium text-right">{value}</dd>
     </div>
   );
 }
 
-// --- La Página ---
+// --- La Página (Sin cambios mayores) ---
 export default async function PropertyPage({
   params: paramsPromise,
 }: {
@@ -156,7 +215,7 @@ export default async function PropertyPage({
   );
   const locationString = locationParts.join(" | ");
 
-  // Diccionario de Status (como en tu dashboard)
+  // Diccionario de Status
   const statusLabels: { [key: string]: string } = {
     EN_VENTA: "En Venta",
     EN_ALQUILER: "En Alquiler",
@@ -184,8 +243,11 @@ export default async function PropertyPage({
 
   return (
     <main>
+      {/* Contador de vistas invisible */}
+      <ViewCounter propertyId={property.id} />
+      
       <div className="container mx-auto max-w-7xl p-4 md:p-8 py-12">
-        {/* --- 1. Header (Título, Precio, Ubicación) --- */}
+        {/* --- 1. Header --- */}
         <header className="mb-6 md:mb-10">
           <div className="flex flex-col md:flex-row justify-between md:items-end mb-2">
             <h1 className="font-clash text-2xl md:text-4xl font-semibold leading-tight max-w-5xl">
@@ -193,7 +255,7 @@ export default async function PropertyPage({
             </h1>
 
             <div className="mt-2 md:mt-0 text-left md:text-right shrink-0">
-              <span className="text-xs md:text-sm font-semibold text-main">
+              <span className="text-xs md:text-sm font-semibold text-main bg-main/10 px-2 py-1 rounded-full inline-block mb-1">
                 {statusDisplay}
               </span>
 
@@ -212,7 +274,7 @@ export default async function PropertyPage({
         <ImageGallery images={images as string[]} />
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 md:gap-12 mt-12">
-          {/* Columna Principal de Contenido */}
+          {/* Columna Principal */}
           <div className="lg:col-span-2 space-y-12">
             {/* 3.1. Aspectos Básicos */}
             <section>
@@ -239,16 +301,12 @@ export default async function PropertyPage({
                 <AspectItem
                   icon={Ruler}
                   label="Sup. Total"
-                  value={
-                    property.total_area ? `${property.total_area} m²` : null
-                  }
+                  value={property.total_area ? `${property.total_area} m²` : null}
                 />
                 <AspectItem
                   icon={Ruler}
                   label="Sup. Cubierta"
-                  value={
-                    property.covered_area ? `${property.covered_area} m²` : null
-                  }
+                  value={property.covered_area ? `${property.covered_area} m²` : null}
                 />
                 <AspectItem
                   icon={Car}
@@ -296,28 +354,20 @@ export default async function PropertyPage({
                 Aspectos Técnicos de la propiedad
               </h2>
 
-              <div className="max-w-md space-y-2">
+              <div className="max-w-md space-y-2 bg-zinc-50 p-6 rounded-xl">
                 <TechSpecItem label="Precio" value={priceDisplay} />
                 <TechSpecItem
                   label="Expensas"
-                  value={
-                    property.expensas
-                      ? `ARS $${property.expensas}`
-                      : "No especifica"
-                  }
+                  value={property.expensas ? `ARS $${property.expensas}` : "No especifica"}
                 />
                 <TechSpecItem label="Antigüedad" value={property.antiguedad} />
                 <TechSpecItem
                   label="Superficie Total"
-                  value={
-                    property.total_area ? `${property.total_area} m²` : null
-                  }
+                  value={property.total_area ? `${property.total_area} m²` : null}
                 />
                 <TechSpecItem
                   label="Superficie Cubierta"
-                  value={
-                    property.covered_area ? `${property.covered_area} m²` : null
-                  }
+                  value={property.covered_area ? `${property.covered_area} m²` : null}
                 />
                 <TechSpecItem label="Cocheras" value={property.cocheras} />
                 <TechSpecItem label="ID de Propiedad" value={property.id} />
@@ -330,7 +380,7 @@ export default async function PropertyPage({
                 Ubicación
               </h2>
 
-              <div className="h-[400px] w-full rounded-lg overflow-hidden border">
+              <div className="h-[400px] w-full rounded-lg overflow-hidden border border-zinc-200">
                 <ClientPropertyMap
                   lat={property.latitude}
                   lng={property.longitude}

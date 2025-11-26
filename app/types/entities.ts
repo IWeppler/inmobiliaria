@@ -16,6 +16,7 @@ export type PropertyWithDetails = Property & {
   property_types: Pick<PropertyType, "name"> | null;
   property_images: Pick<PropertyImage, "image_url">[] | null;
   agent: Agent | null;
+  views_count: number | null;
 };
 
 export type PropertyCardData = Pick<

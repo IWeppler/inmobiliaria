@@ -72,7 +72,6 @@ export function PropertyTable({
   const [filterText, setFilterText] = useState("");
   const [sortBy, setSortBy] = useState("created_at_desc");
 
-  // Colores (Sin cambios)
   const statusColors: { [key: string]: string } = {
     EN_VENTA: "bg-[#77aafe] text-[#00146b] border-[#77aafe]",
     EN_ALQUILER: "bg-[#23c56f] text-[#012e01] border-[#23c56f]",
@@ -221,6 +220,9 @@ export function PropertyTable({
               <TableHead>Título</TableHead>
               <TableHead className="hidden md:table-cell">Dirección</TableHead>
               <TableHead className="hidden sm:table-cell">Ciudad</TableHead>
+              <TableHead className="text-center" title="Visitas">
+                Visitas
+              </TableHead>
               <TableHead className="hidden lg:table-cell">Operación</TableHead>
               <TableHead className="w-[160px]">Estado</TableHead>
               <TableHead>Precio</TableHead>
@@ -277,6 +279,10 @@ export function PropertyTable({
 
                   <TableCell className="hidden sm:table-cell text-muted-foreground text-sm">
                     {property.city || "-"}
+                  </TableCell>
+
+                  <TableCell className="text-center font-mono text-sm text-zinc-500">
+                    {property.views_count || 0}
                   </TableCell>
 
                   <TableCell className="hidden lg:table-cell capitalize text-muted-foreground text-sm">
