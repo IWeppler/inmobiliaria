@@ -139,7 +139,7 @@ export function AgentCard({ agent, propertyTitle }: AgentCardProps) {
             className="bg-zinc-50 border-zinc-200 min-h-[100px]"
           />
         </div>
-        <Button type="submit" className="w-full cursor-pointer bg-foreground">
+        <Button type="submit" className="w-full cursor-pointer bg-foreground hover:bg-foreground/90">
           Enviar Consulta
         </Button>
       </form>

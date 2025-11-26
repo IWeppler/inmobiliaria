@@ -29,15 +29,13 @@ export default async function AgentsPage() {
 
   return (
     <div className="p-6">
-      <div className="flex justify-between items-center mb-6">
-        <div>
+      <div className="flex flex-col justify-between items-center mb-2">
           <h1 className="text-3xl font-clash font-semibold text-foreground">
             Gestión de Equipo
           </h1>
           <p className="text-muted-foreground">
             Administra a tus agentes y administradores.
           </p>
-        </div>
       </div>
 
       {/* Pasamos la data al cliente */}

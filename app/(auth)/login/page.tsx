@@ -3,7 +3,7 @@ import Image from "next/image";
 
 const LoginPage = () => {
   return (
-    <div className="flex min-h-screen font-sans">
+    <div className="flex min-h-screen">
       {/* Columna izquierda */}
       <div className="hidden md:flex relative w-1/2 items-center justify-center bg-foreground">
         <Image
@@ -22,7 +22,7 @@ const LoginPage = () => {
       </div>
 
       {/* Columna derecha */}
-      <div className="flex w-full md:w-1/2 items-center justify-center bg-background">
+      <div className="flex w-full md:w-1/2 items-center justify-center bg-foreground md:bg-background">
         <main className="w-full max-w-md px-8 py-16 bg-foreground">
           <h2 className="text-3xl font-clash font-semibold text-center mb-2 text-background">
             Hola!

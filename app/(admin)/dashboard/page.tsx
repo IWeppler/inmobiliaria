@@ -60,18 +60,13 @@ export default async function DashboardPage() {
     <div className="flex min-h-screen items-start justify-center">
       <main className="w-full p-4 md:p-8">
         {/* Encabezado  */}
-        <div className="flex items-center justify-between space-y-8 mb-6">
+        <div className="flex items-center justify-between space-y-2 mb-6">
           <div>
             <h1 className="text-3xl mb-1 font-clash font-semibold tracking-tight">
               Hola, {agentName}!
             </h1>
-            <p className="text-muted-foreground">
+            <p className="text-muted-foreground pr-4">
               Aquí está un resumen de las propiedades.
-              {currentUserRole === "admin" && (
-                <span className="ml-2 text-xs bg-foreground text-background px-2 py-1 rounded-full">
-                  Modo Admin
-                </span>
-              )}
             </p>
           </div>
           <div className="flex items-center space-x-2">
@@ -80,8 +75,8 @@ export default async function DashboardPage() {
               className="bg-foreground hover:bg-foreground/90 cursor-pointer"
             >
               <Link href="/dashboard/propiedades/nueva">
-                <PlusCircle className="mr-2 h-4 w-4" />
-                Agregar Propiedad
+                <PlusCircle className="sm:mr-2 h-4 w-4" />
+                <span className="hidden sm:inline">Agregar Propiedad</span>
               </Link>
             </Button>
           </div>

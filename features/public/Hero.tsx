@@ -47,7 +47,7 @@ export async function Hero() {
         </p>
 
         {/* SearchBar con fondo más premium */}
-        <div className="w-full max-w-3xl px-4 md:px-0 backdrop-blur-md bg-white/10 rounded-2xl shadow-2xl">
+        <div className="w-full max-w-3xl px-4 md:px-0 ">
           <SearchBar
             locations={locations}
             propertyTypes={propertyTypes as PropertyType[]}

@@ -198,7 +198,7 @@ export function PropertyTable({
           placeholder="Buscar por título, dirección o ciudad..."
           value={filterText}
           onChange={(e) => setFilterText(e.target.value)}
-          className="flex-1"
+          className="flex-1 py-2"
         />
         <Select value={sortBy} onValueChange={setSortBy}>
           <SelectTrigger className="w-full md:w-[220px] bg-white border border-zinc-200">

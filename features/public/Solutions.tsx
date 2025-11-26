@@ -72,8 +72,8 @@ function ServiceCard({
 
 export const Solutions = () => {
   return (
-    <section className="w-full py-28">
-      <div className="container mx-auto max-w-7xl px-6">
+    <section className="w-full py-16">
+      <div className="container mx-auto max-w-7xl">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-20 items-start">
           
           {/* BLOQUE IZQUIERDO */}
@@ -85,8 +85,8 @@ export const Solutions = () => {
               </span>
             </div>
 
-            <h2 className="text-4xl md:text-5xl font-clash font-semibold leading-tight text-zinc-900 mb-6">
-              Te brindamos los mejores <br /> servicios inmobiliarios
+            <h2 className="text-4xl md:text-5xl font-clash font-semibold text-zinc-900 mb-6">
+              Te brindamos los mejores  servicios <br /> inmobiliarios
             </h2>
 
             <p className="text-lg text-zinc-600 mb-10 max-w-lg leading-relaxed">

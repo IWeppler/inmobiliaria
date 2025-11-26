@@ -3,7 +3,16 @@
 import { useState } from "react";
 import Image from "next/image";
 import { toast } from "sonner";
-import { Plus, Trash2, Shield, User, Phone, Mail, Edit, Camera } from "lucide-react";
+import {
+  Trash2,
+  Shield,
+  User,
+  Phone,
+  Mail,
+  Edit,
+  Camera,
+  PlusCircle,
+} from "lucide-react";
 import {
   createAgentAction,
   deleteAgentAction,
@@ -68,7 +77,7 @@ export function AgentsClientPage({
     password: "",
     role: "agente",
   });
-  
+
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
   const openCreateModal = () => {
@@ -105,20 +114,20 @@ export function AgentsClientPage({
     data.append("full_name", formData.full_name);
     data.append("phone", formData.phone);
     data.append("role", formData.role);
-    
+
     if (selectedFile) {
-        data.append("avatar", selectedFile);
+      data.append("avatar", selectedFile);
     }
 
     let result;
 
     if (editingAgent) {
-        data.append("id", editingAgent.id);
-        result = await updateAgentAction(data);
+      data.append("id", editingAgent.id);
+      result = await updateAgentAction(data);
     } else {
-        data.append("email", formData.email);
-        data.append("password", formData.password);
-        result = await createAgentAction(data);
+      data.append("email", formData.email);
+      data.append("password", formData.password);
+      result = await createAgentAction(data);
     }
 
     if (result.error) {
@@ -132,7 +141,8 @@ export function AgentsClientPage({
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm("¿Estás seguro? Esto eliminará el acceso del usuario.")) return;
+    if (!confirm("¿Estás seguro? Esto eliminará el acceso del usuario."))
+      return;
 
     const toastId = toast.loading("Eliminando...");
     const result = await deleteAgentAction(id);
@@ -147,47 +157,63 @@ export function AgentsClientPage({
 
   return (
     <>
-      <div className="flex justify-end mb-6 -mt-16">
+      <div className="flex justify-end mb-6">
         <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
           <DialogTrigger asChild>
-            <Button 
-                onClick={openCreateModal}
-                className="bg-foreground text-white hover:bg-foreground/90 cursor-pointer"
+            <Button
+              onClick={openCreateModal}
+              className="bg-foreground text-white hover:bg-foreground/90 cursor-pointer"
             >
-              <Plus className="w-4 h-4 mr-2" /> Agregar Agente
+              <PlusCircle className="w-4 h-4 mr-2" /> Agregar Agente
             </Button>
           </DialogTrigger>
           <DialogContent className="sm:max-w-[425px]">
             <DialogHeader>
-              <DialogTitle>{editingAgent ? "Editar Agente" : "Nuevo Miembro"}</DialogTitle>
+              <DialogTitle>
+                {editingAgent ? "Editar Agente" : "Nuevo Miembro"}
+              </DialogTitle>
               <DialogDescription>
-                {editingAgent ? "Modifica los datos del usuario." : "Crear un usuario para acceso al sistema."}
+                {editingAgent
+                  ? "Modifica los datos del usuario."
+                  : "Crear un usuario para acceso al sistema."}
               </DialogDescription>
             </DialogHeader>
 
             <form onSubmit={handleSubmit} className="space-y-4 py-4">
-              
               {/* IMAGEN DE PERFIL */}
               <div className="flex flex-col items-center gap-4 mb-4">
-                 <div className="relative w-20 h-20 rounded-full overflow-hidden bg-zinc-100 border-2 border-dashed border-zinc-300 flex items-center justify-center group">
-                    {selectedFile ? (
-                        <Image src={URL.createObjectURL(selectedFile)} alt="Preview" fill className="object-cover" />
-                    ) : editingAgent?.avatar_url ? (
-                        <Image src={editingAgent.avatar_url} alt="Current" fill className="object-cover" />
-                    ) : (
-                        <Camera className="text-zinc-400 w-8 h-8" />
-                    )}
-                 </div>
-                 <Label htmlFor="avatar-upload" className="cursor-pointer text-sm text-blue-600 hover:underline">
-                    {editingAgent || selectedFile ? "Cambiar foto" : "Subir foto"}
-                 </Label>
-                 <Input 
-                    id="avatar-upload" 
-                    type="file" 
-                    accept="image/*" 
-                    className="hidden"
-                    onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
-                 />
+                <div className="relative w-20 h-20 rounded-full overflow-hidden bg-zinc-100 border-2 border-dashed border-zinc-300 flex items-center justify-center group">
+                  {selectedFile ? (
+                    <Image
+                      src={URL.createObjectURL(selectedFile)}
+                      alt="Preview"
+                      fill
+                      className="object-cover"
+                    />
+                  ) : editingAgent?.avatar_url ? (
+                    <Image
+                      src={editingAgent.avatar_url}
+                      alt="Current"
+                      fill
+                      className="object-cover"
+                    />
+                  ) : (
+                    <Camera className="text-zinc-400 w-8 h-8" />
+                  )}
+                </div>
+                <Label
+                  htmlFor="avatar-upload"
+                  className="cursor-pointer text-sm text-blue-600 hover:underline"
+                >
+                  {editingAgent || selectedFile ? "Cambiar foto" : "Subir foto"}
+                </Label>
+                <Input
+                  id="avatar-upload"
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
+                />
               </div>
 
               <div className="space-y-2">
@@ -195,7 +221,9 @@ export function AgentsClientPage({
                 <Input
                   required
                   value={formData.full_name}
-                  onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, full_name: e.target.value })
+                  }
                 />
               </div>
 
@@ -206,21 +234,25 @@ export function AgentsClientPage({
                   required
                   disabled={!!editingAgent}
                   value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, email: e.target.value })
+                  }
                 />
               </div>
 
               {!editingAgent && (
-                  <div className="space-y-2">
-                    <Label>Contraseña</Label>
-                    <Input
-                      type="password"
-                      required
-                      placeholder="Mínimo 6 caracteres"
-                      value={formData.password}
-                      onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                    />
-                  </div>
+                <div className="space-y-2">
+                  <Label>Contraseña</Label>
+                  <Input
+                    type="password"
+                    required
+                    placeholder="Mínimo 6 caracteres"
+                    value={formData.password}
+                    onChange={(e) =>
+                      setFormData({ ...formData, password: e.target.value })
+                    }
+                  />
+                </div>
               )}
 
               <div className="space-y-2">
@@ -228,7 +260,9 @@ export function AgentsClientPage({
                 <Input
                   placeholder="549..."
                   value={formData.phone}
-                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, phone: e.target.value })
+                  }
                 />
               </div>
 
@@ -236,7 +270,9 @@ export function AgentsClientPage({
                 <Label>Rol</Label>
                 <Select
                   value={formData.role}
-                  onValueChange={(val) => setFormData({ ...formData, role: val })}
+                  onValueChange={(val) =>
+                    setFormData({ ...formData, role: val })
+                  }
                 >
                   <SelectTrigger>
                     <SelectValue />
@@ -249,8 +285,16 @@ export function AgentsClientPage({
               </div>
 
               <DialogFooter>
-                <Button type="submit" disabled={isLoading} className="bg-foreground text-white cursor-pointer">
-                  {isLoading ? "Guardando..." : (editingAgent ? "Guardar Cambios" : "Crear Usuario")}
+                <Button
+                  type="submit"
+                  disabled={isLoading}
+                  className="bg-foreground text-white cursor-pointer"
+                >
+                  {isLoading
+                    ? "Guardando..."
+                    : editingAgent
+                    ? "Guardar Cambios"
+                    : "Crear Usuario"}
                 </Button>
               </DialogFooter>
             </form>
@@ -292,7 +336,9 @@ export function AgentsClientPage({
                 <TableCell className="font-medium">
                   {agent.full_name || "Sin nombre"}
                   {agent.id === currentUserId && (
-                      <span className="ml-2 text-xs text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">Tú</span>
+                    <span className="ml-2 text-xs text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">
+                      Tú
+                    </span>
                   )}
                 </TableCell>
 
@@ -321,26 +367,26 @@ export function AgentsClientPage({
                 </TableCell>
                 <TableCell className="text-right">
                   <div className="flex justify-end gap-2">
-                      {/* BOTÓN EDITAR */}
+                    {/* BOTÓN EDITAR */}
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => openEditModal(agent)}
+                    >
+                      <Edit className="w-4 h-4 text-zinc-500" />
+                    </Button>
+
+                    {/* BOTÓN BORRAR (Protegido) */}
+                    {agent.id !== currentUserId && (
                       <Button
                         variant="ghost"
                         size="icon"
-                        onClick={() => openEditModal(agent)}
+                        className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                        onClick={() => handleDelete(agent.id)}
                       >
-                        <Edit className="w-4 h-4 text-zinc-500" />
+                        <Trash2 className="w-4 h-4" />
                       </Button>
-
-                      {/* BOTÓN BORRAR (Protegido) */}
-                      {agent.id !== currentUserId && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="text-red-500 hover:text-red-700 hover:bg-red-50"
-                            onClick={() => handleDelete(agent.id)}
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                      )}
+                    )}
                   </div>
                 </TableCell>
               </TableRow>

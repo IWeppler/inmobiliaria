@@ -138,8 +138,8 @@ export function LeadTable({ initialLeads, userRole }: LeadTableProps) {
             <h1 className="font-clash font-semibold text-2xl">
               Gestión de Leads
             </h1>
-            <p className="text-muted-foreground">
-              Aquí puedes ver y gestionar tus clientes potenciales.
+            <p className="text-muted-foreground pr-2">
+              Aquí puedes ver y gestionar tus clentes potenciales.
             </p>
           </div>
           <DialogTrigger asChild>

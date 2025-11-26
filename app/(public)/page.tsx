@@ -39,7 +39,7 @@ export default async function Home() {
       <Hero />
       <main className="flex min-h-screen w-full flex-col items-center justify-start py-16">
         <section className="w-full pb-16">
-  <h2 className="text-[2.75rem] leading-tight font-clash font-semibold mb-4">
+  <h2 className="text-4xl md:text-5xl font-clash font-semibold mb-4">
     Nuevas Propiedades
   </h2>
 

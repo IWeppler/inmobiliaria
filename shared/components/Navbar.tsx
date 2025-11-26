@@ -79,7 +79,7 @@ export function Navbar() {
         </div>
 
         {/* Contenido del menú (links, botones, redes) */}
-        <div className="flex flex-col justify-between h-[calc(100vh-4rem)]">
+        <div className="flex flex-col justify-between h-[calc(100vh-8rem)]">
           {/* 1. Links de Navegación */}
           <div className="flex flex-col">
             {navLinks.map((link) => (
@@ -98,7 +98,7 @@ export function Navbar() {
             ))}
           </div>
 
-          <div className="pb-10">
+          <div className="pb-10 px-3">
             <Link
               href={whatsappLink}
               className="flex items-center justify-center w-full px-4 py-3 mb-6
