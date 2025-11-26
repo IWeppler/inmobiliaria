@@ -4,7 +4,6 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { MapPin } from "lucide-react";
 import { Button } from "@/shared/components/ui/button";
-import { Input } from "@/shared/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -13,7 +12,12 @@ import {
   SelectValue,
 } from "@/shared/components/ui/select";
 
-// Tipos que recibimos del componente servidor
+type LocationOption = {
+  city: string;
+  province: string;
+  label: string;
+};
+
 type PropertyType = {
   id: number;
   name: string;
@@ -21,27 +25,32 @@ type PropertyType = {
 
 type HeroSearchCardProps = {
   propertyTypes: PropertyType[];
+  locations: LocationOption[];
 };
 
-export function SearchBar({ propertyTypes }: HeroSearchCardProps) {
+export function SearchBar({ propertyTypes, locations }: HeroSearchCardProps) {
   const router = useRouter();
 
-  // Estados para el formulario
-  const [operation, setOperation] = useState("alquileres");
+  const [operation, setOperation] = useState("");
   const [propertyTypeId, setPropertyTypeId] = useState<string>("all");
-  const [location, setLocation] = useState("");
+  const [locationValue, setLocationValue] = useState<string>("all");
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
 
     const params = new URLSearchParams();
-    params.set("tipo", operation);
+
+    if (operation) {
+      params.set("tipo", operation);
+    }
 
     if (propertyTypeId && propertyTypeId !== "all") {
       params.set("typeId", propertyTypeId);
     }
-    if (location) {
-      params.set("loc", location);
+
+    if (locationValue && locationValue !== "all") {
+      const [city] = locationValue.split(",");
+      params.set("loc", city.trim());
     }
 
     router.push(`/propiedades?${params.toString()}`);
@@ -49,26 +58,24 @@ export function SearchBar({ propertyTypes }: HeroSearchCardProps) {
 
   const tabs = [
     { label: "Venta", value: "venta" },
-    { label: "Alquileres", value: "alquileres" },
-    // { label: "Alquiler Temporal", value: "alquiler_temporal" },
-    // { label: "Emprendimientos", value: "emprendimiento" },
+    { label: "Alquiler", value: "alquiler" },
   ];
 
   return (
     <div className="w-full bg-white p-4 rounded-2xl shadow-2xl">
-      {/* 1. Tabs de Texto */}
-      <div className="flex space-x-6 md:space-x-8 border-b border-zinc-200 mb-6">
+      <div className="flex w-full max-w-44 gap-4 border-b border-zinc-200 mb-6">
         {tabs.map((tab) => (
           <button
             key={tab.value}
             onClick={() => setOperation(tab.value)}
-            className={`pb-3 text-base md:text-lg font-medium transition-colors rounded-none
-              ${
-                operation === tab.value
-                  ? "text-black border-b-2 border-black "
-                  : "text-zinc-500 hover:text-black"
-              }
-            `}
+            className={`
+        flex-1 pb-3 text-base md:text-lg font-medium transition-colors text-center relative
+        ${
+          operation === tab.value
+            ? "text-black border-b-2 border-black -mb-px"
+            : "text-zinc-500 hover:text-black"
+        }
+      `}
           >
             {tab.label}
           </button>
@@ -80,28 +87,22 @@ export function SearchBar({ propertyTypes }: HeroSearchCardProps) {
         onSubmit={handleSearch}
         className="flex flex-col gap-4 sm:flex-row md:items-center"
       >
-        {/* 2.1. Select de Tipo de Propiedad (ocupa 2 de 6 columnas) */}
+        {/* 2.1. Select de Tipo de Propiedad */}
         <Select value={propertyTypeId} onValueChange={setPropertyTypeId}>
           <SelectTrigger
             className="relative w-full sm:w-46 md:col-span-1 h-14 text-base text-zinc-700 flex items-center"
-            style={{
-              height: "56px",
-              minHeight: "56px",
-              display: "flex",
-              alignItems: "center",
-            }}
+            style={{ height: "56px", minHeight: "56px" }}
           >
             <SelectValue placeholder="Tipo de Propiedad" />
           </SelectTrigger>
           <SelectContent
             side="bottom"
-            sideOffset={4}
             position="popper"
             align="start"
             className="z-9999"
           >
             <SelectItem value="all">Todos los Tipos</SelectItem>
-            {propertyTypes.map((type) => (
+            {propertyTypes?.map((type) => (
               <SelectItem key={type.id} value={String(type.id)}>
                 {type.name}
               </SelectItem>
@@ -110,15 +111,36 @@ export function SearchBar({ propertyTypes }: HeroSearchCardProps) {
         </Select>
 
         {/* 2.2. Input de Ubicación */}
-        <div className="relative flex-1">
-          <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-zinc-400" />
-          <Input
-            type="text"
-            placeholder="Ingresá una ubicación"
-            className="h-14 pl-12 w-full text-[1.02rem] placeholder:text-[1.02rem] placeholder:text-zinc-500"
-            value={location}
-            onChange={(e) => setLocation(e.target.value)}
-          />
+        <div className="flex-1 relative">
+          <Select value={locationValue} onValueChange={setLocationValue}>
+            <SelectTrigger
+              className="w-full h-14 text-base text-zinc-700 flex items-center gap-2 pl-4"
+              style={{ height: "56px", minHeight: "56px" }}
+            >
+              <div className="flex items-center gap-3 w-full">
+                <MapPin className="h-5 w-5 text-zinc-400 shrink-0" />
+                <SelectValue placeholder="Seleccionar Ubicación" />
+              </div>
+            </SelectTrigger>
+
+            <SelectContent position="popper" className="max-h-[200px] z-9999">
+              <SelectItem value="all">Todas las zonas</SelectItem>
+              {locations?.length > 0 ? (
+                locations.map((loc, index) => (
+                  <SelectItem key={index} value={loc.label}>
+                    <span className="font-medium">{loc.city}</span>
+                    <span className="text-zinc-400 ml-2 text-sm">
+                      {loc.province}
+                    </span>
+                  </SelectItem>
+                ))
+              ) : (
+                <div className="p-2 text-sm text-zinc-500 text-center">
+                  No hay ubicaciones cargadas
+                </div>
+              )}
+            </SelectContent>
+          </Select>
         </div>
 
         {/* 2.3. Botón de Búsqueda */}

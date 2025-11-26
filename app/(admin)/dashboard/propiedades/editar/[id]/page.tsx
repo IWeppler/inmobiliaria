@@ -58,7 +58,7 @@ export default async function EditPropertyPage({
   return (
     <div className="flex-1 space-y-8 max-w-5xl mx-auto p-4">
       <Suspense fallback={<div>Cargando formulario...</div>}>
-        <PropertyForm propertyTypes={propertyTypes} initialData={initialData} />
+        <PropertyForm propertyTypes={propertyTypes} initialData={initialData}  />
       </Suspense>
     </div>
   );

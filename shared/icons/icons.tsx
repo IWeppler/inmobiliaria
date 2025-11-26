@@ -7,7 +7,7 @@ export const VentaIcon = (
     stroke="currentColor"
     aria-hidden="true"
     data-slot="icon"
-    className="w-10 h-10 text-main mb-5"
+    className="w-10 h-10 text-main"
   >
     <path
       strokeLinecap="round"
@@ -26,7 +26,7 @@ export const CompraIcon = (
     stroke="currentColor"
     aria-hidden="true"
     data-slot="icon"
-    className="w-10 h-10 text-main mb-5"
+    className="w-10 h-10 text-main"
   >
     <path
       strokeLinecap="round"
@@ -45,7 +45,7 @@ export const AlquileresIcon = (
     stroke="currentColor"
     aria-hidden="true"
     data-slot="icon"
-    className="w-10 h-10 text-main mb-5"
+    className="w-10 h-10 text-main"
   >
     <path
       strokeLinecap="round"
@@ -62,7 +62,7 @@ export const TasacionesIcon = (
     viewBox="0 0 24 24"
     strokeWidth={1.5}
     stroke="currentColor"
-    className="w-10 h-10 text-main mb-5"
+    className="w-10 h-10 text-main"
   >
     <path
       strokeLinecap="round"

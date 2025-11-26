@@ -1,5 +1,6 @@
 import Image from "next/image";
-import { SearchBar } from "./SearchBar";
+import { SearchBar } from "@/features/public/SearchBar";
+import { getUniqueLocations } from "@/shared/utils/getLocations";
 import { createClientServer } from "@/lib/supabase";
 
 type PropertyType = {
@@ -15,8 +16,10 @@ export async function Hero() {
     .select("id, name")
     .order("name", { ascending: true });
 
+  const locations = await getUniqueLocations();
+
   return (
-    <section className="relative h-[80dvh] md:h-[80dvh] min-h-[400px] w-full mx-auto flex flex-col justify-around md:justify-center items-center">
+    <section className="relative h-[75dvh] md:h-[80dvh] min-h-[480px] w-full mx-auto flex flex-col justify-center items-center">
       {/* Imagen de Fondo */}
       <Image
         src="/bghero3.jpg"
@@ -27,25 +30,28 @@ export async function Hero() {
         className="rounded-4xl"
       />
 
-      {/* Overlay */}
-      <div className="absolute inset-0 bg-linear-to-b from-black/40 via-black/50 to-black/70 rounded-4xl z-10" />
+      {/* Overlay mejorado (más elegante) */}
+      <div className="absolute inset-0 rounded-4xl bg-black/40 md:bg-black/35 backdrop-blur-[1px] z-10" />
 
-      {/* Contenido principal */}
-      <div className="relative z-20 flex flex-col justify-around items-center w-full max-w-5xl h-full px-4 text-center">
-        {/* Títulos */}
-        <div className="flex flex-col items-center">
-          <h1 className="text-6xl font-bold mb-4 text-white drop-shadow-lg">
-            Encontrá tu próximo hogar
-          </h1>
-          <p className="text-xl text-white/90 mb-10 max-w-2xl drop-shadow-md">
-            El portal inmobiliario con la tecnología más rápida para que
-            explores propiedades al instante.
-          </p>
-        </div>
+      {/* Contenido */}
+      <div className="relative z-20 flex flex-col items-center w-full max-w-5xl px-6 text-center">
+        {/* Título */}
+        <h1 className="font-clash text-5xl px-8 md:px-0 md:text-7xl font-semibold mb-4 text-white drop-shadow-xl leading-[1.1]">
+          Encontrá tu próximo hogar
+        </h1>
 
-        {/* SearchBar */}
-        <div className="w-full max-w-3xl px-4 md:px-0">
-          <SearchBar propertyTypes={propertyTypes as PropertyType[]} />
+        {/* Subtítulo */}
+        <p className="text-lg md:text-xl text-white/90 mb-10 max-w-2xl leading-relaxed drop-shadow">
+          El portal inmobiliario con la tecnología más rápida para que explores
+          propiedades al instante.
+        </p>
+
+        {/* SearchBar con fondo más premium */}
+        <div className="w-full max-w-3xl px-4 md:px-0 backdrop-blur-md bg-white/10 rounded-2xl shadow-2xl">
+          <SearchBar
+            locations={locations}
+            propertyTypes={propertyTypes as PropertyType[]}
+          />
         </div>
       </div>
     </section>

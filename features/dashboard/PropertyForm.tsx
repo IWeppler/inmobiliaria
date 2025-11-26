@@ -9,8 +9,9 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { toast } from "sonner";
 import { v4 as uuidv4 } from "uuid";
+import dynamic from "next/dynamic";
 
-// Importaciones de Shadcn (asumidas)
+// Importaciones de Shadcn
 import { Checkbox } from "@/shared/components/ui/checkbox";
 import { Button } from "@/shared/components/ui/button";
 import {
@@ -38,10 +39,23 @@ import {
   CardHeader,
   CardTitle,
 } from "@/shared/components/ui/card";
-import { Loader2, Search, Trash2 } from "lucide-react";
+import { Loader2, Search, Trash2, MapPin } from "lucide-react";
 import Image from "next/image";
 
-// --- Tipos y Schemas ---
+// Importación dinámica del mapa
+const LocationPicker = dynamic(
+  () => import("@/features/dashboard/LocationPicker"),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="h-[400px] w-full bg-zinc-100 animate-pulse rounded-lg flex items-center justify-center text-zinc-400">
+        Cargando Mapa...
+      </div>
+    ),
+  }
+);
+
+// --- Tipos ---
 type PropertyType = {
   id: number;
   name: string;
@@ -52,16 +66,26 @@ type Amenity = {
   name: string;
 };
 
-// El mismo schema de Zod
+// Tipo para el Agente
+type Agent = {
+  id: string;
+  full_name: string | null;
+};
+
+// --- SCHEMA ZOD ACTUALIZADO ---
 export const propertySchema = z.object({
   title: z.string().min(5, { message: "El título es muy corto." }),
   description: z.string().optional(),
-  street_address: z.string().min(5, "La dirección es muy corta."),
+  street_address: z.string().optional(),
   neighborhood: z.string().optional(),
   city: z.string().min(3, "La ciudad es muy corta."),
   province: z.string().min(3, "La provincia es muy corta."),
   latitude: z.coerce.number().nullable(),
   longitude: z.coerce.number().nullable(),
+
+  // CORRECCIÓN 1: Agregamos agent_id al esquema
+  agent_id: z.string().optional().nullable(),
+
   property_type_id: z.coerce
     .number()
     .min(1, { message: "Debes seleccionar un tipo." }),
@@ -99,18 +123,25 @@ type PropertyFormProps = {
 export function PropertyForm({ initialData }: PropertyFormProps) {
   const router = useRouter();
   const supabase = createClientBrowser();
+
   const [propertyTypes, setPropertyTypes] = useState<PropertyType[]>([]);
+  const [agents, setAgents] = useState<Agent[]>([]); // Estado para agentes
   const [files, setFiles] = useState<File[] | null>(null);
   const [geocodingLoading, setGeocodingLoading] = useState(false);
   const [allAmenities, setAllAmenities] = useState<Amenity[]>([]);
+
   const [existingImages, setExistingImages] = useState(
     initialData?.property_images || []
   );
 
-  // Determinamos si estamos en modo "Edición"
+  const [mapCenter, setMapCenter] = useState<[number, number]>(
+    initialData?.latitude && initialData?.longitude
+      ? [initialData.latitude, initialData.longitude]
+      : [-29.2333, -61.7667]
+  );
+
   const isEditMode = !!initialData;
 
-  // --- Formulario Principal ---
   const mainForm = useForm<PropertyForm>({
     resolver: zodResolver(propertySchema) as unknown as Resolver<PropertyForm>,
     defaultValues: initialData
@@ -118,6 +149,9 @@ export function PropertyForm({ initialData }: PropertyFormProps) {
           ...initialData,
           neighborhood: initialData.neighborhood || "",
           description: initialData.description || "",
+          street_address: initialData.street_address || "",
+          // Aseguramos que agent_id venga del initialData
+          agent_id: initialData.agent_id || null,
         }
       : {
           title: "",
@@ -125,9 +159,10 @@ export function PropertyForm({ initialData }: PropertyFormProps) {
           street_address: "",
           neighborhood: "",
           city: "",
-          province: "",
+          province: "Santa Fe",
           latitude: null,
           longitude: null,
+          agent_id: null, // Default null
           property_type_id: 0,
           price: 0,
           total_area: 0,
@@ -140,89 +175,108 @@ export function PropertyForm({ initialData }: PropertyFormProps) {
         },
   });
 
-  // --- Lógica de Carga de Datos ---
-  const fetchPropertyTypes = useCallback(async () => {
-    const { data: types } = await supabase
-      .from("property_types")
-      .select("id, name")
-      .order("name", { ascending: true });
-    if (types) setPropertyTypes(types);
-  }, [supabase]);
+  const handleLocationSelect = useCallback(
+    (lat: number, lng: number) => {
+      mainForm.setValue("latitude", lat);
+      mainForm.setValue("longitude", lng);
+    },
+    [mainForm]
+  );
 
+  // --- Carga de Datos (Tipos y Agentes) ---
   useEffect(() => {
-    // Gatekeeper y carga inicial
-    const checkUserAndLoadData = async () => {
+    const loadData = async () => {
+      // 1. Tipos de Propiedad
+      const { data: types } = await supabase
+        .from("property_types")
+        .select("id, name")
+        .order("name", { ascending: true });
+      if (types) setPropertyTypes(types);
+
+      // 2. Agentes (CORRECCIÓN: Carga real de datos)
+      const { data: agentsData } = await supabase
+        .from("agents")
+        .select("id, full_name")
+        .order("full_name", { ascending: true });
+      if (agentsData) setAgents(agentsData);
+    };
+
+    const checkUserAndLoad = async () => {
       const {
         data: { user },
       } = await supabase.auth.getUser();
       if (!user) router.push("/login");
-      await fetchPropertyTypes();
+      await loadData();
     };
-    checkUserAndLoadData();
-  }, [supabase, router, fetchPropertyTypes]);
 
+    checkUserAndLoad();
+  }, [supabase, router]);
+
+  // Carga de Amenities
   useEffect(() => {
     const fetchAmenities = async () => {
       const { data } = await supabase
         .from("amenities")
         .select("id, name")
         .order("name", { ascending: true });
-      if (data) {
-        setAllAmenities(data);
-      }
+      if (data) setAllAmenities(data);
     };
     fetchAmenities();
   }, [supabase]);
 
-  // --- Lógica de Geocodificación (Idéntica) ---
+  // --- Geocoding ---
   const handleGeocode = async () => {
     setGeocodingLoading(true);
     const { street_address, city, province } = mainForm.getValues();
-    if (!street_address || !city || !province) {
-      toast.error("Por favor, completa dirección, ciudad y provincia.");
+
+    if (!city || !province) {
+      toast.error(
+        "Ingresa al menos Ciudad y Provincia para buscar en el mapa."
+      );
       setGeocodingLoading(false);
       return;
     }
-    const query = encodeURIComponent(`${street_address}, ${city}, ${province}`);
+
+    const addressQuery = street_address ? `${street_address}, ` : "";
+    const query = encodeURIComponent(`${addressQuery}${city}, ${province}`);
     const url = `https://nominatim.openstreetmap.org/search?q=${query}&format=json&limit=1`;
+
     try {
       const response = await fetch(url);
       const data = await response.json();
+
       if (data && data.length > 0) {
-        const { lat, lon } = data[0];
-        mainForm.setValue("latitude", parseFloat(lat));
-        mainForm.setValue("longitude", parseFloat(lon));
-        toast.success("¡Coordenadas encontradas!");
+        const lat = parseFloat(data[0].lat);
+        const lon = parseFloat(data[0].lon);
+        setMapCenter([lat, lon]);
+
+        if (street_address) {
+          mainForm.setValue("latitude", lat);
+          mainForm.setValue("longitude", lon);
+          toast.success("Mapa centrado y ubicación marcada.");
+        } else {
+          toast.info("Mapa centrado en la ciudad. Haz click para marcar.");
+        }
       } else {
-        toast.error("No se encontraron coordenadas para esa dirección.");
-        mainForm.setValue("latitude", null);
-        mainForm.setValue("longitude", null);
+        toast.error("No se encontró la zona.");
       }
     } catch (error) {
       console.log(error);
-      toast.error("Error al buscar coordenadas.");
+      toast.error("Error de conexión con el servicio de mapas.");
     }
     setGeocodingLoading(false);
   };
 
   const handleDeleteImage = async (image: ExistingImage) => {
     const toastId = toast.loading("Eliminando imagen...");
-
-    // 1. Borrar del Storage
     const path = image.image_url.split("/properties/").pop();
-    if (path) {
-      await supabase.storage.from("properties").remove([path]);
-    }
-
-    // 2. Borrar de la tabla 'property_images'
+    if (path) await supabase.storage.from("properties").remove([path]);
     await supabase.from("property_images").delete().eq("id", image.id);
-
-    // 3. Actualizar el estado local
     setExistingImages((prev) => prev.filter((img) => img.id !== image.id));
     toast.success("Imagen eliminada.", { id: toastId });
   };
 
-  // --- Lógica de Submit Principal  ---
+  // --- Submit ---
   const onSubmitProperty = async (data: PropertyForm) => {
     const {
       data: { user },
@@ -232,16 +286,19 @@ export function PropertyForm({ initialData }: PropertyFormProps) {
       return;
     }
 
-    // ID para los toasts
+    if (!data.latitude || !data.longitude) {
+      toast.error("Por favor, marca la ubicación en el mapa.");
+      return;
+    }
+
     const toastId = isEditMode ? "update" : "create";
-    toast.loading(
-      isEditMode ? "Actualizando propiedad..." : "Creando propiedad...",
-      { id: toastId }
-    );
+    toast.loading(isEditMode ? "Actualizando..." : "Creando...", {
+      id: toastId,
+    });
 
     const { amenities, ...propertyData } = data;
 
-    // --- 1. Subir NUEVAS Imágenes ---
+    // Subida de Imágenes
     const newImagePaths: { path: string; publicUrl: string }[] = [];
     if (files && files.length > 0) {
       for (const file of files) {
@@ -251,16 +308,12 @@ export function PropertyForm({ initialData }: PropertyFormProps) {
           .upload(filePath, file);
 
         if (uploadError) {
-          toast.error(`Error subiendo imagen: ${uploadError.message}`, {
-            id: toastId,
-          });
+          toast.error(`Error imagen: ${uploadError.message}`, { id: toastId });
           continue;
         }
-
         const { data: publicUrlData } = supabase.storage
           .from("properties")
           .getPublicUrl(uploadData.path);
-
         newImagePaths.push({
           path: uploadData.path,
           publicUrl: publicUrlData.publicUrl,
@@ -268,114 +321,88 @@ export function PropertyForm({ initialData }: PropertyFormProps) {
       }
     }
 
-    // --- 2. Insertar o Actualizar la Propiedad ---
+    // Insert / Update Propiedad
     let propertyId = initialData?.id;
 
     if (isEditMode && initialData) {
-      // --- MODO UPDATE ---
-      const { error: updateError } = await supabase
+      // UPDATE
+      const { error } = await supabase
         .from("properties")
-        // 👇 CAMBIO 2: Usar 'propertyData' en lugar de 'data'
-        .update(propertyData)
+        .update(propertyData) // Aquí ya viaja el agent_id seleccionado
         .eq("id", initialData.id);
 
-      if (updateError) {
-        toast.error(
-          `Error al actualizar la propiedad: ${updateError.message}`,
-          { id: toastId }
-        );
+      if (error) {
+        toast.error(error.message, { id: toastId });
         return;
       }
     } else {
-      // --- MODO INSERT (Crear) ---
-      const { data: newProperty, error: insertError } = await supabase
+      // INSERT
+      // CORRECCIÓN LÓGICA:
+      // Si el usuario seleccionó un agente en el form (propertyData.agent_id), usamos ese.
+      // Si NO seleccionó nada (es null), usamos el ID del usuario logueado como fallback (user.id).
+      const finalAgentId = propertyData.agent_id
+        ? propertyData.agent_id
+        : user.id;
+
+      const { data: newProperty, error } = await supabase
         .from("properties")
-        // 👇 CAMBIO 2: Usar 'propertyData' en lugar de 'data'
-        .insert({ ...propertyData, agent_id: user.id })
+        .insert({
+          ...propertyData,
+          agent_id: finalAgentId,
+        })
         .select()
         .single();
 
-      if (insertError) {
-        toast.error(`Error al crear la propiedad: ${insertError.message}`, {
-          id: toastId,
-        });
+      if (error) {
+        toast.error(error.message, { id: toastId });
         return;
       }
       propertyId = newProperty.id;
     }
 
-    // --- 👇 CAMBIO 3: Sincronizar Amenities ---
-    // Esta lógica va DESPUÉS de guardar la propiedad y ANTES del éxito
+    // Amenities
     if (propertyId) {
-      // 3.1. Borrar todos los amenities ANTIGUOS de esta propiedad
-      const { error: deleteError } = await supabase
+      await supabase
         .from("property_amenities")
         .delete()
         .eq("property_id", propertyId);
-
-      if (deleteError) {
-        toast.error(`Error al actualizar amenities: ${deleteError.message}`, {
-          id: toastId,
-        });
-        return; // Detener si no podemos borrar los antiguos
-      }
-
-      // 3.2. Insertar los amenities NUEVOS (si hay alguno seleccionado)
       if (amenities && amenities.length > 0) {
-        const newAmenityLinks = amenities.map((amenityId) => ({
+        const newLinks = amenities.map((id) => ({
           property_id: propertyId,
-          amenity_id: amenityId,
+          amenity_id: id,
         }));
-
-        const { error: insertError } = await supabase
-          .from("property_amenities")
-          .insert(newAmenityLinks);
-
-        if (insertError) {
-          toast.error(`Error al guardar amenities: ${insertError.message}`, {
-            id: toastId,
-          });
-          return;
-        }
+        await supabase.from("property_amenities").insert(newLinks);
       }
     }
-    // --- Fin Cambio 3 ---
 
-    // --- 4. Insertar Imágenes en la tabla (Tu lógica original - Sin cambios) ---
+    // Imágenes
     if (propertyId && newImagePaths.length > 0) {
       const imagesToInsert = newImagePaths.map((img, index) => ({
         property_id: propertyId!,
         image_url: img.publicUrl,
         order: existingImages.length + index,
       }));
-
       await supabase.from("property_images").insert(imagesToInsert);
     }
 
-    // --- 5. Éxito (Tu lógica original - Sin cambios) ---
-    toast.success(
-      isEditMode ? "¡Propiedad actualizada!" : "¡Propiedad creada!",
-      { id: toastId }
-    );
+    toast.success("¡Listo!", { id: toastId });
     if (!isEditMode) {
       mainForm.reset();
       setFiles(null);
+      setMapCenter([-29.2333, -61.7667]);
     }
     router.push("/dashboard");
     router.refresh();
   };
 
-  // --- Renderizado (JSX con Shadcn) ---
   return (
     <Card>
       <CardHeader>
-        <CardTitle>
+        <CardTitle className="font-clash font-semibold text-xl">
           {isEditMode ? "Editar Propiedad" : "Cargar Nueva Propiedad"}
         </CardTitle>
         <CardDescription>
-          {isEditMode
-            ? "Modifica los campos de la propiedad."
-            : "Completa todos los campos para añadir una nueva propiedad."}
+          Completa los datos. Usa el mapa para ubicar campos o lotes.
         </CardDescription>
       </CardHeader>
 
@@ -385,19 +412,16 @@ export function PropertyForm({ initialData }: PropertyFormProps) {
             onSubmit={mainForm.handleSubmit(onSubmitProperty)}
             className="space-y-8"
           >
-            {/* Titulo y descripcion del inmueble */}
+            {/* 1. Datos Básicos */}
             <div className="space-y-4">
               <FormField
                 control={mainForm.control}
                 name="title"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Título</FormLabel>
+                    <FormLabel>Título Publicación</FormLabel>
                     <FormControl>
-                      <Input
-                        placeholder="Ej: Espectacular 3 ambientes..."
-                        {...field}
-                      />
+                      <Input placeholder="Ej: Campo 500 Has..." {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -408,12 +432,9 @@ export function PropertyForm({ initialData }: PropertyFormProps) {
                 name="description"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Descripción</FormLabel>
+                    <FormLabel>Descripción Completa</FormLabel>
                     <FormControl>
-                      <Textarea
-                        placeholder="Detalles de la propiedad..."
-                        {...field}
-                      />
+                      <Textarea placeholder="Detalles..." {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -421,35 +442,26 @@ export function PropertyForm({ initialData }: PropertyFormProps) {
               />
             </div>
 
-            {/* --- Sección Dirección y Geocodificación --- */}
-            <div className="space-y-4 p-4 border rounded-md">
-              <h3 className="text-lg font-medium">Ubicación</h3>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* 2. UBICACIÓN Y MAPA */}
+            <div className="space-y-4 p-4 border rounded-md bg-zinc-50/50">
+              <div className="flex items-center gap-2 mb-2">
+                <MapPin className="h-5 w-5 text-primary" />
+                <h3 className="font-clash font-semibold text-xl">
+                  Ubicación & Mapa
+                </h3>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <FormField
                   control={mainForm.control}
-                  name="street_address"
-                  render={({ field }) => (
-                    <FormItem className="md:col-span-3">
-                      <FormLabel>Dirección (Calle y Nro)</FormLabel>
-                      <FormControl>
-                        <Input
-                          placeholder="Ej: Av. Corrientes 1234"
-                          {...field}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={mainForm.control}
-                  name="neighborhood"
+                  name="province"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Barrio (Opcional)</FormLabel>
+                      <FormLabel>Provincia</FormLabel>
                       <FormControl>
-                        <Input placeholder="Centro" {...field} />
+                        <Input placeholder="Santa Fe" {...field} />
                       </FormControl>
+                      <FormMessage />
                     </FormItem>
                   )}
                 />
@@ -458,7 +470,7 @@ export function PropertyForm({ initialData }: PropertyFormProps) {
                   name="city"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Ciudad</FormLabel>
+                      <FormLabel>Ciudad / Localidad</FormLabel>
                       <FormControl>
                         <Input placeholder="Tostado" {...field} />
                       </FormControl>
@@ -466,23 +478,38 @@ export function PropertyForm({ initialData }: PropertyFormProps) {
                     </FormItem>
                   )}
                 />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <FormField
                   control={mainForm.control}
-                  name="province"
+                  name="street_address"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Provincia</FormLabel>
+                      <FormLabel>Dirección / Referencia</FormLabel>
                       <FormControl>
-                        <Input placeholder="Santa Fé" {...field} />
+                        <Input placeholder="Ej: Ruta 95 Km 10" {...field} />
                       </FormControl>
-                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={mainForm.control}
+                  name="neighborhood"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Barrio / Paraje</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Ej: Paraje El Tigre" {...field} />
+                      </FormControl>
                     </FormItem>
                   )}
                 />
               </div>
+
               <Button
                 type="button"
-                variant="outline"
+                variant="default"
                 onClick={handleGeocode}
                 disabled={geocodingLoading}
               >
@@ -491,52 +518,29 @@ export function PropertyForm({ initialData }: PropertyFormProps) {
                 ) : (
                   <Search className="mr-2 h-4 w-4" />
                 )}
-                Buscar Coordenadas
+                Buscar Zona en Mapa
               </Button>
-              <div className="grid grid-cols-2 gap-4">
-                <FormField
-                  control={mainForm.control}
-                  name="latitude"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Latitud</FormLabel>
-                      <FormControl>
-                        <Input
-                          readOnly
-                          placeholder="(auto)"
-                          {...field}
-                          value={String(field.value ?? "")}
-                        />
-                      </FormControl>
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={mainForm.control}
-                  name="longitude"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Longitud</FormLabel>
-                      <FormControl>
-                        <Input
-                          type="number"
-                          {...field}
-                          value={Number(field.value ?? 0)}
-                          onChange={(e) =>
-                            field.onChange(Number(e.target.value))
-                          }
-                        />
-                      </FormControl>
-                    </FormItem>
-                  )}
-                />
+
+              <div className="space-y-2 pt-2">
+                <FormLabel className="text-base font-medium text-black">
+                  Marca el punto exacto en el mapa:
+                </FormLabel>
+                <div className="border-2 border-zinc-200 rounded-lg overflow-hidden shadow-sm">
+                  <LocationPicker
+                    initialLat={initialData?.latitude || undefined}
+                    initialLng={initialData?.longitude || undefined}
+                    cityCoordinates={mapCenter}
+                    onLocationSelect={handleLocationSelect}
+                  />
+                </div>
               </div>
             </div>
 
-            {/* --- Sección Tipo, Operación y Estado --- */}
-            <div className="space-y-4 p-4 border rounded-md">
-              <h3 className="text-lg font-medium">Detalles</h3>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* 3. Detalles y Operación */}
+            <div className="space-y-4 p-4 border rounded-md bg-zinc-50/50">
+              <h3 className="font-clash font-semibold text-xl">Detalles</h3>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 <FormField
                   control={mainForm.control}
                   name="property_type_id"
@@ -549,7 +553,7 @@ export function PropertyForm({ initialData }: PropertyFormProps) {
                       >
                         <FormControl>
                           <SelectTrigger>
-                            <SelectValue placeholder="Seleccionar tipo..." />
+                            <SelectValue placeholder="Tipo..." />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
@@ -564,6 +568,38 @@ export function PropertyForm({ initialData }: PropertyFormProps) {
                     </FormItem>
                   )}
                 />
+
+                {/* SELECT DE AGENTE RESPONSABLE */}
+                <FormField
+                  control={mainForm.control}
+                  name="agent_id"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Agente Responsable</FormLabel>
+                      <Select
+                        onValueChange={field.onChange}
+                        defaultValue={field.value || undefined}
+                        value={field.value || undefined}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Seleccionar agente" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {agents.map((agent) => (
+                            <SelectItem key={agent.id} value={agent.id}>
+                              {agent.full_name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+              {/* Operación y Estado */}
                 <FormField
                   control={mainForm.control}
                   name="operation_type"
@@ -617,36 +653,17 @@ export function PropertyForm({ initialData }: PropertyFormProps) {
                 />
               </div>
 
-              {/* --- Sección Precio y Moneda --- */}
+              {/* Precios y Medidas */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <FormField
                   control={mainForm.control}
                   name="price"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Precio $</FormLabel>
+                      <FormLabel>Precio</FormLabel>
                       <FormControl>
                         <Input type="number" {...field} />
                       </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={mainForm.control}
-                  name="expensas"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Expensas (Opcional)</FormLabel>
-                      <FormControl>
-                        <Input
-                          type="number"
-                          placeholder="Ej: 50000"
-                          {...field}
-                          value={field.value ?? ""}
-                        />
-                      </FormControl>
-                      <FormMessage />
                     </FormItem>
                   )}
                 />
@@ -675,14 +692,13 @@ export function PropertyForm({ initialData }: PropertyFormProps) {
                 />
               </div>
 
-              {/* --- Sección Detalles (Habitaciones, M2) --- */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <FormField
                   control={mainForm.control}
                   name="bedrooms"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Dormitorios</FormLabel>
+                      <FormLabel>Dorm.</FormLabel>
                       <FormControl>
                         <Input type="number" {...field} />
                       </FormControl>
@@ -703,42 +719,10 @@ export function PropertyForm({ initialData }: PropertyFormProps) {
                 />
                 <FormField
                   control={mainForm.control}
-                  name="rooms"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Ambientes</FormLabel>
-                      <Select
-                        onValueChange={field.onChange}
-                        defaultValue={
-                          field.value ? String(field.value) : undefined
-                        }
-                      >
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Selecciona la cantidad de ambientes" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="0">N/A</SelectItem>
-                          <SelectItem value="1">Monoambiente</SelectItem>
-                          <SelectItem value="2">2 ambientes</SelectItem>
-                          <SelectItem value="3">3 ambientes</SelectItem>
-                          <SelectItem value="4">4 ambientes</SelectItem>
-                          <SelectItem value="5">5 o más ambientes</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <FormField
-                  control={mainForm.control}
                   name="total_area"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Área Total (m²)</FormLabel>
+                      <FormLabel>Total (m²)</FormLabel>
                       <FormControl>
                         <Input type="number" {...field} />
                       </FormControl>
@@ -750,7 +734,7 @@ export function PropertyForm({ initialData }: PropertyFormProps) {
                   name="covered_area"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Área Cubierta (m²)</FormLabel>
+                      <FormLabel>Cub. (m²)</FormLabel>
                       <FormControl>
                         <Input type="number" {...field} />
                       </FormControl>
@@ -760,24 +744,16 @@ export function PropertyForm({ initialData }: PropertyFormProps) {
               </div>
             </div>
 
-            {/* Sección Amenities */}
-            <div className="space-y-4 p-4 border rounded-md">
+            {/* Amenities */}
+            <div className="space-y-4 p-4 border rounded-md bg-zinc-50/50">
+              <FormLabel className="font-clash font-semibold text-xl">
+                Amenities
+              </FormLabel>
               <FormField
                 control={mainForm.control}
                 name="amenities"
                 render={({ field }) => (
                   <FormItem>
-                    <div className="mb-4">
-                      <FormLabel className="text-lg font-medium">
-                        Amenities
-                      </FormLabel>
-                      <FormDescription>
-                        Selecciona todos los amenities que apliquen.
-                      </FormDescription>
-                    </div>
-                    {/* Renderizamos una grilla de checkboxes.
-                  'field.value' es el array de IDs seleccionados (ej: [1, 5, 10])
-                */}
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                       {allAmenities.map((amenity) => (
                         <FormItem
@@ -786,10 +762,8 @@ export function PropertyForm({ initialData }: PropertyFormProps) {
                         >
                           <FormControl>
                             <Checkbox
-                              // Comprueba si el ID de este amenity está en el array del formulario
                               checked={field.value?.includes(amenity.id)}
                               onCheckedChange={(checked) => {
-                                // Lógica para añadir/quitar el ID del array
                                 return checked
                                   ? field.onChange([
                                       ...(field.value || []),
@@ -803,58 +777,47 @@ export function PropertyForm({ initialData }: PropertyFormProps) {
                               }}
                             />
                           </FormControl>
-                          <FormLabel className="font-normal">
+                          <FormLabel className="font-normal cursor-pointer">
                             {amenity.name}
                           </FormLabel>
                         </FormItem>
                       ))}
                     </div>
-                    <FormMessage />
                   </FormItem>
                 )}
               />
             </div>
 
-            {/* --- Sección Carga de Imágenes --- */}
-            <div className="space-y-4 p-4 border rounded-md">
-              <h3 className="text-lg font-medium">Imágenes</h3>
-
-              {/* 1. Galería de Imágenes Existentes (Solo en modo Editar) */}
+            {/* Imágenes */}
+            <div className="space-y-4 p-4 border rounded-md bg-zinc-50/50">
+              <h3 className="font-clash font-semibold text-xl">Imágenes</h3>
+              {/* Galería Existente */}
               {isEditMode && existingImages.length > 0 && (
-                <div className="mb-4">
-                  <FormLabel>Imágenes Actuales</FormLabel>
-                  <div className="flex flex-wrap gap-2 mt-2">
-                    {existingImages.map((image) => (
-                      <div key={image.id} className="relative w-24 h-24">
-                        <Image
-                          src={image.image_url}
-                          alt="Imagen existente"
-                          fill
-                          style={{ objectFit: "cover" }}
-                          className="rounded-md"
-                        />
-                        <Button
-                          type="button"
-                          variant="destructive"
-                          size="icon"
-                          className="absolute -top-2 -right-2 h-6 w-6 rounded-full z-10"
-                          onClick={() => handleDeleteImage(image)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
+                <div className="flex flex-wrap gap-2 mb-4">
+                  {existingImages.map((image) => (
+                    <div key={image.id} className="relative w-24 h-24 group">
+                      <Image
+                        src={image.image_url}
+                        alt="propiedad"
+                        fill
+                        className="rounded-md object-cover"
+                      />
+                      <Button
+                        type="button"
+                        variant="destructive"
+                        size="icon"
+                        className="absolute top-1 right-1 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                        onClick={() => handleDeleteImage(image)}
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  ))}
                 </div>
               )}
-
-              {/* 2. Input para Nuevas Imágenes */}
+              {/* Input Nueva Imagen */}
               <FormItem>
-                <FormLabel>
-                  {isEditMode
-                    ? "Añadir más imágenes"
-                    : "Imágenes de la Propiedad"}
-                </FormLabel>
+                <FormLabel>Subir Nuevas</FormLabel>
                 <FormControl>
                   <Input
                     type="file"
@@ -867,22 +830,17 @@ export function PropertyForm({ initialData }: PropertyFormProps) {
                     }
                   />
                 </FormControl>
-                <FormDescription>
-                  Puedes seleccionar múltiples imágenes.
-                </FormDescription>
               </FormItem>
-
-              {/* 3. Vista previa de imágenes NUEVAS */}
+              {/* Preview */}
               {files && files.length > 0 && (
                 <div className="flex flex-wrap gap-2 mt-2">
                   {files.map((file, i) => (
-                    <div key={i} className="relative w-24 h-24">
+                    <div key={i} className="relative w-20 h-20">
                       <Image
                         src={URL.createObjectURL(file)}
-                        alt="Vista previa"
+                        alt="preview"
                         fill
-                        style={{ objectFit: "cover" }}
-                        className="rounded-md"
+                        className="rounded-md object-cover"
                       />
                     </div>
                   ))}
@@ -890,18 +848,13 @@ export function PropertyForm({ initialData }: PropertyFormProps) {
               )}
             </div>
 
-            {/* --- Botón de Submit --- */}
             <Button
               type="submit"
               disabled={mainForm.formState.isSubmitting}
-              className="w-full text-lg py-6"
+              className="w-full text-lg py-6 bg-foreground hover:bg-foreground/90"
             >
               {mainForm.formState.isSubmitting ? (
-                isEditMode ? (
-                  <Loader2 className="mr-2 h-6 w-6 animate-spin" />
-                ) : (
-                  "Actualizando..."
-                )
+                <Loader2 className="mr-2 h-6 w-6 animate-spin" />
               ) : isEditMode ? (
                 "Guardar Cambios"
               ) : (

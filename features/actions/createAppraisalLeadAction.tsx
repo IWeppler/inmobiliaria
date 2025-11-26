@@ -3,7 +3,6 @@
 import { createClientServer } from "@/lib/supabase"; 
 import { z } from "zod";
 
-// Schema de validación (debe coincidir con el del cliente)
 const appraisalSchema = z.object({
   name: z.string().min(3),
   phone: z.string().min(8),
@@ -52,7 +51,7 @@ export async function createAppraisalLeadAction(
 
   // 3. Buscar el agente (user_id)
   const { data: agent, error: agentError } = await supabase
-    .from("agents") // O 'profiles'
+    .from("agents") 
     .select("user_id")
     .limit(1)
     .single();
@@ -64,12 +63,10 @@ export async function createAppraisalLeadAction(
     };
   }
 
-  // 4. Insertar el nuevo Lead de Tasación
   const { error: insertError } = await supabase.from("leads").insert({
     name: name,
     phone: phone,
     email: email || null,
-    // 👇 Construimos una nota más completa
     notes: `SOLICITUD DE TASACIÓN\n
     - Dirección: ${address}
     - Tipo: ${propertyType}
@@ -89,7 +86,6 @@ export async function createAppraisalLeadAction(
     };
   }
 
-  // 5. Éxito
   return {
     success: true,
     message: "¡Solicitud enviada! Te contactaremos a la brevedad.",

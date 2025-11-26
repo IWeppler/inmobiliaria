@@ -12,14 +12,14 @@ export function ServiceStepItem({
 }) {
   return (
     <div className="flex items-start gap-4">
-      <div className="shrink-0 p-2 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-        <Icon className="w-6 h-6 text-blue-600 dark:text-blue-400" />
+      <div className="shrink-0 p-2 bg-blue-50 rounded-lg">
+        <Icon className="w-6 h-6 text-main" />
       </div>
       <div>
-        <h3 className="text-lg font-semibold text-zinc-900 dark:text-white mb-1">
+        <h3 className="text-lg font-semibold text-foreground mb-1">
           {title}
         </h3>
-        <p className="text-zinc-600 dark:text-zinc-300 leading-relaxed">
+        <p className="text-muted-foreground leading-relaxed">
           {description}
         </p>
       </div>

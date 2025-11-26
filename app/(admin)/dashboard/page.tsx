@@ -4,77 +4,96 @@ import { PlusCircle } from "lucide-react";
 import Link from "next/link";
 import { PropertyTable } from "@/features/dashboard/PropertyTable";
 import type { PropertyWithDetails } from "@/app/types/entities";
+import { redirect } from "next/navigation";
 
-// Esta función busca los datos del agente y las propiedades
 async function getDashboardData() {
   const supabase = await createClientServer();
 
-  // 1. Obtener el usuario/agente
   const {
     data: { user },
   } = await supabase.auth.getUser();
+
+  if (!user) return null; 
+
   const { data: agent } = await supabase
     .from("agents")
     .select("*")
-    .eq("id", user?.id || "")
+    .eq("id", user.id)
     .single();
 
-  // 2. Obtener las propiedades
   const { data: properties, error } = await supabase
     .from("properties")
     .select(
       `
       *,
       property_types ( name ),
-      property_images ( image_url )
+      property_images ( image_url ),
+      agents ( full_name ) 
     `
     )
     .order("created_at", { ascending: false });
 
   if (error) {
     console.error("Error fetching properties:", error);
-    // Manejar el error elegantemente
   }
 
-  // Tipamos los datos para pasarlos
-  const typedProperties: PropertyWithDetails[] = properties || [];
+  const typedProperties: PropertyWithDetails[] = (properties as any) || [];
 
   return {
-    agentName: agent?.full_name,
+    currentUserId: user.id,
+    currentUserRole: agent?.role || "agente",
+    agentName: agent?.full_name || agent?.email,
     properties: typedProperties,
   };
 }
 
-// --- La Página ---
 export default async function DashboardPage() {
-  // 1. Cargamos los datos en el servidor
-  const { agentName, properties } = await getDashboardData();
+  const data = await getDashboardData();
+
+  if (!data) {
+    redirect("/login");
+  }
+
+  const { agentName, properties, currentUserId, currentUserRole } = data;
 
   return (
     <div className="flex min-h-screen items-start justify-center">
       <main className="w-full p-4 md:p-8">
-      {/* Encabezado y Saludo */}
-      <div className="flex items-center justify-between space-y-8">
-        <div>
-          <h1 className="text-3xl mb-1 font-bold tracking-tight">
-            ¡Bienvenido, {agentName}!
-          </h1>
-          <p className="text-muted-foreground">
-            Aquí está un resumen de tus propiedades.
-          </p>
+        {/* Encabezado  */}
+        <div className="flex items-center justify-between space-y-8 mb-6">
+          <div>
+            <h1 className="text-3xl mb-1 font-clash font-semibold tracking-tight">
+              Hola, {agentName}!
+            </h1>
+            <p className="text-muted-foreground">
+              Aquí está un resumen de las propiedades.
+              {currentUserRole === "admin" && (
+                <span className="ml-2 text-xs bg-foreground text-background px-2 py-1 rounded-full">
+                  Modo Admin
+                </span>
+              )}
+            </p>
+          </div>
+          <div className="flex items-center space-x-2">
+            <Button
+              asChild
+              className="bg-foreground hover:bg-foreground/90 cursor-pointer"
+            >
+              <Link href="/dashboard/propiedades/nueva">
+                <PlusCircle className="mr-2 h-4 w-4" />
+                Agregar Propiedad
+              </Link>
+            </Button>
+          </div>
         </div>
-        <div className="flex items-center space-x-2">
-          <Button asChild>
-            <Link href="/dashboard/propiedades/nueva">
-              <PlusCircle className="mr-2 h-4 w-4" />
-              Agregar Propiedad
-            </Link>
-          </Button>
-        </div>
-      </div>
 
-      <PropertyTable initialProperties={properties} />
-    </main>
+        {/* Pasamos los datos de permisos a la tabla */}
+        <PropertyTable
+          initialProperties={properties}
+          currentUserId={currentUserId}
+          currentUserRole={currentUserRole}
+        />
+      </main>
     </div>
   );
 }

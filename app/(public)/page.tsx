@@ -39,21 +39,21 @@ export default async function Home() {
       <Hero />
       <main className="flex min-h-screen w-full flex-col items-center justify-start py-16">
         <section className="w-full pb-16">
-          <h2 className="text-3xl font-bold mb-8">Propiedades Destacadas</h2>
+  <h2 className="text-[2.75rem] leading-tight font-clash font-semibold mb-4">
+    Nuevas Propiedades
+  </h2>
 
-          {safeProperties.length > 0 ? (
-            <div className="grid grid-cols-1 gap-2 md:grid-cols-2 lg:gap-6 lg:grid-cols-4  w-full">
-              {safeProperties.map((property) => (
-                <PropertyCard
-                  key={property.id}
-                  property={property as PropertyCardData}
-                />
-              ))}
-            </div>
-          ) : (
-            <p>No hay propiedades disponibles en este momento.</p>
-          )}
-        </section>
+  {safeProperties.length > 0 ? (
+    <div className="grid grid-cols-1 gap-2 md:grid-cols-2 lg:gap-6 lg:grid-cols-4 w-full">
+      {safeProperties.map((property) => (
+        <PropertyCard key={property.id} property={property as PropertyCardData} />
+      ))}
+    </div>
+  ) : (
+    <p>No hay propiedades disponibles en este momento.</p>
+  )}
+</section>
+
         <Solutions />
       </main>
     </div>

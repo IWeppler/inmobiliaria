@@ -113,7 +113,7 @@ export function ContactForm() {
                 <Textarea
                   placeholder="Escribí tu consulta..."
                   {...field}
-                  className="min-h-[150px] resize-none"
+                  className="min-h-[150px] resize-none bg-white"
                 />
               </FormControl>
               <FormMessage />
@@ -122,7 +122,7 @@ export function ContactForm() {
         />
         <Button
           type="submit"
-          className="w-full md:w-auto h-12 text-base px-8 bg-foreground hover:bg-foreground/90 transition-colors duration-500 cursor-pointer"
+          className="w-full md:w-auto h-12 text-base px-8 font-clash bg-foreground hover:bg-foreground/90 transition-colors duration-500 cursor-pointer"
         >
           Enviar Mensaje
         </Button>

@@ -13,8 +13,8 @@ import {
 // Componentes Cliente que crearemos
 import { ClientPropertyMap } from "@/features/properties/ClientPropertyMap";
 import { ImageGallery } from "@/features/properties/ImageGallery";
-import { ContactAside } from "@/features/properties/ContactAside";
 import { DescriptionWithReadMore } from "@/features/properties/DescriptionReadMore";
+import { AgentCard } from "@/features/public/AgentCard";
 
 // --- Tipos ---
 type Amenity = { amenities: { name: string } | null };
@@ -48,6 +48,7 @@ type PropertyFullDetails = {
     full_name: string | null;
     avatar_url: string | null;
     phone: string | null;
+    email: string | null;
   } | null;
 };
 // ---
@@ -67,7 +68,7 @@ async function getPropertyDetails(
       property_types ( name ),
       property_images ( image_url ),
       property_amenities ( amenities ( name ) ),
-      agents ( full_name, avatar_url, phone )
+      agents ( full_name, avatar_url, phone, email )
     `
     )
     .eq("id", slug)
@@ -81,7 +82,6 @@ async function getPropertyDetails(
 }
 
 // --- Componentes de UI Helpers ---
-// Un helper para mostrar los "Aspectos Básicos"
 function AspectItem({
   icon: Icon,
   label,
@@ -188,30 +188,38 @@ export default async function PropertyPage({
         {/* --- 1. Header (Título, Precio, Ubicación) --- */}
         <header className="mb-6 md:mb-10">
           <div className="flex flex-col md:flex-row justify-between md:items-end mb-2">
-            <h1 className="text-xl md:text-2xl font-bold max-w-3xl">{title}</h1>
+            <h1 className="font-clash text-2xl md:text-4xl font-semibold leading-tight max-w-5xl">
+              {title}
+            </h1>
+
             <div className="mt-2 md:mt-0 text-left md:text-right shrink-0">
-              <span className="text-sm font-medium text-main">
+              <span className="text-xs md:text-sm font-semibold text-main">
                 {statusDisplay}
               </span>
-              <p className="text-lg font-semibold text-black">{priceDisplay}</p>
+
+              <p className="font-clash text-xl md:text-2xl font-semibold text-black">
+                {priceDisplay}
+              </p>
             </div>
           </div>
-          <div className="flex items-center text-zinc-600">
+
+          <div className="flex items-center text-zinc-600 mt-1">
             <MapPin size={16} className="mr-2 shrink-0" />
-            <span className="text-base">{locationString}</span>
+            <span className="text-sm md:text-base">{locationString}</span>
           </div>
         </header>
 
-        {/* --- 2. Galería de Imágenes (Componente Cliente) --- */}
         <ImageGallery images={images as string[]} />
 
-        {/* --- 3. Layout Principal (Contenido + Aside) --- */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 md:gap-12 mt-12">
           {/* Columna Principal de Contenido */}
           <div className="lg:col-span-2 space-y-12">
             {/* 3.1. Aspectos Básicos */}
             <section>
-              <h2 className="text-2xl font-semibold mb-6">Aspectos Básicos</h2>
+              <h2 className="font-clash text-xl md:text-2xl font-semibold mb-6">
+                Aspectos Básicos
+              </h2>
+
               <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                 <AspectItem
                   icon={BedDouble}
@@ -252,9 +260,10 @@ export default async function PropertyPage({
 
             {/* 3.2. Descripción */}
             <section>
-              <h2 className="text-2xl font-semibold mb-4">
+              <h2 className="font-clash text-xl md:text-2xl font-semibold mb-4">
                 Lo que tenés que saber de esta propiedad
               </h2>
+
               <DescriptionWithReadMore
                 text={property.description || "No hay descripción disponible."}
               />
@@ -263,14 +272,18 @@ export default async function PropertyPage({
             {/* 3.3. Amenities */}
             {amenities.length > 0 && (
               <section>
-                <h2 className="text-2xl font-semibold mb-6">
+                <h2 className="font-clash text-xl md:text-2xl font-semibold mb-6">
                   Amenities y Características
                 </h2>
+
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                   {amenities.map((name) => (
-                    <div key={name} className="flex items-center gap-3">
-                      <CheckCircle size={18} className="text-main" />
-                      <span className="text-base">{name}</span>
+                    <div
+                      key={name}
+                      className="flex items-center gap-3 text-sm md:text-base text-zinc-700"
+                    >
+                      <CheckCircle size={18} className="text-main shrink-0" />
+                      <span>{name}</span>
                     </div>
                   ))}
                 </div>
@@ -279,10 +292,11 @@ export default async function PropertyPage({
 
             {/* 3.4. Aspectos Técnicos */}
             <section>
-              <h2 className="text-2xl font-semibold mb-6">
+              <h2 className="font-clash text-xl md:text-2xl font-semibold mb-6">
                 Aspectos Técnicos de la propiedad
               </h2>
-              <div className="max-w-md">
+
+              <div className="max-w-md space-y-2">
                 <TechSpecItem label="Precio" value={priceDisplay} />
                 <TechSpecItem
                   label="Expensas"
@@ -310,9 +324,12 @@ export default async function PropertyPage({
               </div>
             </section>
 
-            {/* 3.5. Ubicación (Mapa) */}
+            {/* 3.5. Ubicación */}
             <section>
-              <h2 className="text-2xl font-semibold mb-6">Ubicación</h2>
+              <h2 className="font-clash text-xl md:text-2xl font-semibold mb-6">
+                Ubicación
+              </h2>
+
               <div className="h-[400px] w-full rounded-lg overflow-hidden border">
                 <ClientPropertyMap
                   lat={property.latitude}
@@ -323,10 +340,13 @@ export default async function PropertyPage({
             </section>
           </div>
 
-          {/* Columna Lateral (Aside) */}
+          {/* Aside */}
           <aside className="lg:col-span-1">
             <div className="sticky top-24">
-              <ContactAside propertyId={property.id} agent={property.agents} />
+              <AgentCard
+                agent={property.agents}
+                propertyTitle={property.title}
+              />
             </div>
           </aside>
         </div>

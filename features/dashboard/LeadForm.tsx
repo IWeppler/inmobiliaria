@@ -28,13 +28,12 @@ import {
   SelectValue,
 } from "@/shared/components/ui/select";
 
-// Tipo simple para el dropdown de propiedades
 type PropertyMini = {
   id: string;
   title: string;
+  agent_id: string;
 };
 
-// Esquema de Zod para validar el formulario
 const leadSchema = z.object({
   name: z
     .string()
@@ -64,22 +63,20 @@ export function LeadForm({ onSuccess }: LeadFormProps) {
   const [properties, setProperties] = useState<PropertyMini[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Cargar propiedades para el Select
   useEffect(() => {
     const fetchProperties = async () => {
       const { data } = await supabase
         .from("properties")
-        .select("id, title")
+        .select("id, title, agent_id")
         .order("title", { ascending: true });
 
       if (data) {
-        setProperties(data);
+        setProperties(data as unknown as PropertyMini[]);
       }
     };
     fetchProperties();
   }, [supabase]);
 
-  // Configuración de React Hook Form
   const form = useForm<LeadForm>({
     resolver: zodResolver(leadSchema),
     defaultValues: {
@@ -91,21 +88,44 @@ export function LeadForm({ onSuccess }: LeadFormProps) {
     },
   });
 
-  // Handler para el envío
   const onSubmit = async (data: LeadForm) => {
     setIsSubmitting(true);
     const toastId = toast.loading("Creando nuevo lead...");
 
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) {
+      toast.error("Sesión expirada", { id: toastId });
+      return;
+    }
+
+    let assignedAgentId = user.id;
+    if (
+      data.property_id &&
+      data.property_id !== "none" &&
+      data.property_id !== ""
+    ) {
+      const selectedProp = properties.find((p) => p.id === data.property_id);
+      if (selectedProp && selectedProp.agent_id) {
+        assignedAgentId = selectedProp.agent_id;
+      }
+    }
+
     const cleanData = {
-      ...data,
+      name: data.name,
       email: data.email || null,
       phone: data.phone || null,
+      status: "NUEVO",
+      source: data.source,
       notes: data.notes || null,
       property_id:
         data.property_id === "none" || data.property_id === ""
           ? null
           : data.property_id,
-      status: "NUEVO",
+
+      created_by: user.id,
+      agent_id: assignedAgentId,
     };
 
     const { error } = await supabase.from("leads").insert(cleanData);
@@ -115,7 +135,14 @@ export function LeadForm({ onSuccess }: LeadFormProps) {
     if (error) {
       toast.error(`Error al crear el lead: ${error.message}`, { id: toastId });
     } else {
-      toast.success("Lead creado con éxito.", { id: toastId });
+      if (assignedAgentId !== user.id) {
+        toast.success("Lead creado y asignado al agente responsable.", {
+          id: toastId,
+        });
+      } else {
+        toast.success("Lead creado con éxito.", { id: toastId });
+      }
+
       form.reset();
       router.refresh();
       onSuccess?.();
@@ -210,7 +237,6 @@ export function LeadForm({ onSuccess }: LeadFormProps) {
                 <FormLabel>Propiedad de Interés (Opcional)</FormLabel>
                 <Select
                   onValueChange={field.onChange}
-                  // Corregimos el defaultValue para que acepte string vacío
                   defaultValue={field.value ? String(field.value) : ""}
                 >
                   <FormControl>
@@ -243,7 +269,7 @@ export function LeadForm({ onSuccess }: LeadFormProps) {
               <FormControl>
                 <Textarea
                   placeholder="Ej: El cliente llamó consultando por la casa..."
-                  className="resize-none"
+                  className="resize-none bg-white"
                   {...field}
                 />
               </FormControl>
@@ -255,7 +281,7 @@ export function LeadForm({ onSuccess }: LeadFormProps) {
         <Button
           type="submit"
           disabled={isSubmitting}
-          className="w-full cursor-pointer"
+          className="w-full bg-foreground hover:bg-foreground/90 cursor-pointer"
         >
           {isSubmitting ? "Guardando..." : "Crear Lead"}
         </Button>

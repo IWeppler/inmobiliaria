@@ -24,8 +24,8 @@ export function Navbar() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
           <div className="flex justify-between items-center h-16">
             {/* Logo / Home Link */}
-            <Link href="/" className="text-2xl font-bold text-black">
-              Inmobiliaria
+            <Link href="/" className="text-xl font-clash font-semibold text-foreground">
+              TerraNova
             </Link>
 
             {/* Navigation Links (Desktop) */}
@@ -34,11 +34,7 @@ export function Navbar() {
                 <Link
                   key={link.href}
                   href={link.href}
-                  className={`text-sm font-medium transition-colors ${
-                    pathname === link.href
-                      ? "text-main"
-                      : "text-zinc-600 hover:text-black "
-                  }`}
+                  className={`text-sm font-medium transition-colors text-zinc-600 hover:text-black`}
                 >
                   {link.label}
                 </Link>
@@ -65,14 +61,13 @@ export function Navbar() {
           ${isMobileMenuOpen ? "translate-x-0" : "translate-x-full"}
         `}
       >
-        {/* Encabezado del menú (con logo y 'X') */}
         <div className="flex justify-between items-center h-16 px-4 sm:px-6 border-b ">
           <Link
             href="/"
-            className="text-2xl font-bold text-black "
+            className="text-2xl font-bold text-foreground"
             onClick={() => setIsMobileMenuOpen(false)}
           >
-            Inmobiliaria
+            TerraNova
           </Link>
           <button
             onClick={() => setIsMobileMenuOpen(false)}

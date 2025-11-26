@@ -15,7 +15,7 @@ export const Footer = () => {
           <div>
             <Link href="/" className="flex items-center space-x-3">
               <span className="text-white self-center text-2xl font-semibold whitespace-nowrap">
-                Inmobiliaria
+                TerraNova
               </span>
             </Link>
             <p className="mt-4 text-sm text-gray-400">
@@ -37,6 +37,11 @@ export const Footer = () => {
                   Contacto
                 </Link>
               </li>
+              <li>
+                <Link href="/login" className="text-gray-400 hover:underline hover:text-white">
+                  Ingresar
+                </Link>
+              </li>
             </ul>
           </div>
 
@@ -56,8 +61,8 @@ export const Footer = () => {
               </li>
               <li className="flex items-center">
                 <Mail size={16} className="mr-2" />
-                <a href="mailto:info@inmobiliaria.com" className="text-gray-400 hover:underline hover:text-white">
-                  info@inmobiliaria.com
+                <a href="mailto:info@TerraNova.com" className="text-gray-400 hover:underline hover:text-white">
+                  info@TerraNova.com
                 </a>
               </li>
             </ul>
@@ -89,7 +94,7 @@ export const Footer = () => {
           <span className="text-center sm:text-left mb-2 sm:mb-0">
             © {new Date().getFullYear()}{" "}
             <Link href="/" className="hover:underline hover:text-white">
-              Inmobiliaria™
+              TerraNova
             </Link>
             . Todos los derechos reservados.
           </span>

@@ -1,31 +1,32 @@
 import { AlquileresIcon, CompraIcon, TasacionesIcon, VentaIcon } from "@/shared/icons/icons";
+import { ArrowRight } from "lucide-react";
+import Link from "next/link";
 import React from "react";
 
-// --- Datos para cada tarjeta de servicio ---
 const serviceData = [
   {
     icon: VentaIcon,
     title: "Venta",
     description:
-      "Vendé tu propiedad al mejor precio de mercado. Te acompañamos en cada paso, de forma segura y profesional.",
+      "Vendé tu propiedad al mejor precio del mercado. Te acompañamos en cada paso, con una gestión profesional y segura.",
   },
   {
     icon: CompraIcon,
     title: "Compra",
     description:
-      "Encontramos el hogar o la inversión que buscás. Detrás de cada propiedad hay un proyecto de vida, y entendemos el tuyo.",
+      "Encontramos el hogar o inversión ideal. Nuestra experiencia asegura que tomes decisiones informadas.",
   },
   {
     icon: AlquileresIcon,
     title: "Alquileres",
     description:
-      "Gestionamos alquileres con transparencia y eficiencia, cuidando tanto al inquilino como al propietario en cada paso.",
+      "Gestionamos alquileres de forma transparente y eficiente, cuidando tanto propietarios como inquilinos.",
   },
   {
     icon: TasacionesIcon,
     title: "Tasaciones",
     description:
-      "Conocé el valor real de tu inmueble. Tasaciones profesionales basadas en nuestro profundo conocimiento del mercado.",
+      "Tasaciones profesionales basadas en datos reales y análisis del mercado inmobiliario.",
   },
 ];
 
@@ -39,47 +40,86 @@ function ServiceCard({
   description: string;
 }) {
   return (
-    <div className="bg-white border border-zinc-200 rounded-xl p-6 md:p-8 flex flex-col items-start text-left">
-      {icon}
-      <h3 className="text-xl font-semibold mb-2 text-zinc-900">{title}</h3>
-      <p className="text-zinc-600 ">{description}</p>
+    <div
+      className="
+      group bg-white border border-zinc-200 rounded-2xl 
+      p-8 shadow-sm hover:shadow-xl transition-all duration-500 
+      hover:-translate-y-2 cursor-pointer
+    "
+    >
+      {/* Icon */}
+      <div
+        className="
+        w-14 h-14 rounded-xl bg-main/10 flex items-center justify-center 
+        mb-6 group-hover:bg-main/20 transition-colors 
+      "
+      >
+        {icon}
+      </div>
+
+      {/* Title */}
+      <h3 className="text-2xl font-clash font-semibold mb-2 text-zinc-900">
+        {title}
+      </h3>
+
+      {/* Description */}
+      <p className="text-zinc-600 leading-relaxed text-base">
+        {description}
+      </p>
     </div>
   );
 }
 
 export const Solutions = () => {
   return (
-    <section className="w-full pt-16 pb-24">
-      <div className="container mx-auto max-w-6xl px-4">
-        {/* Encabezado de la sección */}
-        <div className="text-center max-w-3xl mx-auto">
-          <span className="text-sm font-medium text-main border border-main px-3 py-1 rounded-full">
-            Nuestros servicios
-          </span>
-          <h2 className="text-3xl md:text-4xl font-bold mt-4 text-zinc-900">
-            Soluciones inmobiliarias a tu{" "}
-            medida
-          </h2>
-          <p className="mt-4 text-lg text-zinc-600 ">
-            En{" "}
-            <span className="font-semibold text-black ">
-              tu Inmobiliaria
-            </span>{" "}
-            entendemos que cada cliente es único. Por eso, ofrecemos un servicio
-            personalizado y adaptado a tus necesidades.
-          </p>
-        </div>
+    <section className="w-full py-28">
+      <div className="container mx-auto max-w-7xl px-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-20 items-start">
+          
+          {/* BLOQUE IZQUIERDO */}
+          <div>
+            <div className="flex items-center gap-3 mb-6">
+              <div className="w-10 h-[2px] bg-main"></div>
+              <span className="text-sm font-medium uppercase tracking-wide text-main">
+                Nuestros servicios
+              </span>
+            </div>
 
-        {/* Grilla de Servicios */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8 mt-12">
-          {serviceData.map((service) => (
-            <ServiceCard
-              key={service.title}
-              icon={service.icon}
-              title={service.title}
-              description={service.description}
-            />
-          ))}
+            <h2 className="text-4xl md:text-5xl font-clash font-semibold leading-tight text-zinc-900 mb-6">
+              Te brindamos los mejores <br /> servicios inmobiliarios
+            </h2>
+
+            <p className="text-lg text-zinc-600 mb-10 max-w-lg leading-relaxed">
+              Acompañamos a propietarios, compradores e inversores con servicios profesionales y un enfoque moderno.
+            </p>
+
+            <Link href="/contacto" className="bg-foreground hover:bg-foreground/90 text-white w-fit px-6 py-3 rounded-lg flex items-center gap-2 text-sm font-medium transition-all cursor-pointer">
+              Escribinos <ArrowRight size={18} />
+            </Link>
+          </div>
+
+          {/* BLOQUE DERECHO */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-12 gap-y-14">
+            {serviceData.map((s) => (
+              <div
+                key={s.title}
+                className="flex flex-col items-start gap-3"
+              >
+                <div className="p-3 rounded-xl bg-main/10 text-main flex items-center justify-center">
+                  {s.icon}
+                </div>
+
+                <h3 className="text-xl font-semibold text-zinc-900 ">
+                  {s.title}
+                </h3>
+
+                <p className="text-zinc-600 leading-relaxed text-[15px]">
+                  {s.description}
+                </p>
+              </div>
+            ))}
+          </div>
+
         </div>
       </div>
     </section>

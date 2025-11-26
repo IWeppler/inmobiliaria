@@ -1,13 +1,11 @@
+/* app/layout.tsx */
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "@/shared/components/ui/sonner";
 import "leaflet/dist/leaflet.css";
 
-const inter = Inter({ subsets: ["latin"] });
-
 export const metadata: Metadata = {
-  title: "InmoStack - Tu Portal Inmobiliario",
+  title: "TerraNova - Tu Portal Inmobiliario",
   description: "Encuentra la propiedad de tus sueños.",
 };
 
@@ -18,7 +16,13 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="es" className="light" style={{ colorScheme: "light" }}>
-      <body className={inter.className}>
+      <head>
+        <link
+          href="https://api.fontshare.com/v2/css?f[]=clash-grotesk@500,600,700&f[]=general-sans@400,500,600,700&display=swap"
+          rel="stylesheet"
+        />
+      </head>
+      <body>
         {children}
         <Toaster position="bottom-right" richColors />
       </body>

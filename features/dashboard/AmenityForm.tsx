@@ -90,7 +90,7 @@ export function AddAmenityForm() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-xl">Gestionar Amenities</CardTitle>
+        <CardTitle className="font-clash text-2xl">Gestionar Amenities</CardTitle>
         <CardDescription>
           Añade nuevos amenities para el formulario principal.
         </CardDescription>

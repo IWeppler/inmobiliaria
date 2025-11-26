@@ -14,7 +14,7 @@ export default async function ContactoPage() {
             <div className="relative h-[80vh] w-full md:w-[600px]">
               <Image
                 src="/contact.webp"
-                alt="Contacto Inmobiliaria"
+                alt="Contacto TerraNova"
                 fill
                 className="object-cover"
               />
@@ -26,7 +26,7 @@ export default async function ContactoPage() {
             <span className="text-sm font-semibold uppercase text-main mb-2">
               Contacto
             </span>
-            <h1 className="text-4xl md:text-5xl font-bold text-zinc-900">
+            <h1 className="text-4xl md:text-5xl font-clash font-semibold text-zinc-900">
               Ponete en contacto
             </h1>
             <p className="text-lg text-zinc-600 mb-10">
@@ -34,9 +34,9 @@ export default async function ContactoPage() {
             </p>
 
             {/* Información de Contacto */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-8 mb-10">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-10">
               <div>
-                <h3 className="text-lg font-semibold mb-2 flex items-center">
+                <h3 className="font-clash text-lg font-semibold flex items-center">
                   <MapPin size={18} className="mr-2" /> Dirección
                 </h3>
                 <p className="text-zinc-600">
@@ -46,11 +46,11 @@ export default async function ContactoPage() {
                 </p>
               </div>
               <div>
-                <h3 className="text-lg font-semibold mb-2 flex items-center">
+                <h3 className="font-clash text-lg font-semibold flex items-center">
                   <Mail size={18} className="mr-2" /> Email y Teléfono
                 </h3>
                 <p className="text-zinc-600">
-                  info@inmobiliaria.com
+                  info@TerraNova.com
                   <br />
                   +54 (3491) 00-0000
                 </p>

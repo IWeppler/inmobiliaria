@@ -102,7 +102,7 @@ export function FormLogin() {
           <button
             type="submit"
             disabled={loading}
-            className="cursor-pointer w-full flex justify-center py-3 px-4 border border-transparent rounded-md font-medium transition-colors duration-500 text-white bg-main hover:bg-main/80 disabled:bg-zinc-400"
+            className="cursor-pointer w-full flex justify-center py-3 px-4 border border-transparent rounded-md font-clash font-medium transition-colors duration-500 text-white bg-main hover:bg-main/80 disabled:bg-zinc-400"
           >
             {loading ? "Ingresando..." : "Iniciar Sesión"}
           </button>

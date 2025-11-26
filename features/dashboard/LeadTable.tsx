@@ -45,15 +45,13 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/shared/components/ui/dialog";
-import { MoreHorizontal, Trash2, PlusCircle, Edit } from "lucide-react";
+import { MoreHorizontal, Trash2, PlusCircle, Edit, User } from "lucide-react";
 import { LeadForm } from "./LeadForm";
 import Link from "next/link";
 
-// --- Diccionarios para Status (¡Igual que en PropertyTable!) ---
-
 const statusColors: { [key: string]: string } = {
   NUEVO: "bg-blue-600 hover:bg-blue-700",
-  CONTACTADO: "bg-yellow-500 hover:bg-yellow-600",
+  CONTACTADO: "bg-yellow-500 hover:bg-yellow-600 text-foreground",
   VISITA_PROGRAMADA: "bg-orange-500 hover:bg-orange-600",
   NEGOCIACION: "bg-green-600 hover:bg-green-700",
   CERRADO: "bg-zinc-600 hover:bg-zinc-700",
@@ -72,9 +70,10 @@ const statusLabels: { [key: string]: string } = {
 // Props que recibe el componente
 type LeadTableProps = {
   initialLeads: LeadWithDetails[];
+  userRole: string;
 };
 
-export function LeadTable({ initialLeads }: LeadTableProps) {
+export function LeadTable({ initialLeads, userRole }: LeadTableProps) {
   const supabase = createClientBrowser();
   const [leads, setLeads] = useState(initialLeads);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -82,6 +81,8 @@ export function LeadTable({ initialLeads }: LeadTableProps) {
     null
   );
   const [isModalOpen, setIsModalOpen] = useState(false);
+
+  const isAdmin = userRole === "admin";
 
   const handleStatusUpdate = async (leadId: string, newStatus: string) => {
     setLeads((prev) =>
@@ -98,13 +99,11 @@ export function LeadTable({ initialLeads }: LeadTableProps) {
     // 3. Revertir si hay error
     if (error) {
       toast.error(`Error al actualizar estado: ${error.message}`);
-      // Revertimos al estado original (initialLeads)
       setLeads(initialLeads);
     } else {
       toast.success(
         `Lead actualizado a "${statusLabels[newStatus] || newStatus}"`
       );
-      // Opcional: refrescar `initialLeads` si fuera necesario
     }
   };
 
@@ -136,13 +135,15 @@ export function LeadTable({ initialLeads }: LeadTableProps) {
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-semibold">Gestión de Leads</h1>
+            <h1 className="font-clash font-semibold text-2xl">
+              Gestión de Leads
+            </h1>
             <p className="text-muted-foreground">
               Aquí puedes ver y gestionar tus clientes potenciales.
             </p>
           </div>
           <DialogTrigger asChild>
-            <Button>
+            <Button className="bg-foreground hover:bg-foreground/90 cursor-pointer">
               <PlusCircle className="mr-2 h-4 w-4" />
               Agregar Lead
             </Button>
@@ -152,7 +153,9 @@ export function LeadTable({ initialLeads }: LeadTableProps) {
         <DialogContent className="sm:max-w-[600px]">
           {/* 1. Añade el DialogHeader con el título y descripción */}
           <DialogHeader>
-            <DialogTitle>Crear Nuevo Lead</DialogTitle>
+            <DialogTitle className="font-clash font-semibold">
+              Crear Nuevo Lead
+            </DialogTitle>
             <DialogDescription>
               Añade un nuevo cliente potencial al sistema.
             </DialogDescription>
@@ -161,11 +164,12 @@ export function LeadTable({ initialLeads }: LeadTableProps) {
         </DialogContent>
       </Dialog>
 
-      <div className="rounded-lg border shadow-sm">
+      <div className="bg-white rounded-lg border shadow-sm">
         <Table>
           <TableHeader>
             <TableRow>
               <TableHead>Nombre</TableHead>
+              {isAdmin && <TableHead>Agente Asignado</TableHead>}
               <TableHead className="hidden md:table-cell">
                 Propiedad de Interés
               </TableHead>
@@ -188,6 +192,23 @@ export function LeadTable({ initialLeads }: LeadTableProps) {
                     {lead.name}
                   </Link>
                 </TableCell>
+
+                {isAdmin && (
+                  <TableCell>
+                    {lead.agents ? (
+                      <div className="flex items-center gap-2 text-sm font-medium">
+                        <div className="bg-zinc-100 p-1 rounded-full">
+                          <User className="h-3 w-3 text-zinc-500" />
+                        </div>
+                        {lead.agents.full_name}
+                      </div>
+                    ) : (
+                      <span className="text-zinc-400 text-xs italic">
+                        Sin asignar
+                      </span>
+                    )}
+                  </TableCell>
+                )}
 
                 {/* Propiedad de Interés */}
                 <TableCell className="hidden md:table-cell text-muted-foreground">

@@ -14,8 +14,8 @@ import { Label } from "@/shared/components/ui/label";
 type PropertyType = { id: number; name: string };
 type Amenity = { id: number; name: string };
 type PageSearchParams = {
-  tipo?: string;
-  typeId?: string;
+  tipo?: string; 
+  typeId?: string; 
   loc?: string;
   amenities?: string;
   bedrooms?: string;
@@ -30,6 +30,7 @@ type PropertyFilterListProps = {
 };
 
 export function PropertyFilterList({
+  types, 
   amenities,
   cities,
   currentParams,
@@ -71,20 +72,21 @@ export function PropertyFilterList({
     [searchParams]
   );
 
-  // --- Helpers para saber qué está seleccionado ---
+  // --- Helpers  ---
   const selectedTipo = currentParams.tipo || "";
+  const selectedTypeId = currentParams.typeId || ""; 
   const selectedLocation = currentParams.loc || "";
   const selectedAmenities = currentParams.amenities?.split(",") || [];
   const selectedBedrooms = currentParams.bedrooms || "";
   const selectedBathrooms = currentParams.bathrooms || "";
 
   return (
-    <div className="w-full bg-white  border border-zinc-200 rounded-lg p-6">
-      <h3 className="text-xl font-semibold mb-4">Filtros</h3>
+    <div className="w-full bg-white border border-zinc-200 rounded-lg p-6">
+      <h3 className="text-xl font-semibold">Filtros</h3>
 
       <Accordion
         type="multiple"
-        defaultValue={["operation", "location", "amenities"]}
+        defaultValue={["operation", "propertyType", "location", "amenities"]}
       >
         {/* --- Filtro de Operación --- */}
         <AccordionItem value="operation">
@@ -114,6 +116,28 @@ export function PropertyFilterList({
               />
               <Label htmlFor="op-alquiler">Alquiler</Label>
             </div>
+          </AccordionContent>
+        </AccordionItem>
+
+        <AccordionItem value="propertyType">
+          <AccordionTrigger>Tipo de Propiedad</AccordionTrigger>
+          <AccordionContent className="space-y-3">
+            {(types || []).map((type) => (
+              <div key={type.id} className="flex items-center space-x-2">
+                <Checkbox
+                  id={`type-${type.id}`}
+                  checked={selectedTypeId === String(type.id)}
+                  onCheckedChange={() =>
+                    router.push(
+                      pathname +
+                        "?" +
+                        createQueryString("typeId", String(type.id))
+                    )
+                  }
+                />
+                <Label htmlFor={`type-${type.id}`}>{type.name}</Label>
+              </div>
+            ))}
           </AccordionContent>
         </AccordionItem>
 
@@ -204,7 +228,6 @@ export function PropertyFilterList({
             ))}
           </AccordionContent>
         </AccordionItem>
-        
       </Accordion>
     </div>
   );

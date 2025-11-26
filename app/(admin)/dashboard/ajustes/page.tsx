@@ -15,7 +15,7 @@ export default async function DashboardPage() {
   const currentRate = rate?.usd_to_ars || 1500;
 
   return (
-    <div className="flex min-h-screen items-start justify-center font-inter">
+    <div className="flex min-h-screen items-start justify-center">
       <main className="w-full max-w-5xl p-4 space-y-12">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
           <AddPropertyTypeForm />

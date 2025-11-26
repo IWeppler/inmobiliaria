@@ -84,7 +84,7 @@ export function AddPropertyTypeForm() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-xl">Gestionar Tipos de Inmuebles</CardTitle>
+        <CardTitle className="font-clash text-2xl">Gestionar Tipos de Inmuebles</CardTitle>
         <CardDescription>
           Añade nuevos tipos de propiedad para el formulario principal.
         </CardDescription>

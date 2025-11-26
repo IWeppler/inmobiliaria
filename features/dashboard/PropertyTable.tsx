@@ -3,12 +3,19 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 import { createClientBrowser } from "@/lib/supabase-browser";
 import type { PropertyWithDetails } from "@/app/types/entities";
 import { toast } from "sonner";
-import { MoreHorizontal, Edit, Trash, ArrowUpDown } from "lucide-react";
+import {
+  MoreHorizontal,
+  Edit,
+  Trash,
+  ArrowUpDown,
+  Loader2,
+  Shield,
+} from "lucide-react";
 
-// Importaciones de Shadcn
 import {
   Table,
   TableBody,
@@ -25,7 +32,6 @@ import {
   DropdownMenuTrigger,
 } from "@/shared/components/ui/dropdown-menu";
 import { Button } from "@/shared/components/ui/button";
-import { Badge } from "@/shared/components/ui/badge";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -45,15 +51,20 @@ import {
   SelectValue,
 } from "@/shared/components/ui/select";
 
-// Props que recibe el componente
 type PropertyTableProps = {
   initialProperties: PropertyWithDetails[];
+  currentUserId: string;
+  currentUserRole: string;
 };
 
-export function PropertyTable({ initialProperties }: PropertyTableProps) {
+export function PropertyTable({
+  initialProperties,
+  currentUserId,
+  currentUserRole,
+}: PropertyTableProps) {
   const supabase = createClientBrowser();
+  const router = useRouter();
 
-  // Estado local para manejar la lista y el diálogo de borrado
   const [properties, setProperties] = useState(initialProperties);
   const [isDeleting, setIsDeleting] = useState(false);
   const [propertyToDelete, setPropertyToDelete] =
@@ -61,12 +72,13 @@ export function PropertyTable({ initialProperties }: PropertyTableProps) {
   const [filterText, setFilterText] = useState("");
   const [sortBy, setSortBy] = useState("created_at_desc");
 
+  // Colores (Sin cambios)
   const statusColors: { [key: string]: string } = {
-    EN_VENTA: "bg-emerald-500 hover:bg-emerald-600 text-white",
-    EN_ALQUILER: "bg-sky-500 hover:bg-sky-600 text-white",
-    RESERVADO: "bg-amber-500 hover:bg-amber-600 text-black",
-    VENDIDO: "bg-zinc-700 hover:bg-zinc-800 text-white",
-    ALQUILADO: "bg-purple-600 hover:bg-purple-700 text-white",
+    EN_VENTA: "bg-[#77aafe] text-[#00146b] border-[#77aafe]",
+    EN_ALQUILER: "bg-[#23c56f] text-[#012e01] border-[#23c56f]",
+    RESERVADO: "bg-[#fb6f7a] text-[#650100] border-[#fb6f7a]",
+    VENDIDO: "bg-[#fed440] text-[#6a3f03] border-[#fed440]",
+    ALQUILADO: "bg-[#f47a49] text-[#5f0101] border-[#f47a49]",
   };
 
   const statusLabels: { [key: string]: string } = {
@@ -79,8 +91,6 @@ export function PropertyTable({ initialProperties }: PropertyTableProps) {
 
   const filteredAndSortedProperties = useMemo(() => {
     const lowerFilter = filterText.toLowerCase();
-
-    // 1. Filtrar
     const filtered = properties.filter(
       (prop) =>
         prop.title?.toLowerCase().includes(lowerFilter) ||
@@ -88,7 +98,6 @@ export function PropertyTable({ initialProperties }: PropertyTableProps) {
         prop.city?.toLowerCase().includes(lowerFilter)
     );
 
-    // 2. Ordenar
     switch (sortBy) {
       case "price_asc":
         filtered.sort((a, b) => (a.price || 0) - (b.price || 0));
@@ -96,7 +105,6 @@ export function PropertyTable({ initialProperties }: PropertyTableProps) {
       case "price_desc":
         filtered.sort((a, b) => (b.price || 0) - (a.price || 0));
         break;
-
       case "city_asc":
         filtered.sort((a, b) => (a.city || "").localeCompare(b.city || ""));
         break;
@@ -108,18 +116,51 @@ export function PropertyTable({ initialProperties }: PropertyTableProps) {
         );
         break;
     }
-
     return filtered;
   }, [properties, filterText, sortBy]);
 
-  // --- Lógica de Borrado ---
+  const handleStatusChange = async (
+    propertyId: number | string,
+    newStatus: string
+  ) => {
+    const oldProperties = [...properties];
+
+    setProperties((prev) =>
+      prev.map((p) =>
+        p.id === propertyId ? { ...p, status: newStatus as any } : p
+      )
+    );
+
+    const toastId = toast.loading("Actualizando estado...");
+
+    try {
+      const { data, error } = await supabase
+        .from("properties")
+        .update({ status: newStatus })
+        .eq("id", propertyId)
+        .select();
+
+      if (error) throw error;
+
+      if (!data || data.length === 0) {
+        throw new Error("No tienes permisos para editar esta propiedad (RLS).");
+      }
+
+      toast.success("Estado actualizado", { id: toastId });
+      router.refresh();
+    } catch (error: any) {
+      console.error("Error updating:", error);
+      setProperties(oldProperties);
+      toast.error(`Error: ${error.message}`, { id: toastId });
+    }
+  };
+
   const handleDeleteProperty = async () => {
     if (!propertyToDelete) return;
 
     setIsDeleting(true);
-    const toastId = toast.loading("Eliminando propiedad y sus imágenes...");
+    const toastId = toast.loading("Eliminando propiedad...");
 
-    // 1. Borrar imágenes del Storage (¡Importante!)
     const imagePaths =
       propertyToDelete.property_images?.map((img) => img.image_url) || [];
 
@@ -145,6 +186,7 @@ export function PropertyTable({ initialProperties }: PropertyTableProps) {
     } else {
       toast.success("Propiedad eliminada con éxito.", { id: toastId });
       setProperties((prev) => prev.filter((p) => p.id !== propertyToDelete.id));
+      router.refresh();
     }
     setPropertyToDelete(null);
   };
@@ -159,8 +201,7 @@ export function PropertyTable({ initialProperties }: PropertyTableProps) {
           className="flex-1"
         />
         <Select value={sortBy} onValueChange={setSortBy}>
-          <SelectTrigger className="w-full md:w-[220px]">
-            <ArrowUpDown className="mr-2 h-4 w-4" />
+          <SelectTrigger className="w-full md:w-[220px] bg-white border border-zinc-200">
             <SelectValue placeholder="Ordenar por..." />
           </SelectTrigger>
           <SelectContent>
@@ -172,7 +213,7 @@ export function PropertyTable({ initialProperties }: PropertyTableProps) {
         </Select>
       </div>
 
-      <div className="rounded-lg border shadow-sm">
+      <div className="rounded-md border bg-white">
         <Table>
           <TableHeader>
             <TableRow>
@@ -181,16 +222,17 @@ export function PropertyTable({ initialProperties }: PropertyTableProps) {
               <TableHead className="hidden md:table-cell">Dirección</TableHead>
               <TableHead className="hidden sm:table-cell">Ciudad</TableHead>
               <TableHead className="hidden lg:table-cell">Operación</TableHead>
-              <TableHead>Estado</TableHead>
+              <TableHead className="w-[160px]">Estado</TableHead>
               <TableHead>Precio</TableHead>
-              <TableHead className="w-[50px]">Acciones</TableHead>
+              <TableHead className="w-[50px]"></TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {filteredAndSortedProperties.map((property) => {
+              const isAdmin = currentUserRole === "admin";
+              const isOwner = property.agent_id === currentUserId;
+              const canEdit = isAdmin || isOwner;
               const mainImage = property.property_images?.[0]?.image_url;
-
-              // --- Formateo de precio ---
               const hasPrice =
                 typeof property.price === "number" && property.price > 0;
               const formattedPrice = hasPrice
@@ -198,80 +240,114 @@ export function PropertyTable({ initialProperties }: PropertyTableProps) {
                     property.price as number
                   )
                 : "N/A";
+
+              const currentColorClass =
+                statusColors[property.status || ""] ||
+                "bg-gray-100 text-gray-800";
+
               return (
                 <TableRow key={property.id}>
                   <TableCell>
-                    <Image
-                      src={
-                        mainImage ||
-                        "https://placehold.co/100x100/e0e0e0/a1a1a1?text=Sin+Foto"
-                      }
-                      alt={property.title}
-                      width={64}
-                      height={64}
-                      className="rounded-md object-cover"
-                      unoptimized
-                    />
+                    <div className="relative w-16 h-16 rounded-md overflow-hidden bg-zinc-100">
+                      <Image
+                        src={
+                          mainImage ||
+                          "https://placehold.co/100x100/e0e0e0/a1a1a1?text=Sin+Foto"
+                        }
+                        alt={property.title}
+                        fill
+                        className="object-cover"
+                        unoptimized
+                      />
+                    </div>
                   </TableCell>
+
                   <TableCell className="font-medium">
                     <Link
                       href={`/dashboard/propiedades/editar/${property.id}`}
-                      className="hover:underline"
+                      className="hover:underline text-zinc-900"
                     >
                       {property.title}
                     </Link>
                   </TableCell>
-                  <TableCell className="hidden md:table-cell text-muted-foreground">
-                    {property.street_address || "Sin dirección"}
+
+                  <TableCell className="hidden md:table-cell text-muted-foreground text-sm">
+                    {property.street_address || "-"}
                   </TableCell>
-                  <TableCell className="hidden sm:table-cell text-muted-foreground">
-                    {property.city || "N/A"}
+
+                  <TableCell className="hidden sm:table-cell text-muted-foreground text-sm">
+                    {property.city || "-"}
                   </TableCell>
-                  <TableCell className="hidden lg:table-cell capitalize text-muted-foreground">
+
+                  <TableCell className="hidden lg:table-cell capitalize text-muted-foreground text-sm">
                     {property.operation_type}
                   </TableCell>
+
                   <TableCell>
-                    <Badge
-                      className={`text-white text-sm ${
-                        statusColors[property.status || ""] || "bg-zinc-500"
-                      }`}
+                    <Select
+                      defaultValue={property.status}
+                      onValueChange={(val) =>
+                        handleStatusChange(property.id, val)
+                      }
+                      disabled={!canEdit}
                     >
-                      {statusLabels[property.status || ""] ||
-                        property.status ||
-                        "N/A"}
-                    </Badge>
+                      <SelectTrigger
+                        className={`h-8 w-full text-xs font-semibold border-0 ring-0 focus:ring-0 shadow-none ${currentColorClass}`}
+                      >
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {Object.keys(statusLabels).map((statusKey) => (
+                          <SelectItem key={statusKey} value={statusKey}>
+                            {statusLabels[statusKey]}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </TableCell>
-                  <TableCell className="font-semibold">
+
+                  <TableCell className="font-semibold text-sm">
                     {hasPrice
                       ? `${property.currency} $${formattedPrice}`
                       : "Consultar"}
                   </TableCell>
+
                   <TableCell>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon">
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuLabel>Acciones</DropdownMenuLabel>
-                        <DropdownMenuItem asChild>
-                          <Link
-                            href={`/dashboard/propiedades/editar/${property.id}`}
+                    {canEdit ? (
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
                           >
-                            <Edit className="mr-2 h-4 w-4" />
-                            Editar
-                          </Link>
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={() => setPropertyToDelete(property)}
-                          className="text-red-500"
-                        >
-                          <Trash className="mr-2 h-4 w-4" />
-                          Borrar
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuLabel>Acciones</DropdownMenuLabel>
+
+                          <DropdownMenuItem asChild>
+                            <Link
+                              href={`/dashboard/propiedades/editar/${property.id}`}
+                            >
+                              <Edit className="mr-2 h-4 w-4" /> Editar
+                            </Link>
+                          </DropdownMenuItem>
+
+                          <DropdownMenuItem
+                            onClick={() => setPropertyToDelete(property)}
+                            className="text-red-600 focus:text-red-600 focus:bg-red-50"
+                          >
+                            <Trash className="mr-2 h-4 w-4" /> Borrar
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    ) : (
+                      <div className="w-8 h-8 flex items-center justify-center opacity-20">
+                        <Shield className="w-4 h-4" />
+                      </div>
+                    )}
                   </TableCell>
                 </TableRow>
               );
@@ -288,8 +364,8 @@ export function PropertyTable({ initialProperties }: PropertyTableProps) {
           <AlertDialogHeader>
             <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
             <AlertDialogDescription>
-              Esta acción no se puede deshacer. Esto eliminará permanentemente
-              la propiedad y todas sus imágenes asociadas.
+              Esta acción eliminará la propiedad y sus imágenes de forma
+              permanente.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -299,7 +375,11 @@ export function PropertyTable({ initialProperties }: PropertyTableProps) {
               disabled={isDeleting}
               className="bg-red-600 hover:bg-red-700"
             >
-              {isDeleting ? "Eliminando..." : "Sí, eliminar"}
+              {isDeleting ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                "Sí, eliminar"
+              )}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
