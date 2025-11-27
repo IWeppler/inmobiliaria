@@ -63,7 +63,7 @@ export function SearchBar({ propertyTypes, locations }: HeroSearchCardProps) {
 
   return (
     <div className="w-full bg-white p-4 rounded-2xl shadow-2xl">
-      <div className="flex w-full max-w-44 gap-4 border-b border-zinc-200 mb-6">
+      <div className="flex w-full md:max-w-44 gap-4 border-b border-zinc-200 mb-6">
         {tabs.map((tab) => (
           <button
             key={tab.value}
