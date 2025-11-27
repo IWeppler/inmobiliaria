@@ -192,12 +192,12 @@ export function PropertyTable({
 
   return (
     <>
-      <div className="flex flex-col md:flex-row items-center gap-4 mb-6">
+      <div className="flex flex-col md:flex-row items-center gap-4 p-2 max-w-2xl">
         <Input
           placeholder="Buscar por título, dirección o ciudad..."
           value={filterText}
           onChange={(e) => setFilterText(e.target.value)}
-          className="flex-1 py-2"
+          className="flex-1"
         />
         <Select value={sortBy} onValueChange={setSortBy}>
           <SelectTrigger className="w-full md:w-[220px] bg-white border border-zinc-200">
@@ -250,7 +250,7 @@ export function PropertyTable({
               return (
                 <TableRow key={property.id}>
                   <TableCell>
-                    <div className="relative w-16 h-16 rounded-md overflow-hidden bg-zinc-100">
+                    <div className="relative w-12 h-12 rounded-md overflow-hidden bg-zinc-100">
                       <Image
                         src={
                           mainImage ||

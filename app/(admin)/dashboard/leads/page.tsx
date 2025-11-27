@@ -1,5 +1,5 @@
 import { createClientServer } from "@/lib/supabase";
-import { LeadTable } from "@/features/dashboard/LeadTable";
+import { LeadTable } from "@/features/dashboard/leads/LeadTable";
 import { redirect } from "next/navigation";
 
 export default async function LeadsPage() {

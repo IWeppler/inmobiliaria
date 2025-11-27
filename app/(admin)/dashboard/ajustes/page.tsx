@@ -1,7 +1,7 @@
 import { createClientServer } from "@/lib/supabase";
-import { AddAmenityForm } from "@/features/dashboard/AmenityForm";
-import { ExchangeRateManager } from "@/features/dashboard/ExchangeRate";
-import { AddPropertyTypeForm } from "@/features/dashboard/PropertyTypeForm";
+import { AddAmenityForm } from "@/features/dashboard/amenities/AmenityForm";
+import { ExchangeRateManager } from "@/features/dashboard/settings/ExchangeRate";
+import { AddPropertyTypeForm } from "@/features/dashboard/property/PropertyTypeForm";
 
 export default async function DashboardPage() {
   const supabase = await createClientServer();

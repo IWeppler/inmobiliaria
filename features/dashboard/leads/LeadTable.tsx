@@ -46,7 +46,7 @@ import {
   DialogDescription,
 } from "@/shared/components/ui/dialog";
 import { MoreHorizontal, Trash2, PlusCircle, Edit, User } from "lucide-react";
-import { LeadForm } from "./LeadForm";
+import { LeadForm } from "@/features/dashboard/leads/LeadForm";
 import Link from "next/link";
 
 const statusColors: { [key: string]: string } = {

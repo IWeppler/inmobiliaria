@@ -1,6 +1,6 @@
 import { createClientServer } from "@/lib/supabase";
 import { notFound, redirect } from "next/navigation";
-import { LeadDetailClient } from "@/features/dashboard/LeadDetailClient";
+import { LeadDetailClient } from "@/features/dashboard/leads/LeadDetailClient";
 
 export default async function LeadDetailPage({
   params: paramsPromise,

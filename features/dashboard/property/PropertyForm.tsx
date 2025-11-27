@@ -44,7 +44,7 @@ import Image from "next/image";
 
 // Importación dinámica del mapa
 const LocationPicker = dynamic(
-  () => import("@/features/dashboard/LocationPicker"),
+  () => import("@/features/dashboard/property/LocationPicker"),
   {
     ssr: false,
     loading: () => (
