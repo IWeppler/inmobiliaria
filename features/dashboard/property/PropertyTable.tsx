@@ -57,6 +57,13 @@ type PropertyTableProps = {
   currentUserRole: string;
 };
 
+type PropertyStatus =
+  | "EN_VENTA"
+  | "EN_ALQUILER"
+  | "RESERVADO"
+  | "VENDIDO"
+  | "ALQUILADO";
+
 export function PropertyTable({
   initialProperties,
   currentUserId,
@@ -94,7 +101,7 @@ export function PropertyTable({
       (prop) =>
         prop.title?.toLowerCase().includes(lowerFilter) ||
         prop.street_address?.toLowerCase().includes(lowerFilter) ||
-        prop.city?.toLowerCase().includes(lowerFilter)
+        prop.city?.toLowerCase().includes(lowerFilter),
     );
 
     switch (sortBy) {
@@ -111,7 +118,7 @@ export function PropertyTable({
       default:
         filtered.sort(
           (a, b) =>
-            new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+            new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
         );
         break;
     }
@@ -120,14 +127,16 @@ export function PropertyTable({
 
   const handleStatusChange = async (
     propertyId: number | string,
-    newStatus: string
+    newStatus: PropertyStatus,
   ) => {
     const oldProperties = [...properties];
 
     setProperties((prev) =>
       prev.map((p) =>
-        p.id === propertyId ? { ...p, status: newStatus as any } : p
-      )
+        p.id === propertyId
+          ? { ...p, status: newStatus as PropertyWithDetails["status"] }
+          : p,
+      ),
     );
 
     const toastId = toast.loading("Actualizando estado...");
@@ -147,10 +156,12 @@ export function PropertyTable({
 
       toast.success("Estado actualizado", { id: toastId });
       router.refresh();
-    } catch (error: any) {
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : "Error desconocido";
       console.error("Error updating:", error);
       setProperties(oldProperties);
-      toast.error(`Error: ${error.message}`, { id: toastId });
+      toast.error(`Error: ${errorMessage}`, { id: toastId });
     }
   };
 
@@ -212,154 +223,163 @@ export function PropertyTable({
         </Select>
       </div>
 
-      <div className="rounded-md border bg-white">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="w-20">Imagen</TableHead>
-              <TableHead>Título</TableHead>
-              <TableHead className="hidden md:table-cell">Dirección</TableHead>
-              <TableHead className="hidden sm:table-cell">Ciudad</TableHead>
-              <TableHead className="text-center" title="Visitas">
-                Visitas
-              </TableHead>
-              <TableHead className="hidden lg:table-cell">Operación</TableHead>
-              <TableHead className="w-[160px]">Estado</TableHead>
-              <TableHead>Precio</TableHead>
-              <TableHead className="w-[50px]"></TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {filteredAndSortedProperties.map((property) => {
-              const isAdmin = currentUserRole === "admin";
-              const isOwner = property.agent_id === currentUserId;
-              const canEdit = isAdmin || isOwner;
-              const mainImage = property.property_images?.[0]?.image_url;
-              const hasPrice =
-                typeof property.price === "number" && property.price > 0;
-              const formattedPrice = hasPrice
-                ? new Intl.NumberFormat("es-AR", { style: "decimal" }).format(
-                    property.price as number
-                  )
-                : "N/A";
+      <div className="rounded-md border bg-white w-full overflow-hidden">
+        {/* Contenedor con scroll horizontal controlado */}
+        <div className="overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow className="whitespace-nowrap">
+                {" "}
+                {/* Evita que los encabezados se amontonen */}
+                <TableHead className="w-20">Imagen</TableHead>
+                <TableHead>Título</TableHead>
+                <TableHead className="hidden md:table-cell">
+                  Dirección
+                </TableHead>
+                <TableHead className="hidden sm:table-cell">Ciudad</TableHead>
+                <TableHead className="text-center">Visitas</TableHead>
+                <TableHead className="hidden lg:table-cell">
+                  Operación
+                </TableHead>
+                <TableHead className="w-[160px]">Estado</TableHead>
+                <TableHead>Precio</TableHead>
+                <TableHead className="w-[50px]"></TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filteredAndSortedProperties.map((property) => {
+                const isAdmin = currentUserRole === "admin";
+                const isOwner = property.agent_id === currentUserId;
+                const canEdit = isAdmin || isOwner;
+                const mainImage = property.property_images?.[0]?.image_url;
+                const hasPrice =
+                  typeof property.price === "number" && property.price > 0;
+                const formattedPrice = hasPrice
+                  ? new Intl.NumberFormat("es-AR", { style: "decimal" }).format(
+                      property.price as number,
+                    )
+                  : "N/A";
 
-              const currentColorClass =
-                statusColors[property.status || ""] ||
-                "bg-gray-100 text-gray-800";
+                const currentColorClass =
+                  statusColors[property.status || ""] ||
+                  "bg-gray-100 text-gray-800";
 
-              return (
-                <TableRow key={property.id}>
-                  <TableCell>
-                    <div className="relative w-12 h-12 rounded-md overflow-hidden bg-zinc-100">
-                      <Image
-                        src={
-                          mainImage ||
-                          "https://placehold.co/100x100/e0e0e0/a1a1a1?text=Sin+Foto"
-                        }
-                        alt={property.title}
-                        fill
-                        className="object-cover"
-                        unoptimized
-                      />
-                    </div>
-                  </TableCell>
-
-                  <TableCell className="font-medium">
-                    <Link
-                      href={`/dashboard/propiedades/editar/${property.id}`}
-                      className="hover:underline text-zinc-900"
-                    >
-                      {property.title}
-                    </Link>
-                  </TableCell>
-
-                  <TableCell className="hidden md:table-cell text-muted-foreground text-sm">
-                    {property.street_address || "-"}
-                  </TableCell>
-
-                  <TableCell className="hidden sm:table-cell text-muted-foreground text-sm">
-                    {property.city || "-"}
-                  </TableCell>
-
-                  <TableCell className="text-center font-mono text-sm text-zinc-500">
-                    {property.views_count || 0}
-                  </TableCell>
-
-                  <TableCell className="hidden lg:table-cell capitalize text-muted-foreground text-sm">
-                    {property.operation_type}
-                  </TableCell>
-
-                  <TableCell>
-                    <Select
-                      defaultValue={property.status}
-                      onValueChange={(val) =>
-                        handleStatusChange(property.id, val)
-                      }
-                      disabled={!canEdit}
-                    >
-                      <SelectTrigger
-                        className={`h-8 w-full text-xs font-semibold border-0 ring-0 focus:ring-0 shadow-none ${currentColorClass}`}
-                      >
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {Object.keys(statusLabels).map((statusKey) => (
-                          <SelectItem key={statusKey} value={statusKey}>
-                            {statusLabels[statusKey]}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </TableCell>
-
-                  <TableCell className="font-semibold text-sm">
-                    {hasPrice
-                      ? `${property.currency} $${formattedPrice}`
-                      : "Consultar"}
-                  </TableCell>
-
-                  <TableCell>
-                    {canEdit ? (
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8"
-                          >
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuLabel>Acciones</DropdownMenuLabel>
-
-                          <DropdownMenuItem asChild>
-                            <Link
-                              href={`/dashboard/propiedades/editar/${property.id}`}
-                            >
-                              <Edit className="mr-2 h-4 w-4" /> Editar
-                            </Link>
-                          </DropdownMenuItem>
-
-                          <DropdownMenuItem
-                            onClick={() => setPropertyToDelete(property)}
-                            className="text-red-600 focus:text-red-600 focus:bg-red-50"
-                          >
-                            <Trash className="mr-2 h-4 w-4" /> Borrar
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    ) : (
-                      <div className="w-8 h-8 flex items-center justify-center opacity-20">
-                        <Shield className="w-4 h-4" />
+                return (
+                  <TableRow key={property.id}>
+                    <TableCell>
+                      <div className="relative w-12 h-12 rounded-md overflow-hidden bg-zinc-100">
+                        <Image
+                          src={
+                            mainImage ||
+                            "https://placehold.co/100x100/e0e0e0/a1a1a1?text=Sin+Foto"
+                          }
+                          alt={property.title}
+                          fill
+                          className="object-cover"
+                          unoptimized
+                        />
                       </div>
-                    )}
-                  </TableCell>
-                </TableRow>
-              );
-            })}
-          </TableBody>
-        </Table>
+                    </TableCell>
+
+                    <TableCell className="font-medium max-w-[200px]">
+                      {" "}
+                      <Link
+                        href={`/dashboard/propiedades/editar/${property.id}`}
+                        className="block truncate hover:underline text-zinc-900"
+                        title={property.title}
+                      >
+                        {property.title}
+                      </Link>
+                    </TableCell>
+
+                    <TableCell className="hidden md:table-cell text-muted-foreground text-sm">
+                      {property.street_address || "-"}
+                    </TableCell>
+
+                    <TableCell className="hidden sm:table-cell text-muted-foreground text-sm">
+                      {property.city || "-"}
+                    </TableCell>
+
+                    <TableCell className="text-center font-mono text-sm text-zinc-500">
+                      {property.views_count || 0}
+                    </TableCell>
+
+                    <TableCell className="hidden lg:table-cell capitalize text-muted-foreground text-sm">
+                      {property.operation_type}
+                    </TableCell>
+
+                    <TableCell>
+                      <Select
+                        defaultValue={property.status}
+                        onValueChange={(val) =>
+                          handleStatusChange(property.id, val as PropertyStatus)
+                        }
+                        disabled={!canEdit}
+                      >
+                        <SelectTrigger
+                          className={`h-8 w-full text-xs font-semibold border-0 ring-0 focus:ring-0 shadow-none ${currentColorClass}`}
+                        >
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {Object.keys(statusLabels).map((statusKey) => (
+                            <SelectItem key={statusKey} value={statusKey}>
+                              {statusLabels[statusKey]}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </TableCell>
+
+                    <TableCell className="font-semibold text-sm">
+                      {hasPrice
+                        ? `${property.currency} $${formattedPrice}`
+                        : "Consultar"}
+                    </TableCell>
+
+                    <TableCell>
+                      {canEdit ? (
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8"
+                            >
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuLabel>Acciones</DropdownMenuLabel>
+
+                            <DropdownMenuItem asChild>
+                              <Link
+                                href={`/dashboard/propiedades/editar/${property.id}`}
+                              >
+                                <Edit className="mr-2 h-4 w-4" /> Editar
+                              </Link>
+                            </DropdownMenuItem>
+
+                            <DropdownMenuItem
+                              onClick={() => setPropertyToDelete(property)}
+                              className="text-red-600 focus:text-red-600 focus:bg-red-50"
+                            >
+                              <Trash className="mr-2 h-4 w-4" /> Borrar
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      ) : (
+                        <div className="w-8 h-8 flex items-center justify-center opacity-20">
+                          <Shield className="w-4 h-4" />
+                        </div>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </div>
       </div>
 
       <AlertDialog
