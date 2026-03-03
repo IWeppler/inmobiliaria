@@ -20,48 +20,12 @@ import { DescriptionWithReadMore } from "@/features/properties/DescriptionReadMo
 import { AgentCard } from "@/features/public/AgentCard";
 import { ViewCounter } from "@/features/public/ViewCounter";
 import { PropertyJsonLd } from "@/features/public/seo/PropertyJsonLd";
-
-// --- Tipos ---
-type Amenity = { amenities: { name: string } | null };
-type PropertyImage = { image_url: string | null };
-
-type PropertyFullDetails = {
-  id: string;
-  title: string;
-  street_address: string | null;
-  neighborhood: string | null;
-  city: string | null;
-  province: string | null;
-  status: string;
-  price: number | null;
-  currency: string | null;
-  operation_type: string; // Necesario para el filtro
-  property_types: { name: string } | null;
-  bedrooms: number | null;
-  bathrooms: number | null;
-  rooms: number | null;
-  total_area: number | null;
-  covered_area: number | null;
-  description: string | null;
-  latitude: number | null;
-  longitude: number | null;
-  expensas: number | null;
-  antiguedad: string | null;
-  cocheras: number | null;
-  property_images: PropertyImage[];
-  property_amenities: Amenity[];
-  agents: {
-    id: string; // Necesario para el form
-    full_name: string | null;
-    avatar_url: string | null;
-    phone: string | null;
-    email: string | null;
-  } | null;
-};
+import { PropertyFullDetails } from "@/features/properties/types/index";
+import { ShareButton } from "@/features/properties/ShareButton";
 
 // --- Carga de Datos Principal ---
 async function getPropertyDetails(
-  slug: string
+  slug: string,
 ): Promise<PropertyFullDetails | null> {
   const supabase = await createClientServer();
   const { data, error } = await supabase
@@ -75,7 +39,7 @@ async function getPropertyDetails(
       property_images ( image_url ),
       property_amenities ( amenities ( name ) ),
       agents ( id, full_name, avatar_url, phone, email )
-    `
+    `,
     )
     .eq("id", slug)
     .single();
@@ -87,11 +51,11 @@ async function getPropertyDetails(
   return data as unknown as PropertyFullDetails;
 }
 
-// --- NUEVA FUNCIÓN: Cargar Recomendados ---
+// --- Cargar Recomendados ---
 async function getRecommendedProperties(
   currentId: string,
   city: string | null,
-  operationType: string
+  operationType: string,
 ) {
   if (!city) return [];
 
@@ -99,12 +63,12 @@ async function getRecommendedProperties(
   const { data } = await supabase
     .from("properties")
     .select(
-      "id, title, price, currency, city, province, bedrooms, total_area, property_images(image_url)"
+      "id, title, price, currency, city, province, bedrooms, total_area, property_images(image_url)",
     )
-    .eq("city", city) // Misma ciudad
-    .eq("operation_type", operationType) // Misma operación
-    .neq("id", currentId) // Excluir actual
-    .limit(3); // Traer 3
+    .eq("city", city)
+    .eq("operation_type", operationType)
+    .neq("id", currentId)
+    .limit(3);
 
   return data || [];
 }
@@ -112,7 +76,7 @@ async function getRecommendedProperties(
 // --- Metadata (SEO) ---
 export async function generateMetadata(
   { params }: { params: Promise<{ slug: string }> },
-  parent: ResolvingMetadata
+  parent: ResolvingMetadata,
 ): Promise<Metadata> {
   const { slug } = await params;
   const supabase = await createClientServer();
@@ -133,7 +97,7 @@ export async function generateMetadata(
   let priceText = "";
   if (property.price) {
     priceText = `| ${property.currency} $${property.price.toLocaleString(
-      "es-AR"
+      "es-AR",
     )}`;
   }
 
@@ -210,11 +174,11 @@ export default async function PropertyPage({
 
   if (!property) notFound();
 
-  // 1. Cargar Recomendados (en paralelo o secuencial está bien aquí)
+  // 1. Cargar Recomendados
   const recommendedProperties = await getRecommendedProperties(
     property.id,
     property.city,
-    property.operation_type
+    property.operation_type,
   );
 
   const {
@@ -267,9 +231,12 @@ export default async function PropertyPage({
               {title}
             </h1>
             <div className="md:text-right shrink-0">
-              <span className="text-xs font-bold tracking-wider text-black bg-zinc-100 px-3 py-1 rounded-full inline-block mb-2 uppercase">
-                {statusDisplay}
-              </span>
+              <div className="flex justify-end items-center gap-3 mb-2">
+                <ShareButton title={title} />
+                <span className="text-xs font-bold tracking-wider text-black bg-zinc-100 px-3 py-1.5 rounded-full uppercase">
+                  {statusDisplay}
+                </span>
+              </div>
               <p className="font-clash text-2xl md:text-3xl font-bold text-zinc-900">
                 {priceDisplay}
               </p>
@@ -282,6 +249,7 @@ export default async function PropertyPage({
         </header>
 
         <ImageGallery images={images as string[]} />
+
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 mt-16">
           {/* Columna Principal (8 columnas) */}
@@ -451,7 +419,7 @@ export default async function PropertyPage({
                 let priceFmt = "Consultar";
                 if (prop.price) {
                   priceFmt = `${prop.currency} $${prop.price.toLocaleString(
-                    "es-AR"
+                    "es-AR",
                   )}`;
                 }
 

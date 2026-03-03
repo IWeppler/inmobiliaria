@@ -29,7 +29,7 @@ export function AgentCard({ agent, propertyTitle }: AgentCardProps) {
 
   // Mensaje predeterminado
   const whatsappMessage = encodeURIComponent(
-    `Hola ${displayAgent.full_name}, estoy interesado en la propiedad: ${propertyTitle}`
+    `Hola ${displayAgent.full_name}, estoy interesado en la propiedad: ${propertyTitle}.\n\n¿Podríamos coordinar una visita o podrían brindarme más información al respecto?`
   );
 
   return (
@@ -66,7 +66,7 @@ export function AgentCard({ agent, propertyTitle }: AgentCardProps) {
       {/* 2. Botones de Acción Directa */}
       <div className="grid grid-cols-2 gap-3 mb-6">
         <Button
-          className="w-full bg-[#24d367] hover:bg-[#113828] text-white"
+          className="w-full bg-[#22c962] hover:bg-[#20bb5b] text-white"
           asChild
         >
           <a
@@ -139,8 +139,8 @@ export function AgentCard({ agent, propertyTitle }: AgentCardProps) {
             className="bg-zinc-50 border-zinc-200 min-h-[100px]"
           />
         </div>
-        <Button type="submit" className="w-full cursor-pointer bg-foreground">
-          Enviar Consulta
+        <Button type="submit" className="w-full cursor-pointer bg-foreground hover:bg-foreground/90">
+          Enviar consulta
         </Button>
       </form>
     </div>

@@ -17,7 +17,6 @@ import { Button } from "@/shared/components/ui/button";
 import {
   Form,
   FormControl,
-  FormDescription,
   FormField,
   FormItem,
   FormLabel,
@@ -31,7 +30,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/shared/components/ui/select";
-import { Textarea } from "@/shared/components/ui/textarea";
 import {
   Card,
   CardContent,
@@ -41,6 +39,7 @@ import {
 } from "@/shared/components/ui/card";
 import { Loader2, Search, Trash2, MapPin } from "lucide-react";
 import Image from "next/image";
+import { AiDescriptionField } from "./ui/ai-description";
 
 // Importación dinámica del mapa
 const LocationPicker = dynamic(
@@ -52,7 +51,7 @@ const LocationPicker = dynamic(
         Cargando Mapa...
       </div>
     ),
-  }
+  },
 );
 
 // --- Tipos ---
@@ -115,8 +114,13 @@ type ExistingImage = {
   image_url: string;
 };
 
+export type PropertyFormValues = z.output<typeof propertySchema>;
+
 type PropertyFormProps = {
-  initialData?: PropertyForm & { id: string; property_images: ExistingImage[] };
+  initialData?: PropertyFormValues & {
+    id: string;
+    property_images: ExistingImage[];
+  };
   propertyTypes: PropertyType[];
 };
 
@@ -131,26 +135,27 @@ export function PropertyForm({ initialData }: PropertyFormProps) {
   const [allAmenities, setAllAmenities] = useState<Amenity[]>([]);
 
   const [existingImages, setExistingImages] = useState(
-    initialData?.property_images || []
+    initialData?.property_images || [],
   );
 
   const [mapCenter, setMapCenter] = useState<[number, number]>(
     initialData?.latitude && initialData?.longitude
       ? [initialData.latitude, initialData.longitude]
-      : [-29.2333, -61.7667]
+      : [-29.2333, -61.7667],
   );
 
   const isEditMode = !!initialData;
 
-  const mainForm = useForm<PropertyForm>({
-    resolver: zodResolver(propertySchema) as unknown as Resolver<PropertyForm>,
+  const mainForm = useForm<PropertyFormValues>({
+    resolver: zodResolver(
+      propertySchema,
+    ) as unknown as Resolver<PropertyFormValues>,
     defaultValues: initialData
       ? {
           ...initialData,
           neighborhood: initialData.neighborhood || "",
           description: initialData.description || "",
           street_address: initialData.street_address || "",
-          // Aseguramos que agent_id venga del initialData
           agent_id: initialData.agent_id || null,
         }
       : {
@@ -180,7 +185,7 @@ export function PropertyForm({ initialData }: PropertyFormProps) {
       mainForm.setValue("latitude", lat);
       mainForm.setValue("longitude", lng);
     },
-    [mainForm]
+    [mainForm],
   );
 
   // --- Carga de Datos (Tipos y Agentes) ---
@@ -231,7 +236,7 @@ export function PropertyForm({ initialData }: PropertyFormProps) {
 
     if (!city || !province) {
       toast.error(
-        "Ingresa al menos Ciudad y Provincia para buscar en el mapa."
+        "Ingresa al menos Ciudad y Provincia para buscar en el mapa.",
       );
       setGeocodingLoading(false);
       return;
@@ -277,7 +282,7 @@ export function PropertyForm({ initialData }: PropertyFormProps) {
   };
 
   // --- Submit ---
-  const onSubmitProperty = async (data: PropertyForm) => {
+  const onSubmitProperty = async (data: PropertyFormValues) => {
     const {
       data: { user },
     } = await supabase.auth.getUser();
@@ -328,7 +333,7 @@ export function PropertyForm({ initialData }: PropertyFormProps) {
       // UPDATE
       const { error } = await supabase
         .from("properties")
-        .update(propertyData) // Aquí ya viaja el agent_id seleccionado
+        .update(propertyData)
         .eq("id", initialData.id);
 
       if (error) {
@@ -336,10 +341,6 @@ export function PropertyForm({ initialData }: PropertyFormProps) {
         return;
       }
     } else {
-      // INSERT
-      // CORRECCIÓN LÓGICA:
-      // Si el usuario seleccionó un agente en el form (propertyData.agent_id), usamos ese.
-      // Si NO seleccionó nada (es null), usamos el ID del usuario logueado como fallback (user.id).
       const finalAgentId = propertyData.agent_id
         ? propertyData.agent_id
         : user.id;
@@ -427,19 +428,7 @@ export function PropertyForm({ initialData }: PropertyFormProps) {
                   </FormItem>
                 )}
               />
-              <FormField
-                control={mainForm.control}
-                name="description"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Descripción Completa</FormLabel>
-                    <FormControl>
-                      <Textarea placeholder="Detalles..." {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+              <AiDescriptionField form={mainForm} />
             </div>
 
             {/* 2. UBICACIÓN Y MAPA */}
@@ -599,7 +588,7 @@ export function PropertyForm({ initialData }: PropertyFormProps) {
                   )}
                 />
 
-              {/* Operación y Estado */}
+                {/* Operación y Estado */}
                 <FormField
                   control={mainForm.control}
                   name="operation_type"
@@ -771,8 +760,8 @@ export function PropertyForm({ initialData }: PropertyFormProps) {
                                     ])
                                   : field.onChange(
                                       (field.value || []).filter(
-                                        (id) => id !== amenity.id
-                                      )
+                                        (id) => id !== amenity.id,
+                                      ),
                                     );
                               }}
                             />
@@ -825,7 +814,7 @@ export function PropertyForm({ initialData }: PropertyFormProps) {
                     accept="image/*"
                     onChange={(e) =>
                       setFiles(
-                        e.target.files ? Array.from(e.target.files) : null
+                        e.target.files ? Array.from(e.target.files) : null,
                       )
                     }
                   />
