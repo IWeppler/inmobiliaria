@@ -43,6 +43,7 @@ import {
 } from "@/shared/components/ui/avatar";
 import { Skeleton } from "@/shared/components/ui/skeleton";
 import { createClientBrowser } from "@/lib/supabase-browser";
+import { SidebarNotifications } from "@/shared/components/ui/SidebarNotifications";
 
 const mainNav = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
@@ -156,6 +157,11 @@ export function AppSidebar() {
                   </SidebarMenuItem>
                 );
               })}
+
+              {/* --- COMPONENTE DE NOTIFICACIONES --- */}
+              <SidebarMenuItem>
+                <SidebarNotifications />
+              </SidebarMenuItem>
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>

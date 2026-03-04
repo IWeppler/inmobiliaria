@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { DashboardStats } from "@/features/dashboard/DashboardStats";
 import { LeadsWidget } from "@/features/dashboard/LeadsWidget";
 import { PropertyTable } from "@/features/dashboard/property/PropertyTable";
+import { DashboardCalendar } from "@/features/dashboard/Calendar";
 import { Button } from "@/shared/components/ui/button";
 import Link from "next/link";
 import { PlusCircle } from "lucide-react";
@@ -48,6 +49,8 @@ async function getDashboardData() {
   ]);
 
   const props = properties || [];
+
+  // --- MÉTRICAS DE OPERACIÓN ---
   const totalProperties = props.length;
   const totalViews = props.reduce(
     (acc, curr) => acc + (curr.views_count || 0),
@@ -58,6 +61,38 @@ async function getDashboardData() {
     (p) => p.status === "EN_VENTA" || p.status === "EN_ALQUILER",
   ).length;
 
+  // --- NUEVO: MÉTRICAS DE NEGOCIO / BI ---
+  const now = new Date();
+  const startOfThisMonth = new Date(
+    now.getFullYear(),
+    now.getMonth(),
+    1,
+  ).getTime();
+
+  const closedProps = props.filter(
+    (p) => p.status === "VENDIDO" || p.status === "ALQUILADO",
+  );
+  const totalRevenue = closedProps.reduce(
+    (acc, curr) => acc + (curr.price || 0),
+    0,
+  );
+  const closedDealsCount = closedProps.length;
+  const closedDealsThisMonth = closedProps.filter(
+    (p) => new Date(p.created_at).getTime() >= startOfThisMonth,
+  ).length;
+
+  const newLeadsCount =
+    leads?.filter((l) => !l.status || l.status.toLowerCase() === "nuevo")
+      .length || 0;
+
+  const contactedLeadsCount =
+    leads?.filter((l) => l.status && l.status.toLowerCase() === "contactado")
+      .length || 0;
+
+  const leadsThisMonth =
+    leads?.filter((l) => new Date(l.created_at).getTime() >= startOfThisMonth)
+      .length || 0;
+
   return {
     user,
     agent,
@@ -65,6 +100,14 @@ async function getDashboardData() {
     currentUserRole: agent?.role || "agente",
     properties: props as PropertyWithDetails[],
     leads: leads || [],
+    biMetrics: {
+      totalRevenue,
+      closedDealsCount,
+      closedDealsThisMonth,
+      newLeadsCount,
+      contactedLeadsCount,
+      leadsThisMonth,
+    },
     stats: {
       totalProperties,
       totalViews,
@@ -78,40 +121,50 @@ export default async function DashboardPage() {
   const data = await getDashboardData();
   if (!data) redirect("/login");
 
-  const { agent, properties, leads, stats, currentUserId, currentUserRole } =
-    data;
+  const {
+    agent,
+    properties,
+    leads,
+    stats,
+    biMetrics,
+    currentUserId,
+    currentUserRole,
+  } = data;
 
   return (
-    <div className="flex flex-col w-full max-w-[1600px] mx-auto px-4 py-6 gap-3">
-      {/* SECCIÓN SUPERIOR */}
-      <div className="flex flex-col gap-4 shrink-0">
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-clash font-semibold text-zinc-900">
-              Hola, {agent?.full_name?.split(" ")[0]}!
-            </h1>
-          </div>
-          <Button
-            asChild
-            className="bg-zinc-900 text-white hover:bg-zinc-800 shadow-sm"
-          >
-            <Link href="/dashboard/propiedades/nueva">
-              <PlusCircle className="mr-2 h-4 w-4" />{" "}
-              <span className="hidden sm:inline">Nueva Propiedad</span>
-            </Link>
-          </Button>
+    <div className="flex flex-col w-full max-w-[1600px] mx-auto px-4 py-6 gap-6">
+      {/* HEADER PRINCIPAL */}
+      <div className="flex items-center justify-between shrink-0">
+        <div>
+          <h1 className="text-2xl font-clash font-semibold text-zinc-900">
+            Hola, {agent?.full_name?.split(" ")[0]}!
+          </h1>
+          <p className="text-zinc-500 text-sm mt-1">
+            Aquí está el resumen de tu negocio hoy.
+          </p>
         </div>
-
-        {/* Stats Cards */}
-        <DashboardStats stats={stats} />
+        <Button
+          asChild
+          className="bg-zinc-900 text-white hover:bg-zinc-800 shadow-sm"
+        >
+          <Link href="/dashboard/propiedades/nueva">
+            <PlusCircle className="mr-2 h-4 w-4" />{" "}
+            <span className="hidden sm:inline">Nueva Propiedad</span>
+          </Link>
+        </Button>
       </div>
 
-      <div className="flex flex-col lg:flex-row gap-3 w-full">
+      {/* MÉTRICAS OPERATIVAS (BI) */}
+      <div className="shrink-0">
+        <DashboardStats stats={stats} biMetrics={biMetrics} />
+      </div>
+
+      {/* CONTENIDO PRINCIPAL: TABLA Y LEADS/CALENDARIO */}
+      <div className="flex flex-col lg:flex-row gap-6 w-full mt-2">
         {/* COLUMNA IZQUIERDA: TABLA */}
         <div className="flex flex-col flex-1 min-w-0 bg-white rounded-xl border border-zinc-200 shadow-sm overflow-hidden">
-          <div className="py-4 px-4 border-b border-zinc-100 bg-white flex justify-between items-center shrink-0">
-            <h3 className="font-semibold text-zinc-900">Mis Propiedades</h3>
+          <div className="py-4 px-4 border-b border-zinc-100 flex justify-between items-center shrink-0">
+            <h3 className="font-semibold text-foreground">Mis Propiedades</h3>
             <span className="text-xs bg-zinc-100 text-zinc-600 px-3 py-1 rounded-full font-medium">
               {properties.length} listadas
             </span>
@@ -126,14 +179,22 @@ export default async function DashboardPage() {
           </div>
         </div>
 
-        {/* COLUMNA DERECHA: LEADS */}
-        <div className="flex flex-col w-full lg:w-[260px] xl:w-[400px] shrink-0 bg-white rounded-xl border border-zinc-200 shadow-sm self-start overflow-hidden">
-          <div className="py-4 px-4 border-b border-zinc-100 bg-zinc-50 shrink-0">
-            <h3 className="font-semibold text-zinc-900">Consultas Recientes</h3>
-          </div>
+        {/* COLUMNA DERECHA: CALENDARIO Y LEADS */}
+        <div className="flex flex-col w-full lg:w-[320px] xl:w-[350px] shrink-0 gap-6 self-start">
+          {/* WIDGET 1: CALENDARIO */}
+          <DashboardCalendar />
 
-          <div className="p-0">
-            <LeadsWidget leads={leads} />
+          {/* WIDGET 2: LEADS */}
+          <div className="flex flex-col bg-white rounded-xl border border-zinc-200 shadow-sm overflow-hidden">
+            <div className="py-4 px-4 border-b border-zinc-100 shrink-0">
+              <h3 className="font-semibold text-foreground">
+                Consultas Recientes
+              </h3>
+            </div>
+
+            <div className="p-0">
+              <LeadsWidget leads={leads} />
+            </div>
           </div>
         </div>
       </div>

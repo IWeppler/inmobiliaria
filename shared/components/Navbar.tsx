@@ -58,7 +58,7 @@ export function Navbar() {
         </div>
       </nav>
 
-      {/* --- PANEL DE MENÚ MÓVIL (PANTALLA COMPLETA) --- */}
+      {/* --- PANEL DE MENÚ MÓVIL--- */}
       <div
         className={`md:hidden fixed inset-0 z-50 bg-white transition-transform duration-300 ease-in-out
           ${isMobileMenuOpen ? "translate-x-0" : "translate-x-full"}
