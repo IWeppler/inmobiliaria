@@ -40,7 +40,7 @@ export default async function ContactoPage() {
                   <MapPin size={18} className="mr-2" /> Dirección
                 </h3>
                 <p className="text-zinc-600">
-                  Gobernador Crespo 1658
+                  Calle de Prueba 123
                   <br />
                   Tostado, Santa Fe
                 </p>

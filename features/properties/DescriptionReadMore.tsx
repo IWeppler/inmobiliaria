@@ -10,7 +10,6 @@ type DescriptionProps = {
 export function DescriptionWithReadMore({ text }: DescriptionProps) {
   const [isExpanded, setIsExpanded] = useState(false);
 
-  // Si no hay texto, no renderizar nada
   if (!text) {
     return <p className="text-zinc-700">No hay descripción disponible.</p>;
   }
@@ -28,7 +27,7 @@ export function DescriptionWithReadMore({ text }: DescriptionProps) {
       </div>
 
       {!isExpanded && (
-        <div className="absolute bottom-0 left-0 w-full h-24 bg-linear-to-t from-background via-background/80 to-transparent">
+        <div className="absolute bottom-0 left-0 w-full h-24 bg-linear-to-t from-background via-background/90 to-transparent">
           <Button
             variant="link"
             className="absolute bottom-0 left-0 font-semibold text-main cursor-pointer"
@@ -39,7 +38,6 @@ export function DescriptionWithReadMore({ text }: DescriptionProps) {
         </div>
       )}
 
-      {/* Botón de "Ver menos" que aparece cuando está expandido */}
       {isExpanded && (
         <Button
           variant="link"

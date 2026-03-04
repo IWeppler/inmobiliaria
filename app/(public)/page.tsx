@@ -7,7 +7,7 @@ import { Solutions } from "@/features/public/Solutions";
 export default async function Home() {
   const supabase = await createClientServer();
 
- const { data: properties, error } = await supabase
+  const { data: properties, error } = await supabase
     .from("properties")
     .select(
       `
@@ -22,7 +22,7 @@ export default async function Home() {
       street_address, 
       status,
       property_images ( image_url )
-    `
+    `,
     )
     .eq("status", "EN_VENTA")
     .order("created_at", { ascending: false })
@@ -37,22 +37,25 @@ export default async function Home() {
   return (
     <div className="flex min-h-screen flex-col items-start justify-center mx-2 md:mx-8">
       <Hero />
-      <main className="flex min-h-screen w-full flex-col items-center justify-start py-16">
+      <main className="flex min-h-screen w-full flex-col items-center justify-start py-16 md:py-32">
         <section className="w-full pb-16">
-  <h2 className="text-4xl md:text-5xl font-clash font-semibold mb-4">
-    Nuevas Propiedades
-  </h2>
+          <h2 className="text-4xl md:text-5xl font-clash font-semibold mb-4">
+            Nuevas Propiedades
+          </h2>
 
-  {safeProperties.length > 0 ? (
-    <div className="grid grid-cols-1 gap-2 md:grid-cols-2 lg:gap-6 lg:grid-cols-4 w-full">
-      {safeProperties.map((property) => (
-        <PropertyCard key={property.id} property={property as PropertyCardData} />
-      ))}
-    </div>
-  ) : (
-    <p>No hay propiedades disponibles en este momento.</p>
-  )}
-</section>
+          {safeProperties.length > 0 ? (
+            <div className="grid grid-cols-1 gap-2 md:grid-cols-2 lg:gap-6 lg:grid-cols-4 w-full">
+              {safeProperties.map((property) => (
+                <PropertyCard
+                  key={property.id}
+                  property={property as PropertyCardData}
+                />
+              ))}
+            </div>
+          ) : (
+            <p>No hay propiedades disponibles en este momento.</p>
+          )}
+        </section>
 
         <Solutions />
       </main>

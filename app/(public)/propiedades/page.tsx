@@ -38,7 +38,7 @@ export default async function PropiedadesPage({
       total_area, city, street_address, status,
       property_images ( image_url ),
       ${amenityJoin} ( amenity_id ) 
-    `
+    `,
   );
 
   // --- Aplicar Filtros de searchParams ---
@@ -99,63 +99,64 @@ export default async function PropiedadesPage({
 
   const properties: PropertyCardData[] = (data as PropertyCardData[]) || [];
 
- return (
-  <main className="flex min-h-screen w-full flex-col bg-complementary">
-    <div className="container mx-auto max-w-7xl p-4 md:py-24">
-      
-      {/* Header y Sort (Sin cambios) */}
-      <div className="flex flex-col md:flex-row justify-between md:items-center mb-8">
-        <h1 className="text-3xl md:text-4xl font-clash font-semibold">
-          Propiedades Disponibles
-        </h1>
-        <SortDropdown currentSort={searchParams.sortBy || "default"} />
-      </div>
+  return (
+    <main className="flex min-h-screen w-full flex-col bg-complementary">
+      <div className="container mx-auto max-w-[1600px] p-4 md:py-16">
+        {/* Header y Sort (Sin cambios) */}
+        <div className="flex flex-col md:flex-row justify-between md:items-center mb-8">
+          <h1 className="text-3xl md:text-4xl font-clash font-semibold">
+            Propiedades Disponibles
+          </h1>
+          <SortDropdown currentSort={searchParams.sortBy || "default"} />
+        </div>
 
-      {/* --- Layout de Grilla  --- */}
-      <div className="grid grid-cols-1 md:grid-cols-[280px_1fr] gap-8">
-        
-        {/* Sidebar */}
-        <aside className="
+        {/* --- Layout de Grilla  --- */}
+        <div className="grid grid-cols-1 md:grid-cols-[280px_1fr] gap-8">
+          {/* Sidebar */}
+          <aside
+            className="
           order-1 
           lg:order-0 
           h-fit 
           lg:sticky top-24
-        ">
-          <PropertyFilterList
-            types={propertyTypes as PropertyType[]}
-            amenities={amenities as Amenity[]}
-            cities={cities as string[]}
-            currentParams={searchParams}
-          />
-        </aside>
+        "
+          >
+            <PropertyFilterList
+              types={propertyTypes as PropertyType[]}
+              amenities={amenities as Amenity[]}
+              cities={cities as string[]}
+              currentParams={searchParams}
+            />
+          </aside>
 
-        {/* Cards Section */}
-        <section className="
+          {/* Cards Section */}
+          <section
+            className="
           order-2
           lg:order-0 
-        ">
-          {properties.length > 0 ? (
-            <div className="grid grid-cols-1 sm:grid-cols-1 md:grid-cols-1 lg:grid-cols-2 gap-6">
-              {properties.map((property) => (
-                <PropertyCard
-                  key={property.id}
-                  property={property as PropertyCardData}
-                />
-              ))}
-            </div>
-          ) : (
-            <div className="flex flex-col items-center justify-center h-96 w-full bg-white border border-zinc-200 rounded-lg">
-              <Search size={48} className="text-zinc-400 mb-4" />
-              <h3 className="text-xl mb-2 font-semibold">Sin resultados</h3>
-              <p className="text-zinc-500 px-4 text-center">
-                No se encontraron propiedades con esos filtros.
-              </p>
-            </div>
-          )}
-        </section>
-
+        "
+          >
+            {properties.length > 0 ? (
+              <div className="grid grid-cols-1 sm:grid-cols-1 md:grid-cols-1 lg:grid-cols-3 gap-6">
+                {properties.map((property) => (
+                  <PropertyCard
+                    key={property.id}
+                    property={property as PropertyCardData}
+                  />
+                ))}
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center h-96 w-full bg-white border border-zinc-200 rounded-lg">
+                <Search size={48} className="text-zinc-400 mb-4" />
+                <h3 className="text-xl mb-2 font-semibold">Sin resultados</h3>
+                <p className="text-zinc-500 px-4 text-center">
+                  No se encontraron propiedades con esos filtros.
+                </p>
+              </div>
+            )}
+          </section>
+        </div>
       </div>
-    </div>
-  </main>
-);
+    </main>
+  );
 }

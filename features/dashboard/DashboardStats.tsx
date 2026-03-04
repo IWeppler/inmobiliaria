@@ -43,9 +43,9 @@ export function DashboardStats({ stats }: StatsProps) {
   ];
 
   return (
-    <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+    <div className="grid grid-cols-2 md:grid-cols-4 gap-2 ">
       {items.map((item) => (
-        <Card key={item.label} className="border-zinc-200 shadow-sm">
+        <Card key={item.label} className="border-zinc-200 shadow-sm py-4">
           <CardContent className="flex items-center gap-2">
             <div className={`p-3 rounded-full ${item.bg} ${item.color}`}>
               <item.icon className="w-5 h-5" />

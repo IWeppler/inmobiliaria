@@ -27,7 +27,7 @@ async function getDashboardData() {
   let propQuery = supabase
     .from("properties")
     .select(
-      `*, property_types(name), property_images(image_url), agents(full_name), views_count`
+      `*, property_types(name), property_images(image_url), agents(full_name), views_count`,
     )
     .order("created_at", { ascending: false });
 
@@ -35,7 +35,7 @@ async function getDashboardData() {
     .from("leads")
     .select(`*, properties(title)`)
     .order("created_at", { ascending: false })
-    .limit(20); // Traemos un poco más para que la lista se vea llena
+    .limit(20);
 
   if (!isAdmin) {
     propQuery = propQuery.eq("agent_id", user.id);
@@ -51,11 +51,11 @@ async function getDashboardData() {
   const totalProperties = props.length;
   const totalViews = props.reduce(
     (acc, curr) => acc + (curr.views_count || 0),
-    0
+    0,
   );
   const totalLeads = leads?.length || 0;
   const activeProperties = props.filter(
-    (p) => p.status === "EN_VENTA" || p.status === "EN_ALQUILER"
+    (p) => p.status === "EN_VENTA" || p.status === "EN_ALQUILER",
   ).length;
 
   return {
@@ -82,8 +82,8 @@ export default async function DashboardPage() {
     data;
 
   return (
-    <div className="flex flex-col w-full max-w-312 lg:max-w-7xl mx-auto bg-zinc-50/50 px-4 gap-4 overflow-hidden">
-      {/* SECCIÓN SUPERIOR (FIJA) */}
+    <div className="flex flex-col w-full max-w-[1600px] mx-auto px-4 py-6 gap-3">
+      {/* SECCIÓN SUPERIOR */}
       <div className="flex flex-col gap-4 shrink-0">
         {/* Header */}
         <div className="flex items-center justify-between">
@@ -107,37 +107,32 @@ export default async function DashboardPage() {
         <DashboardStats stats={stats} />
       </div>
 
-      <div className="flex flex-col lg:flex-row gap-4 flex-1 min-h-0 max-h-150">
+      <div className="flex flex-col lg:flex-row gap-3 w-full">
         {/* COLUMNA IZQUIERDA: TABLA */}
-        <div className="flex flex-col bg-white rounded-xl border border-zinc-200 shadow-sm overflow-hidden">
-          <div className="py-2 px-4 border-b border-zinc-100 bg-white shrink-0 flex justify-between items-center">
+        <div className="flex flex-col flex-1 min-w-0 bg-white rounded-xl border border-zinc-200 shadow-sm overflow-hidden">
+          <div className="py-4 px-4 border-b border-zinc-100 bg-white flex justify-between items-center shrink-0">
             <h3 className="font-semibold text-zinc-900">Mis Propiedades</h3>
-            <span className="text-xs bg-zinc-100 text-zinc-600 px-2 py-1 rounded-full">
+            <span className="text-xs bg-zinc-100 text-zinc-600 px-3 py-1 rounded-full font-medium">
               {properties.length} listadas
             </span>
           </div>
 
-          {/* Scroll solo en la tabla */}
-          <div className="flex-1 overflow-auto p-0 scrollbar-thin">
-            {/* Wrapper para evitar scroll horizontal de toda la pagina */}
-            <div className="min-w-full inline-block align-middle">
-              <PropertyTable
-                initialProperties={properties}
-                currentUserId={currentUserId}
-                currentUserRole={currentUserRole}
-              />
-            </div>
+          <div className="p-2 w-full">
+            <PropertyTable
+              initialProperties={properties}
+              currentUserId={currentUserId}
+              currentUserRole={currentUserRole}
+            />
           </div>
         </div>
 
         {/* COLUMNA DERECHA: LEADS */}
-        <div className="flex flex-col bg-white rounded-xl border border-zinc-200 shadow-sm overflow-hidden">
-          <div className="py-2 px-4 border-b border-zinc-100 bg-zinc-50 shrink-0">
+        <div className="flex flex-col w-full lg:w-[260px] xl:w-[400px] shrink-0 bg-white rounded-xl border border-zinc-200 shadow-sm self-start overflow-hidden">
+          <div className="py-4 px-4 border-b border-zinc-100 bg-zinc-50 shrink-0">
             <h3 className="font-semibold text-zinc-900">Consultas Recientes</h3>
           </div>
 
-          {/* Scroll solo en la lista */}
-          <div className="flex-1 overflow-y-auto scrollbar-thin">
+          <div className="p-0">
             <LeadsWidget leads={leads} />
           </div>
         </div>

@@ -88,7 +88,9 @@ export const propertySchema = z.object({
   property_type_id: z.coerce
     .number()
     .min(1, { message: "Debes seleccionar un tipo." }),
-  price: z.coerce.number().min(1, { message: "El precio debe ser mayor a 0." }),
+  price: z.coerce
+    .number()
+    .min(0, { message: "El precio no puede ser negativo." }),
   expensas: z.coerce.number().optional().nullable(),
   bedrooms: z.coerce.number().min(0),
   bathrooms: z.coerce.number().min(0),
@@ -129,7 +131,7 @@ export function PropertyForm({ initialData }: PropertyFormProps) {
   const supabase = createClientBrowser();
 
   const [propertyTypes, setPropertyTypes] = useState<PropertyType[]>([]);
-  const [agents, setAgents] = useState<Agent[]>([]); // Estado para agentes
+  const [agents, setAgents] = useState<Agent[]>([]);
   const [files, setFiles] = useState<File[] | null>(null);
   const [geocodingLoading, setGeocodingLoading] = useState(false);
   const [allAmenities, setAllAmenities] = useState<Amenity[]>([]);
@@ -649,7 +651,12 @@ export function PropertyForm({ initialData }: PropertyFormProps) {
                   name="price"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Precio</FormLabel>
+                      <FormLabel>
+                        Precio{" "}
+                        <span className="text-zinc-400 font-normal ml-1">
+                          (0 = Consultar)
+                        </span>
+                      </FormLabel>
                       <FormControl>
                         <Input type="number" {...field} />
                       </FormControl>

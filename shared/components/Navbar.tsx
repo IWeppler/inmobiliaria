@@ -21,10 +21,13 @@ export function Navbar() {
   return (
     <>
       <nav className="w-full fixed top-0 left-0 bg-background/80 backdrop-blur-md z-40">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6">
+        <div className="max-w-[1600px] mx-auto px-4 sm:px-6">
           <div className="flex justify-between items-center h-16">
             {/* Logo / Home Link */}
-            <Link href="/" className="text-xl font-clash font-semibold text-foreground">
+            <Link
+              href="/"
+              className="text-xl font-clash font-semibold text-foreground"
+            >
               TerraNova
             </Link>
 
@@ -98,7 +101,7 @@ export function Navbar() {
             ))}
           </div>
 
-          <div className="pb-10 px-3">
+          <div className="pb-5 px-3">
             <Link
               href={whatsappLink}
               className="flex items-center justify-center w-full px-4 py-3 mb-6
@@ -127,7 +130,7 @@ export function Navbar() {
             </Link>
 
             {/* Redes Sociales */}
-            <div className="flex justify-center space-x-6 mb-6">
+            <div className="flex justify-center space-x-6 mb-12">
               <Link
                 href="https://facebook.com"
                 target="_blank"
@@ -148,7 +151,7 @@ export function Navbar() {
 
             {/* Dirección (del footer) */}
             <div className="text-center text-sm text-zinc-500 ">
-              <p>Gobernador Crespo 1658</p>
+              <p>Calle de Prueba 123</p>
               <p>Tostado, Santa Fe, Argentina</p>
             </div>
           </div>

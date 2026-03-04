@@ -72,7 +72,7 @@ function ServiceCard({
 
 export const Solutions = () => {
   return (
-    <section className="w-full py-16">
+    <section className="w-full py-16 md:py-32">
       <div className="container mx-auto max-w-7xl">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-20 items-start">
           

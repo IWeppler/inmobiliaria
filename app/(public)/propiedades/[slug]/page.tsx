@@ -12,6 +12,7 @@ import {
   Car,
   CheckCircle,
   ArrowRight,
+  ArrowLeft,
 } from "lucide-react";
 
 import { ClientPropertyMap } from "@/features/properties/ClientPropertyMap";
@@ -57,18 +58,34 @@ async function getRecommendedProperties(
   city: string | null,
   operationType: string,
 ) {
-  if (!city) return [];
-
   const supabase = await createClientServer();
-  const { data } = await supabase
+
+  // 1. Buscamos primero en la misma ciudad y misma operación
+  let { data } = await supabase
     .from("properties")
     .select(
       "id, title, price, currency, city, province, bedrooms, total_area, property_images(image_url)",
     )
-    .eq("city", city)
     .eq("operation_type", operationType)
+    .in("status", ["EN_VENTA", "EN_ALQUILER"])
+    .eq("city", city || "")
     .neq("id", currentId)
     .limit(3);
+
+  // 2. FALLBACK: Si no encuentra suficientes en la misma ciudad, busca en cualquier ciudad
+  if (!data || data.length === 0) {
+    const fallback = await supabase
+      .from("properties")
+      .select(
+        "id, title, price, currency, city, province, bedrooms, total_area, property_images(image_url)",
+      )
+      .eq("operation_type", operationType)
+      .in("status", ["EN_VENTA", "EN_ALQUILER"])
+      .neq("id", currentId)
+      .limit(3);
+
+    data = fallback.data;
+  }
 
   return data || [];
 }
@@ -219,13 +236,20 @@ export default async function PropertyPage({
     property_images?.map((img) => img.image_url).filter(Boolean) || [];
 
   return (
-    <main className="bg-white min-h-screen">
+    <main className="min-h-screen">
       <ViewCounter propertyId={property.id} />
       <PropertyJsonLd property={property} />
 
-      <div className="container mx-auto max-w-7xl p-4 md:p-8 py-8 md:py-12">
+      <div className="container mx-auto max-w-[1600px] p-4 md:p-8 py-8">
         {/* Header */}
         <header className="mb-8 md:mb-12">
+          <Link
+            href="/propiedades"
+            className="flex gap-1 items-center mb-4 hover:underline cursor-pointer"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            <p>Volver a las propiedades</p>
+          </Link>
           <div className="flex flex-col md:flex-row justify-between md:items-end mb-3 gap-4">
             <h1 className="font-clash text-3xl md:text-5xl font-semibold leading-tight max-w-4xl text-zinc-900">
               {title}
@@ -233,7 +257,7 @@ export default async function PropertyPage({
             <div className="md:text-right shrink-0">
               <div className="flex justify-end items-center gap-3 mb-2">
                 <ShareButton title={title} />
-                <span className="text-xs font-bold tracking-wider text-black bg-zinc-100 px-3 py-1.5 rounded-full uppercase">
+                <span className="text-xs font-semibold tracking-wider text-white bg-main px-3 py-1.5 rounded-full uppercase">
                   {statusDisplay}
                 </span>
               </div>
@@ -249,7 +273,6 @@ export default async function PropertyPage({
         </header>
 
         <ImageGallery images={images as string[]} />
-
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 mt-16">
           {/* Columna Principal (8 columnas) */}
@@ -416,8 +439,8 @@ export default async function PropertyPage({
               {recommendedProperties.map((prop) => {
                 const mainImg =
                   prop.property_images?.[0]?.image_url || "/placeholder.jpg";
-                let priceFmt = "Consultar";
-                if (prop.price) {
+                let priceFmt = "Consultar Precio";
+                if (prop.price && prop.price > 0) {
                   priceFmt = `${prop.currency} $${prop.price.toLocaleString(
                     "es-AR",
                   )}`;

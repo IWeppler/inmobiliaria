@@ -11,9 +11,9 @@ import {
   MoreHorizontal,
   Edit,
   Trash,
-  ArrowUpDown,
   Loader2,
   Shield,
+  FileText, // <-- NUEVO ICONO IMPORTADO
 } from "lucide-react";
 
 import {
@@ -203,7 +203,7 @@ export function PropertyTable({
 
   return (
     <>
-      <div className="flex flex-col md:flex-row items-center gap-4 p-2 max-w-2xl">
+      <div className="flex flex-col md:flex-row items-center gap-3 py-2 max-w-2xl">
         <Input
           placeholder="Buscar por título, dirección o ciudad..."
           value={filterText}
@@ -229,8 +229,6 @@ export function PropertyTable({
           <Table>
             <TableHeader>
               <TableRow className="whitespace-nowrap">
-                {" "}
-                {/* Evita que los encabezados se amontonen */}
                 <TableHead className="w-20">Imagen</TableHead>
                 <TableHead>Título</TableHead>
                 <TableHead className="hidden md:table-cell">
@@ -241,7 +239,7 @@ export function PropertyTable({
                 <TableHead className="hidden lg:table-cell">
                   Operación
                 </TableHead>
-                <TableHead className="w-[160px]">Estado</TableHead>
+                <TableHead className="w-[120px]">Estado</TableHead>
                 <TableHead>Precio</TableHead>
                 <TableHead className="w-[50px]"></TableHead>
               </TableRow>
@@ -281,7 +279,7 @@ export function PropertyTable({
                       </div>
                     </TableCell>
 
-                    <TableCell className="font-medium max-w-[200px]">
+                    <TableCell className="font-medium max-w-[100px]">
                       {" "}
                       <Link
                         href={`/dashboard/propiedades/editar/${property.id}`}
@@ -292,7 +290,7 @@ export function PropertyTable({
                       </Link>
                     </TableCell>
 
-                    <TableCell className="hidden md:table-cell text-muted-foreground text-sm">
+                    <TableCell className="hidden md:table-cell text-muted-foreground truncate text-sm max-w-[100px]">
                       {property.street_address || "-"}
                     </TableCell>
 
@@ -317,11 +315,11 @@ export function PropertyTable({
                         disabled={!canEdit}
                       >
                         <SelectTrigger
-                          className={`h-8 w-full text-xs font-semibold border-0 ring-0 focus:ring-0 shadow-none ${currentColorClass}`}
+                          className={`h-8 max-w-[80px] text-xs font-semibold border-0 ring-0 focus:ring-0 shadow-none ${currentColorClass}`}
                         >
                           <SelectValue />
                         </SelectTrigger>
-                        <SelectContent>
+                        <SelectContent className="max-w-[80px]">
                           {Object.keys(statusLabels).map((statusKey) => (
                             <SelectItem key={statusKey} value={statusKey}>
                               {statusLabels[statusKey]}
@@ -351,7 +349,18 @@ export function PropertyTable({
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
                             <DropdownMenuLabel>Acciones</DropdownMenuLabel>
+                            {/* --- BOTÓN DE PDF --- */}
+                            <DropdownMenuItem asChild>
+                              <Link
+                                href={`/dashboard/propiedades/pdf/${property.id}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                              >
+                                <FileText className="mr-2 h-4 w-4" /> Ficha PDF
+                              </Link>
+                            </DropdownMenuItem>
 
+                            {/* --- BOTÓN DE EDITAR --- */}
                             <DropdownMenuItem asChild>
                               <Link
                                 href={`/dashboard/propiedades/editar/${property.id}`}
@@ -360,11 +369,13 @@ export function PropertyTable({
                               </Link>
                             </DropdownMenuItem>
 
+                            {/* --- BOTÓN DE ELIMINAR --- */}
                             <DropdownMenuItem
                               onClick={() => setPropertyToDelete(property)}
                               className="text-red-600 focus:text-red-600 focus:bg-red-50"
                             >
-                              <Trash className="mr-2 h-4 w-4" /> Borrar
+                              <Trash className="mr-2 h-4 w-4 text-red-500" />{" "}
+                              Borrar
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
