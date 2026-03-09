@@ -55,7 +55,7 @@ export default function PropertyCard({ property }: PropertyCardProps) {
     .join(", ");
 
   return (
-    <div className="bg-white p-4 rounded-2xl border border-zinc-200 shadow-xs transition-all duration-300">
+    <div className="bg-white p-2 rounded-2xl border border-zinc-200 shadow-xs transition-all duration-300">
       {/* Imagen */}
       <div className="relative w-full h-56 group rounded-xl overflow-hidden">
         <Link
@@ -81,13 +81,13 @@ export default function PropertyCard({ property }: PropertyCardProps) {
           <>
             <button
               onClick={goToPrev}
-              className="absolute left-2 top-1/2 -translate-y-1/2 z-10 p-1.5 bg-white/90 rounded-full shadow-sm opacity-0 group-hover:opacity-100 transition-opacity hover:bg-white"
+              className="absolute left-2 top-1/2 -translate-y-1/2 z-10 p-1.5 bg-white/90 rounded-full shadow-sm opacity-0 group-hover:opacity-100 transition-opacity hover:bg-white cursor-pointer"
             >
               <ChevronLeft size={20} className="text-zinc-800" />
             </button>
             <button
               onClick={goToNext}
-              className="absolute right-2 top-1/2 -translate-y-1/2 z-10 p-1.5 bg-white/90 rounded-full shadow-sm opacity-0 group-hover:opacity-100 transition-opacity hover:bg-white"
+              className="absolute right-2 top-1/2 -translate-y-1/2 z-10 p-1.5 bg-white/90 rounded-full shadow-sm opacity-0 group-hover:opacity-100 transition-opacity hover:bg-white cursor-pointer"
             >
               <ChevronRight size={20} className="text-zinc-800" />
             </button>

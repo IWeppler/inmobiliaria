@@ -35,16 +35,17 @@ export default async function Home() {
   const safeProperties = properties ?? [];
 
   return (
-    <div className="flex min-h-screen flex-col items-start justify-center mx-2 md:mx-8">
+    <div className="flex min-h-screen flex-col items-start justify-center w-full">
       <Hero />
-      <main className="flex min-h-screen w-full flex-col items-center justify-start py-16 md:py-32">
-        <section className="w-full pb-16">
-          <h2 className="text-4xl md:text-5xl font-clash font-semibold mb-4">
+
+      <main className="flex w-full flex-col items-center justify-start bg-foreground text-white">
+        <section className="w-full mx-auto px-2 md:px-6 pb-16 md:py-24">
+          <h2 className="text-4xl md:text-5xl font-clash font-semibold mb-10">
             Nuevas Propiedades
           </h2>
 
           {safeProperties.length > 0 ? (
-            <div className="grid grid-cols-1 gap-2 md:grid-cols-2 lg:gap-6 lg:grid-cols-4 w-full">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:gap-6 lg:grid-cols-4 w-full">
               {safeProperties.map((property) => (
                 <PropertyCard
                   key={property.id}
@@ -53,12 +54,17 @@ export default async function Home() {
               ))}
             </div>
           ) : (
-            <p>No hay propiedades disponibles en este momento.</p>
+            <p className="text-zinc-400">
+              No hay propiedades disponibles en este momento.
+            </p>
           )}
         </section>
-
-        <Solutions />
       </main>
+
+      {/* Volvemos al fondo blanco para la siguiente sección */}
+      <div className="w-full bg-background text-foreground">
+        <Solutions />
+      </div>
     </div>
   );
 }

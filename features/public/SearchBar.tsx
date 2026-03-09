@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { MapPin } from "lucide-react";
+import { MapPin, Search, Home } from "lucide-react";
 import { Button } from "@/shared/components/ui/button";
 import {
   Select,
@@ -11,6 +11,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/shared/components/ui/select";
+import { motion } from "framer-motion";
 
 type LocationOption = {
   city: string;
@@ -31,7 +32,7 @@ type HeroSearchCardProps = {
 export function SearchBar({ propertyTypes, locations }: HeroSearchCardProps) {
   const router = useRouter();
 
-  const [operation, setOperation] = useState("");
+  const [operation, setOperation] = useState("venta");
   const [propertyTypeId, setPropertyTypeId] = useState<string>("all");
   const [locationValue, setLocationValue] = useState<string>("all");
 
@@ -57,98 +58,139 @@ export function SearchBar({ propertyTypes, locations }: HeroSearchCardProps) {
   };
 
   const tabs = [
-    { label: "Venta", value: "venta" },
-    { label: "Alquiler", value: "alquiler" },
+    { label: "Comprar", value: "venta" },
+    { label: "Alquilar", value: "alquiler" },
   ];
 
   return (
-    <div className="w-full bg-white p-4 rounded-2xl shadow-2xl">
-      <div className="flex w-full md:max-w-44 gap-4 border-b border-zinc-200 mb-6">
-        {tabs.map((tab) => (
-          <button
-            key={tab.value}
-            onClick={() => setOperation(tab.value)}
-            className={`
-        flex-1 pb-3 text-base md:text-lg font-medium transition-colors text-center relative
-        ${
-          operation === tab.value
-            ? "text-black border-b-2 border-black -mb-px"
-            : "text-zinc-500 hover:text-black"
-        }
-      `}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
-
-      {/* 2. Formulario de Búsqueda */}
+    <div className="-mt-8 w-full max-w-5xl mx-auto bg-white p-2 rounded-xl md:rounded-full shadow-2xl transition-all duration-300 border border-zinc-100">
       <form
         onSubmit={handleSearch}
-        className="flex flex-col gap-4 sm:flex-row md:items-center"
+        className="flex flex-col md:flex-row items-center w-full gap-2 md:gap-0"
       >
-        {/* 2.1. Select de Tipo de Propiedad */}
-        <Select value={propertyTypeId} onValueChange={setPropertyTypeId}>
-          <SelectTrigger
-            className="relative w-full sm:w-46 md:col-span-1 h-14 text-base text-zinc-700 flex items-center"
-            style={{ height: "56px", minHeight: "56px" }}
-          >
-            <SelectValue placeholder="Tipo de Propiedad" />
-          </SelectTrigger>
-          <SelectContent
-            side="bottom"
-            position="popper"
-            align="start"
-            className="z-9999"
-          >
-            <SelectItem value="all">Todos los Tipos</SelectItem>
-            {propertyTypes?.map((type) => (
-              <SelectItem key={type.id} value={String(type.id)}>
-                {type.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        {/* 1. TOGGLE DE OPERACIÓN */}
+        <div className="flex bg-zinc-100 p-1.5 rounded-full w-full md:w-auto shrink-0 md:mr-3">
+          {tabs.map((tab) => {
+            const isActive = operation === tab.value;
 
-        {/* 2.2. Input de Ubicación */}
-        <div className="flex-1 relative">
-          <Select value={locationValue} onValueChange={setLocationValue}>
-            <SelectTrigger
-              className="w-full h-14 text-base text-zinc-700 flex items-center gap-2 pl-4"
-              style={{ height: "56px", minHeight: "56px" }}
-            >
-              <div className="flex items-center gap-3 w-full">
-                <MapPin className="h-5 w-5 text-zinc-400 shrink-0" />
-                <SelectValue placeholder="Seleccionar Ubicación" />
-              </div>
-            </SelectTrigger>
-
-            <SelectContent position="popper" className="max-h-[200px] z-9999">
-              <SelectItem value="all">Todas las zonas</SelectItem>
-              {locations?.length > 0 ? (
-                locations.map((loc, index) => (
-                  <SelectItem key={index} value={loc.label}>
-                    <span className="font-medium">{loc.city}</span>
-                    <span className="text-zinc-400 ml-2 text-sm">
-                      {loc.province}
-                    </span>
-                  </SelectItem>
-                ))
-              ) : (
-                <div className="p-2 text-sm text-zinc-500 text-center">
-                  No hay ubicaciones cargadas
-                </div>
-              )}
-            </SelectContent>
-          </Select>
+            return (
+              <button
+                key={tab.value}
+                type="button"
+                onClick={() => setOperation(tab.value)}
+                className={`
+                  relative flex-1 md:flex-none px-6 py-2.5 text-[15px] font-semibold rounded-full transition-colors duration-200
+                  ${
+                    isActive
+                      ? "text-foreground"
+                      : "text-muted-foreground hover:text-foreground cursor-pointer"
+                  }
+                `}
+              >
+                {isActive && (
+                  <motion.div
+                    layoutId="active-operation-pill"
+                    className="absolute inset-0 bg-white shadow-sm rounded-full"
+                    transition={{ type: "spring", stiffness: 400, damping: 30 }}
+                  />
+                )}
+                <span className="relative z-10">{tab.label}</span>
+              </button>
+            );
+          })}
         </div>
 
-        {/* 2.3. Botón de Búsqueda */}
+        <div className="hidden md:block w-px h-10 bg-zinc-200 mx-2 shrink-0" />
+
+        {/* 2. SELECT DE UBICACIÓN */}
+        <div className="flex-1 w-full px-2 md:px-4 flex items-center gap-2 py-2 transition-colors group min-w-0">
+          <div className="bg-zinc-100 p-2.5 rounded-full text-muted-foreground hidden md:flex shrink-0">
+            <MapPin className="w-[18px] h-[18px]" />
+          </div>
+          <div className="flex-1 min-w-0 flex flex-col justify-center">
+            <Select value={locationValue} onValueChange={setLocationValue}>
+              <SelectTrigger className="w-full border-0 shadow-none focus:ring-0 focus:ring-offset-0 p-2 md:p-0 h-auto bg-transparent rounded-none text-[15px] md:text-base font-medium text-foreground transition-all [&>span]:truncate [&>svg]:text-muted-foreground [&>svg]:w-4 [&>svg]:h-4 [&>svg]:ml-2">
+                <SelectValue placeholder="Todas las zonas" />
+              </SelectTrigger>
+
+              <SelectContent
+                position="popper"
+                className="max-h-[300px] z-9999 rounded-2xl p-2"
+              >
+                <SelectItem
+                  value="all"
+                  className="rounded-xl text-base py-3 cursor-pointer"
+                >
+                  Ubicación
+                </SelectItem>
+                {locations?.length > 0 ? (
+                  locations.map((loc, index) => (
+                    <SelectItem
+                      key={index}
+                      value={loc.label}
+                      className="rounded-xl py-3 cursor-pointer"
+                    >
+                      <span className="font-medium">{loc.city}</span>
+                      <span className="text-muted-foreground ml-2 text-sm">
+                        {loc.province}
+                      </span>
+                    </SelectItem>
+                  ))
+                ) : (
+                  <div className="p-4 text-sm text-muted-foreground text-center">
+                    No hay ubicaciones cargadas
+                  </div>
+                )}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        <div className="hidden md:block w-px h-10 bg-zinc-200 mx-2 shrink-0" />
+
+        {/* 3. SELECT DE TIPO DE PROPIEDAD */}
+        <div className="flex-1 w-full px-2 md:px-4 flex items-center gap-2 py-2 transition-colors group min-w-0">
+          <div className="bg-zinc-100 p-2.5 rounded-full text-muted-foreground  hidden md:flex shrink-0 ">
+            <Home className="w-[18px] h-[18px]" />
+          </div>
+          <div className="flex-1 min-w-0 flex flex-col justify-center">
+            <Select value={propertyTypeId} onValueChange={setPropertyTypeId}>
+              <SelectTrigger className="w-full border-0 shadow-none focus:ring-0 focus:ring-offset-0 p-2 md:p-0 h-auto bg-transparent rounded-none text-[15px] md:text-base font-medium text-foreground transition-all [&>span]:truncate [&>svg]:text-muted-foreground [&>svg]:w-4 [&>svg]:h-4 [&>svg]:ml-2">
+                <SelectValue placeholder="Cualquier propiedad" />
+              </SelectTrigger>
+              <SelectContent
+                side="bottom"
+                position="popper"
+                align="start"
+                className="z-9999 rounded-2xl p-2"
+              >
+                <SelectItem
+                  value="all"
+                  className="rounded-xl text-base py-3 cursor-pointer"
+                >
+                  Tipo
+                </SelectItem>
+                {propertyTypes?.map((type) => (
+                  <SelectItem
+                    key={type.id}
+                    value={String(type.id)}
+                    className="rounded-xl py-3 cursor-pointer"
+                  >
+                    {type.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        {/* 4. BOTÓN DE BÚSQUEDA */}
         <Button
           type="submit"
-          className="md:col-span-1 h-14 text-base bg-foreground hover:bg-foreground/90 cursor-pointer"
+          className="w-full md:w-auto h-12 md:h-14 px-8 rounded-3xl md:rounded-full bg-foreground hover:bg-foreground/90 text-background md:text-base font-semibold transition-all mt-2 md:mt-0 shrink-0 md:ml-3 cursor-pointer"
         >
-          Buscar
+          <Search className="w-[18px] h-[18px] mr-1" />
+          <span>Buscar</span>
         </Button>
       </form>
     </div>

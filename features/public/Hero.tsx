@@ -19,42 +19,43 @@ export async function Hero() {
   const locations = await getUniqueLocations();
 
   return (
-    <section className="relative min-h-[75dvh] md:h-[80dvh] w-full mx-auto flex flex-col justify-center items-center">
-      {/* Imagen de Fondo */}
-      <Image
-        src="/bg-hero.avif"
-        alt="hero de la inmobiliaria en Tostado Santa Fe"
-        fill
-        priority
-        style={{ objectFit: "cover" }}
-        className="rounded-4xl"
-      />
-
-      {/* Overlay */}
-      <div className="absolute inset-0 rounded-4xl bg-linear-to-t from-black/80 via-black/40 to-black/30 backdrop-blur-[1px] z-10" />
-
-      {/* Contenido */}
-      <div className="relative z-20 flex flex-col items-center w-full max-w-5xl py-4 px-6 text-center">
-        {/* Título */}
-        <h1 className="font-clash text-4xl px-2 md:px-0 md:text-7xl font-semibold mb-4 text-white drop-shadow-xl leading-[1.1]">
-          Tu próximo hogar o inversión
+    <section className="w-full pt-14 flex flex-col items-center relative">
+      
+      {/* 1. TEXTO SUPERIOR */}
+      <div className="relative z-20 flex flex-col items-center w-full max-w-5xl px-4 text-center mb-8 md:mb-12">
+        <h1 className="font-clash text-5xl md:text-7xl lg:text-[5.5rem] font-semibold mb-3 text-foreground tracking-tight leading-[1.05]">
+          Encontrá tu hogar ideal <br />
+          <span>con TerraNova</span>
         </h1>
 
-        {/* Subtítulo */}
-        <p className="text-md md:text-xl text-white/90 mb-10 max-w-3xl leading-relaxed drop-shadow">
-          La oferta más completa de propiedades urbanas y rurales. Desde tu
-          primera casa hasta grandes hectáreas de inversión, encontralo todo en
-          un solo lugar.
+        <p className="text-lg md:text-xl text-muted-foreground max-w-2xl leading-relaxed">
+          Explorá la oferta más completa de propiedades. Desde tu primera casa
+          hasta grandes hectáreas de inversión en un solo lugar.
         </p>
+      </div>
 
-        {/* SearchBar */}
-        <div className="shadow-2xl w-full max-w-3xl px-4 md:px-0 ">
-          <SearchBar
-            locations={locations}
-            propertyTypes={propertyTypes as PropertyType[]}
+      {/* 2. SEARCHBAR  */}
+      <div className="relative z-30 w-full max-w-4xl px-4 -mb-8 md:-mb-10">
+        <SearchBar
+          locations={locations}
+          propertyTypes={propertyTypes as PropertyType[]}
+        />
+      </div>
+
+      {/* 3. IMAGEN INFERIOR */}
+      <div className="w-full max-w-7xl mx-auto px-4 relative z-10 flex flex-col">
+        <div className="relative w-full h-[400px] md:h-[600px] rounded-t-3xl md:rounded-4xl overflow-hidden shadow-[0_30px_60px_-15px_rgba(0,0,0,0.5)]">
+          <Image
+            src="/bghero3.jpg"
+            alt="Hero de la inmobiliaria en Tostado Santa Fe"
+            fill
+            priority
+            className="object-cover"
           />
         </div>
       </div>
+
+      <div className="absolute bottom-0 left-0 right-0 h-[100px] md:h-[200px] bg-foreground z-0"></div>
     </section>
   );
 }
