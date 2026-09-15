@@ -1,0 +1,186 @@
+@import "tailwindcss";
+
+@import "tw-animate-css";
+
+@theme inline {
+  /* --- FUENTES --- */
+  --font-clash: "Clash Grotesk", sans-serif;
+  --font-general: "General Sans", sans-serif;
+  --font-serif: "Lora", Georgia, serif;
+
+  /* --- COLORES --- */
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-main: #004fbe;
+  --color-main-red: #c4171d;
+
+  /* --- DESIGN SYSTEM "TINTA Y PAPEL" (etapa /dashboard) --- */
+  --color-tn-surface: #faf9f7;
+  --color-tn-surface-raised: #ffffff;
+  --color-tn-border-subtle: #e9e7e2;
+  --color-tn-border-strong: #cfccc5;
+  --color-tn-ink: #1a1a1a;
+  --color-tn-ink-soft: #f0eeea;
+  --color-tn-ink-contrast: #ffffff;
+  --color-tn-text-primary: #1c1b1a;
+  --color-tn-text-secondary: #5d5a55;
+  --color-tn-text-muted: #9a968f;
+
+  /* Badges de estado — propiedad (5) */
+  --color-en-venta: #6762c5;
+  --color-en-venta-bg: #eae8f9;
+  --color-en-alquiler: #145e8c;
+  --color-en-alquiler-bg: #dbedf8;
+  --color-reservado: #fbbf29;
+  --color-reservado-bg: #fbf3d9;
+  --color-vendido: #89b341;
+  --color-vendido-bg: #ebf2dc;
+  --color-alquilado: #0c6b5d;
+  --color-alquilado-bg: #d7f0e7;
+
+  /* Badges de estado — lead (6) */
+  --color-lead-nuevo: #a83a52;
+  --color-lead-nuevo-bg: #fae3e8;
+  --color-lead-contactado: #145e8c;
+  --color-lead-contactado-bg: #dbedf8;
+  --color-lead-visita: #6762c5;
+  --color-lead-visita-bg: #eae8f9;
+  --color-lead-negociacion: #9a4a22;
+  --color-lead-negociacion-bg: #f7e5dc;
+  --color-lead-cerrado: #89b341;
+  --color-lead-cerrado-bg: #ebf2dc;
+  --color-lead-descartado: #8a8781;
+  --color-lead-descartado-bg: #edebe7;
+
+  /* Paleta de charts */
+  --color-tn-chart-1: #4f58c4;
+  --color-tn-chart-2: #c05b2e;
+  --color-tn-chart-3: #12897a;
+  --color-tn-chart-4: #c28e1b;
+
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+html,
+body {
+  font-family: var(--font-general), sans-serif;
+}
+
+:root {
+  --radius: 0.625rem;
+  --background: #f6f6f7;
+  --foreground: #162033;
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.141 0.005 285.823);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.141 0.005 285.823);
+  --primary: oklch(0.21 0.006 285.885);
+  --primary-foreground: oklch(0.985 0 0);
+  --secondary: oklch(0.967 0.001 286.375);
+  --secondary-foreground: oklch(0.21 0.006 285.885);
+  --muted: oklch(0.967 0.001 286.375);
+  --muted-foreground: oklch(0.552 0.016 285.938);
+  --accent: oklch(0.967 0.001 286.375);
+  --accent-foreground: oklch(0.21 0.006 285.885);
+  --destructive: oklch(0.577 0.245 27.325);
+  --border: oklch(0.92 0.004 286.32);
+  --input: oklch(0.92 0.004 286.32);
+  --ring: oklch(0.705 0.015 286.067);
+  --chart-1: oklch(0.646 0.222 41.116);
+  --chart-2: oklch(0.6 0.118 184.704);
+  --chart-3: oklch(0.398 0.07 227.392);
+  --chart-4: oklch(0.828 0.189 84.429);
+  --chart-5: oklch(0.769 0.188 70.08);
+  --sidebar: oklch(0.985 0 0);
+  --sidebar-foreground: oklch(0.141 0.005 285.823);
+  --sidebar-primary: oklch(0.21 0.006 285.885);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.967 0.001 286.375);
+  --sidebar-accent-foreground: oklch(36.657% 0.25406 264.073);
+  --sidebar-border: oklch(0.92 0.004 286.32);
+  --sidebar-ring: oklch(0.705 0.015 286.067);
+}
+
+/* --- SCOPE "TINTA Y PAPEL" ---
+   Remapea las variables que shadcn/ui espera (--background, --card, --primary,
+   --border, --radius, --sidebar-*) a los tokens del nuevo design system.
+   Al ser un scope por clase (no :root), Card/Button/Table/Badge heredan el
+   look nuevo automáticamente sin reescribirse, y solo dentro de los
+   contenedores que llevan esta clase (hoy: /dashboard). El resto de las
+   rutas sigue usando los valores de :root sin cambios. */
+.theme-tn {
+  --background: var(--color-tn-surface);
+  --foreground: var(--color-tn-text-primary);
+  --card: var(--color-tn-surface-raised);
+  --card-foreground: var(--color-tn-text-primary);
+  --popover: var(--color-tn-surface-raised);
+  --popover-foreground: var(--color-tn-text-primary);
+  --primary: var(--color-tn-ink);
+  --primary-foreground: var(--color-tn-ink-contrast);
+  --secondary: var(--color-tn-ink-soft);
+  --secondary-foreground: var(--color-tn-text-primary);
+  --muted: var(--color-tn-ink-soft);
+  --muted-foreground: var(--color-tn-text-muted);
+  --accent: var(--color-tn-ink-soft);
+  --accent-foreground: var(--color-tn-ink);
+  --border: var(--color-tn-border-subtle);
+  --input: var(--color-tn-border-subtle);
+  --ring: var(--color-tn-border-strong);
+  --color-main: var(--color-tn-ink);
+
+  --radius: 0.625rem;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 18px;
+
+  --sidebar: var(--color-tn-surface);
+  --sidebar-foreground: var(--color-tn-text-secondary);
+  --sidebar-primary: var(--color-tn-ink);
+  --sidebar-primary-foreground: var(--color-tn-ink-contrast);
+  --sidebar-accent: var(--color-tn-surface-raised);
+  --sidebar-accent-foreground: var(--color-tn-text-primary);
+  --sidebar-border: var(--color-tn-border-subtle);
+  --sidebar-ring: var(--color-tn-border-strong);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}

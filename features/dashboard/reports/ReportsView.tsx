@@ -1,0 +1,228 @@
+import Link from "next/link";
+import { ArrowDownRight, ArrowUpRight, Minus, AlertTriangle } from "lucide-react";
+import type { ReportData } from "@/features/dashboard/reports/getReportData";
+import { REPORT_THRESHOLDS } from "@/features/dashboard/reports/getReportData";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/shared/components/ui/table";
+
+function fmtMoney(currency: string, amount: number) {
+  return `${currency} ${amount.toLocaleString("es-AR", {
+    maximumFractionDigits: 0,
+  })}`;
+}
+
+function Section({
+  title,
+  subtitle,
+  children,
+}: {
+  title: string;
+  subtitle?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="bg-card rounded-md border border-border shadow-none overflow-hidden">
+      <div className="py-4 px-4 border-b border-border">
+        <h3 className="font-serif font-semibold text-foreground">{title}</h3>
+        {subtitle && (
+          <p className="text-xs text-muted-foreground mt-0.5">{subtitle}</p>
+        )}
+      </div>
+      <div className="p-4">{children}</div>
+    </section>
+  );
+}
+
+// E1.5 — Funnel. Una sola serie (una etapa tras otra), un solo tono: la
+// magnitud la lleva el largo de la barra, la etiqueta y el % respecto a la
+// etapa anterior van como texto, no como color.
+function Funnel({ stages }: { stages: ReportData["funnel"] }) {
+  const max = Math.max(1, ...stages.map((s) => s.count));
+  return (
+    <ol className="flex flex-col gap-3">
+      {stages.map((s, i) => {
+        const prev = i > 0 ? stages[i - 1].count : null;
+        const pct =
+          prev && prev > 0 ? Math.round((s.count / prev) * 100) : null;
+        const width = Math.max(2, (s.count / max) * 100);
+        return (
+          <li key={s.key} className="grid grid-cols-[130px_1fr_auto] items-center gap-3">
+            <span className="text-sm text-foreground">{s.label}</span>
+            <div className="h-5 w-full bg-secondary/60 rounded-sm overflow-hidden">
+              <div
+                className="h-full bg-primary rounded-r-sm"
+                style={{ width: `${width}%` }}
+                title={`${s.label}: ${s.count}`}
+              />
+            </div>
+            <span className="text-sm tabular-nums text-foreground min-w-[110px] text-right">
+              {s.count.toLocaleString("es-AR")}
+              {pct !== null && (
+                <span className="text-xs text-muted-foreground ml-1.5">
+                  ({pct}%)
+                </span>
+              )}
+            </span>
+          </li>
+        );
+      })}
+    </ol>
+  );
+}
+
+// E1.6 — Ingresos mes vs. mes anterior, agrupado por moneda (no se mezcla
+// USD con ARS en un mismo número).
+function Revenue({ revenue }: { revenue: ReportData["revenue"] }) {
+  const { current, previous } = revenue;
+  const currencies = Array.from(
+    new Set([
+      ...Object.keys(current.byCurrency),
+      ...Object.keys(previous.byCurrency),
+    ])
+  );
+
+  const Trend = ({ now, before }: { now: number; before: number }) => {
+    if (before === 0 && now === 0)
+      return <Minus className="size-3.5 text-muted-foreground" />;
+    if (now >= before)
+      return <ArrowUpRight className="size-3.5 text-emerald-700" />;
+    return <ArrowDownRight className="size-3.5 text-red-700" />;
+  };
+
+  return (
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      {[current, previous].map((m) => (
+        <div
+          key={m.label}
+          className="rounded-md border border-border p-4 flex flex-col gap-2"
+        >
+          <span className="text-sm font-medium text-muted-foreground">
+            {m.label}
+          </span>
+          {currencies.length === 0 ? (
+            <span className="text-[28px] leading-none font-serif font-medium tracking-tight text-foreground">
+              —
+            </span>
+          ) : (
+            currencies.map((c) => (
+              <div key={c} className="flex items-center gap-2">
+                <span className="text-[28px] leading-none font-serif font-medium tracking-tight text-foreground">
+                  {fmtMoney(c, m.byCurrency[c] ?? 0)}
+                </span>
+                {m === current && (
+                  <Trend
+                    now={current.byCurrency[c] ?? 0}
+                    before={previous.byCurrency[c] ?? 0}
+                  />
+                )}
+              </div>
+            ))
+          )}
+          <span className="text-xs text-muted-foreground">
+            {m.deals} {m.deals === 1 ? "operación cerrada" : "operaciones cerradas"}
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+export function ReportsView({ data }: { data: ReportData }) {
+  const { MIN_VIEWS, LOW_RATIO } = REPORT_THRESHOLDS;
+  return (
+    <div className="flex flex-col gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        {[
+          { label: "Propiedades activas", value: data.totals.activeProperties },
+          { label: "Leads abiertos", value: data.totals.openLeads },
+          {
+            label: "Operaciones cerradas (histórico)",
+            value: data.totals.closedDealsAllTime,
+          },
+        ].map((t) => (
+          <div
+            key={t.label}
+            className="bg-card p-5 rounded-md border border-border shadow-none"
+          >
+            <span className="text-sm font-medium text-muted-foreground block mb-3">
+              {t.label}
+            </span>
+            <span className="text-[36px] leading-none font-serif font-medium tracking-tight text-foreground">
+              {t.value}
+            </span>
+          </div>
+        ))}
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <Section
+          title="Funnel de conversión"
+          subtitle="Vistas → Leads → Visita agendada → Cerrado. Porcentaje respecto a la etapa anterior."
+        >
+          <Funnel stages={data.funnel} />
+        </Section>
+
+        <Section
+          title="Ingresos"
+          subtitle="Según la fecha en que la propiedad pasó a Vendida / Alquilada."
+        >
+          <Revenue revenue={data.revenue} />
+        </Section>
+      </div>
+
+      <Section
+        title="Propiedades con bajo ratio de consultas"
+        subtitle={`Activas con ≥ ${MIN_VIEWS} vistas y menos de ${
+          LOW_RATIO * 100
+        } % de leads por vista. Señal de posible problema de precio o fotos.`}
+      >
+        {data.lowRatio.length === 0 ? (
+          <p className="text-sm text-muted-foreground">
+            Ninguna propiedad por debajo del umbral.
+          </p>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Propiedad</TableHead>
+                <TableHead className="text-right">Vistas</TableHead>
+                <TableHead className="text-right">Leads</TableHead>
+                <TableHead className="text-right">Ratio</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {data.lowRatio.map((p) => (
+                <TableRow key={p.id}>
+                  <TableCell className="font-medium">
+                    <Link
+                      href={`/dashboard/propiedades/editar/${p.id}`}
+                      className="hover:underline hover:text-primary inline-flex items-center gap-2"
+                    >
+                      <AlertTriangle className="size-3.5 text-amber-600 shrink-0" />
+                      {p.title}
+                    </Link>
+                  </TableCell>
+                  <TableCell className="text-right tabular-nums">
+                    {p.views}
+                  </TableCell>
+                  <TableCell className="text-right tabular-nums">
+                    {p.leads}
+                  </TableCell>
+                  <TableCell className="text-right tabular-nums">
+                    {(p.ratio * 100).toFixed(1)} %
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
+      </Section>
+    </div>
+  );
+}
