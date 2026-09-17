@@ -3,11 +3,8 @@ import { supabaseAdmin, nextAgentForLead } from "@/lib/supabase-admin";
 import {
   markRead,
   parseInbound,
-  sendText,
   whatsappEnabled,
 } from "@/lib/whatsapp";
-import { aiAgentEnabled, generateAgentReply } from "@/features/whatsapp/agent";
-import { BRAND } from "@/lib/brand";
 
 // E3.3 / E3.4 — Webhook de WhatsApp Business.
 //   GET  -> verificación del webhook (Meta manda hub.challenge)
@@ -30,7 +27,6 @@ export async function GET(req: NextRequest) {
 }
 
 const WA_PREFIX = "[WhatsApp]";
-const WA_BOT_PREFIX = "[WhatsApp · asistente]";
 
 async function findOrCreateLead(phone: string, profileName?: string) {
   // El teléfono guardado puede tener formato libre: se compara por los
@@ -92,71 +88,12 @@ export async function POST(req: Request) {
       await addNote(lead.id, `${WA_PREFIX} ${msg.text}`);
       if (whatsappEnabled) void markRead(msg.id).catch(() => {});
 
-      if (!aiAgentEnabled || !whatsappEnabled) {
-        await notifyAgent(
-          lead.agent_id,
-          lead.id,
-          created ? "Nuevo lead por WhatsApp" : "Mensaje de WhatsApp",
-          `${lead.name}: ${msg.text.slice(0, 120)}`
-        );
-        continue;
-      }
-
-      // E3.4: historial reciente (notas de WhatsApp) para dar contexto.
-      const { data: notes } = await supabaseAdmin
-        .from("lead_notes")
-        .select("content")
-        .eq("lead_id", lead.id)
-        .order("created_at", { ascending: false })
-        .limit(12);
-      const history = (notes ?? [])
-        .map((n) => n.content ?? "")
-        .filter((c) => c.startsWith(WA_PREFIX) || c.startsWith(WA_BOT_PREFIX))
-        .reverse()
-        .slice(0, -1) // el último es el mensaje actual
-        .map((c) =>
-          c.startsWith(WA_BOT_PREFIX)
-            ? { role: "agente" as const, text: c.slice(WA_BOT_PREFIX.length).trim() }
-            : { role: "lead" as const, text: c.slice(WA_PREFIX.length).trim() }
-        );
-
-      const ai = await generateAgentReply({
-        leadName: lead.name,
-        history,
-        message: msg.text,
-      });
-
-      let reply = ai.reply.trim();
-      if (ai.intent === "agendar" && ai.propertyId) {
-        reply += `\n\nElegí día y horario acá: ${BRAND.siteUrl}/agendar/${ai.propertyId}`;
-      }
-
-      const sent = await sendText(msg.from, reply);
-      await addNote(
+      await notifyAgent(
+        lead.agent_id,
         lead.id,
-        `${WA_BOT_PREFIX} ${reply}${sent.ok ? "" : `\n(no enviado: ${sent.error})`}`
+        created ? "Nuevo lead por WhatsApp" : "Mensaje de WhatsApp",
+        `${lead.name}: ${msg.text.slice(0, 120)}`
       );
-
-      // Perfilado: se guarda como nota estructurada si se infirió algo.
-      const profile = Object.entries(ai.profile).filter(([, v]) => v);
-      if (profile.length > 0) {
-        await addNote(
-          lead.id,
-          `[Perfil IA] ${profile.map(([k, v]) => `${k}: ${v}`).join(" · ")}`
-        );
-      }
-
-      if (ai.intent === "humano" || created) {
-        await notifyAgent(
-          lead.agent_id,
-          lead.id,
-          ai.intent === "humano" ? "WhatsApp: pide hablar con un asesor" : "Nuevo lead por WhatsApp",
-          `${lead.name}: ${msg.text.slice(0, 120)}`
-        );
-      }
-      if (ai.intent === "agendar" && lead.status === "NUEVO") {
-        await supabaseAdmin.from("leads").update({ status: "CONTACTADO" }).eq("id", lead.id);
-      }
     } catch (e) {
       console.error("WhatsApp webhook error:", e);
     }

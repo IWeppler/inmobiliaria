@@ -169,9 +169,9 @@ export function ContractForm({ properties, owners, tenants }: Props) {
 
   return (
     <form onSubmit={submit} className="space-y-6">
-      <Card className="shadow-none border-border rounded-md">
+      <Card>
         <CardHeader>
-          <CardTitle className="font-serif font-semibold">Partes</CardTitle>
+          <CardTitle className="font-semibold">Partes</CardTitle>
         </CardHeader>
         <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="space-y-2">
@@ -206,9 +206,9 @@ export function ContractForm({ properties, owners, tenants }: Props) {
         </CardContent>
       </Card>
 
-      <Card className="shadow-none border-border rounded-md">
+      <Card>
         <CardHeader>
-          <CardTitle className="font-serif font-semibold">Condiciones</CardTitle>
+          <CardTitle className="font-semibold">Condiciones</CardTitle>
         </CardHeader>
         <CardContent className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <div className="space-y-2">

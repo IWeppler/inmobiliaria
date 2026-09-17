@@ -20,7 +20,7 @@ const PDFViewer = dynamic(
     ssr: false,
     loading: () => (
       <div className="flex h-screen items-center justify-center">
-        <Loader2 className="w-10 h-10 animate-spin text-slate-800" />
+        <Loader2 className="w-10 h-10 animate-spin text-muted-foreground" />
         <span className="ml-4 text-lg font-medium">
           Cargando visualizador PDF...
         </span>
@@ -272,10 +272,10 @@ export default function PDFPage() {
 
   if (loading) {
     return (
-      <div className="flex h-screen flex-col items-center justify-center bg-zinc-50">
-        <Loader2 className="w-12 h-12 animate-spin text-indigo-600 mb-4" />
+      <div className="flex h-screen flex-col items-center justify-center bg-background">
+        <Loader2 className="w-12 h-12 animate-spin text-muted-foreground mb-4" />
         <h2 className="text-xl font-semibold">Generando Ficha PDF...</h2>
-        <p className="text-zinc-500">
+        <p className="text-muted-foreground">
           Recopilando imágenes y datos de la propiedad
         </p>
       </div>
@@ -284,10 +284,10 @@ export default function PDFPage() {
 
   if (error || !property) {
     return (
-      <div className="flex h-screen items-center justify-center bg-zinc-50">
+      <div className="flex h-screen items-center justify-center bg-background">
         <div className="text-center">
-          <h2 className="text-2xl font-bold text-red-600 mb-2">Error</h2>
-          <p className="text-zinc-600">
+          <h2 className="text-xl font-semibold text-danger mb-2">Error</h2>
+          <p className="text-fg-secondary">
             No se pudo generar el PDF. La propiedad no existe o hubo un error.
           </p>
         </div>

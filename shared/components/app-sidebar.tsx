@@ -5,8 +5,7 @@ import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
 import {
   LayoutDashboard,
-  PlusCircle,
-  ListOrdered,
+  Inbox,
   LogOut,
   Settings,
   Users,
@@ -15,6 +14,7 @@ import {
   Building2,
   BarChart3,
   KeyRound,
+  CalendarDays,
 } from "lucide-react";
 
 import {
@@ -45,25 +45,28 @@ import {
 } from "@/shared/components/ui/avatar";
 import { Skeleton } from "@/shared/components/ui/skeleton";
 import { createClientBrowser } from "@/lib/supabase-browser";
-import { SidebarNotifications } from "@/shared/components/ui/SidebarNotifications";
 
+// Navegación = destinos. Las acciones ("Nueva propiedad") viven en el
+// header de cada pantalla, no acá.
 const mainNav = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
   { title: "Propiedades", url: "/dashboard/propiedades", icon: Building2 },
-  {
-    title: "Agregar Propiedad",
-    url: "/dashboard/propiedades/nueva",
-    icon: PlusCircle,
-  },
-  { title: "Gestión de Leads", url: "/dashboard/leads", icon: ListOrdered },
-  { title: "Reportes", url: "/dashboard/reportes", icon: BarChart3 },
+  { title: "Leads", url: "/dashboard/leads", icon: Inbox },
+  { title: "Agenda", url: "/dashboard/agenda", icon: CalendarDays },
   { title: "Alquileres", url: "/dashboard/alquileres", icon: KeyRound },
+  { title: "Reportes", url: "/dashboard/reportes", icon: BarChart3 },
 ];
 
 const adminNav = [
-  { title: "Equipo / Agentes", url: "/dashboard/agentes", icon: Users },
+  { title: "Equipo", url: "/dashboard/agentes", icon: Users },
   { title: "Ajustes", url: "/dashboard/ajustes", icon: Settings },
 ];
+
+// "/dashboard" es hoja; el resto marca activa toda su sección.
+function isActivePath(pathname: string, url: string) {
+  if (url === "/dashboard") return pathname === url;
+  return pathname === url || pathname.startsWith(`${url}/`);
+}
 
 type UserProfile = {
   full_name: string;
@@ -112,33 +115,21 @@ export function AppSidebar() {
   };
 
   const isAdmin = user?.role === "admin";
-  // Etapa de rediseño visual: el nuevo tratamiento de superficies/acento
-  // tinta solo aplica en /dashboard (principal). El resto de las rutas del
-  // panel sigue con el theme actual hasta que se decida propagarlo.
-  const isDashboardHome = pathname === "/dashboard";
 
   return (
-    <Sidebar
-      collapsible="icon"
-      className={isDashboardHome ? "theme-tn" : undefined}
-    >
+    <Sidebar collapsible="icon">
       {/* --- HEADER  --- */}
       <SidebarHeader>
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton size="lg" asChild>
               <Link href="/dashboard">
-                <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-zinc-900 text-white">
-                  <Building2 className="size-4" />
-                </div>
-                <div className="grid flex-1 text-left text-sm leading-tight">
-                  <span className="truncate font-clash font-semibold">
-                    TerraNova
-                  </span>
-                  <span className="truncate text-xs text-muted-foreground">
-                    Panel de Control
-                  </span>
-                </div>
+                <span className="truncate text-base font-semibold tracking-tight text-foreground group-data-[collapsible=icon]:hidden">
+                  TerraNova
+                </span>
+                <span className="hidden size-8 items-center justify-center rounded-md bg-foreground text-xs font-semibold text-background group-data-[collapsible=icon]:flex">
+                  T
+                </span>
               </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>
@@ -149,22 +140,16 @@ export function AppSidebar() {
       <SidebarContent>
         {/* Grupo Principal */}
         <SidebarGroup>
-          <SidebarGroupLabel>Plataforma</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               {mainNav.map((item) => {
-                const isActive = pathname === item.url;
+                const isActive = isActivePath(pathname, item.url);
                 return (
                   <SidebarMenuItem key={item.title}>
                     <SidebarMenuButton
                       asChild
                       isActive={isActive}
                       tooltip={item.title}
-                      className={
-                        isDashboardHome && isActive
-                          ? "data-[active=true]:border data-[active=true]:border-sidebar-border"
-                          : undefined
-                      }
                     >
                       <Link href={item.url}>
                         <item.icon />
@@ -174,11 +159,6 @@ export function AppSidebar() {
                   </SidebarMenuItem>
                 );
               })}
-
-              {/* --- COMPONENTE DE NOTIFICACIONES --- */}
-              <SidebarMenuItem>
-                <SidebarNotifications />
-              </SidebarMenuItem>
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
@@ -190,7 +170,7 @@ export function AppSidebar() {
             <SidebarGroupContent>
               <SidebarMenu>
                 {adminNav.map((item) => {
-                  const isActive = pathname === item.url;
+                  const isActive = isActivePath(pathname, item.url);
                   return (
                     <SidebarMenuItem key={item.title}>
                       <SidebarMenuButton
@@ -231,12 +211,12 @@ export function AppSidebar() {
                     size="lg"
                     className="data-[state=open]:bg-sidebar-accent"
                   >
-                    <Avatar className="h-8 w-8 rounded-lg">
+                    <Avatar className="size-8 rounded-md">
                       <AvatarImage
                         src={user?.avatar_url || ""}
                         alt={user?.full_name}
                       />
-                      <AvatarFallback className="rounded-lg font-bold">
+                      <AvatarFallback className="rounded-md text-xs font-medium">
                         {user?.full_name?.[0] || "U"}
                       </AvatarFallback>
                     </Avatar>
@@ -252,19 +232,19 @@ export function AppSidebar() {
                   </SidebarMenuButton>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent
-                  className="w-[--radix-dropdown-menu-trigger-width] min-w-56 rounded-lg"
+                  className="w-[--radix-dropdown-menu-trigger-width] min-w-56"
                   side="bottom"
                   align="end"
                   sideOffset={4}
                 >
                   <DropdownMenuLabel className="p-0 font-normal">
                     <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
-                      <Avatar className="h-8 w-8 rounded-lg">
+                      <Avatar className="size-8 rounded-md">
                         <AvatarImage
                           src={user?.avatar_url || ""}
                           alt={user?.full_name}
                         />
-                        <AvatarFallback className="rounded-lg">
+                        <AvatarFallback className="rounded-md text-xs font-medium">
                           {user?.full_name?.[0]}
                         </AvatarFallback>
                       </Avatar>
@@ -290,7 +270,7 @@ export function AppSidebar() {
                   <DropdownMenuSeparator />
                   <DropdownMenuItem
                     onClick={handleLogout}
-                    className="text-red-600 focus:text-red-600 cursor-pointer"
+                    className="text-danger focus:text-danger cursor-pointer"
                   >
                     <LogOut className="mr-2 h-4 w-4" />
                     Cerrar Sesión

@@ -1,14 +1,18 @@
 "use client";
 
 import { createClientBrowser } from "@/lib/supabase-browser";
+import { Button } from "@/shared/components/ui/button";
+import { Input } from "@/shared/components/ui/input";
+import { Label } from "@/shared/components/ui/label";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { AlertCircle, Eye, EyeOff, Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 
 const loginSchema = z.object({
-  email: z.string().email({ message: "Por favor, ingresa un email válido." }),
+  email: z.string().email({ message: "Ingresá un email válido." }),
   password: z
     .string()
     .min(6, { message: "La contraseña debe tener al menos 6 caracteres." }),
@@ -21,6 +25,7 @@ export function FormLogin() {
   const supabase = createClientBrowser();
   const [authError, setAuthError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   const {
     register,
@@ -39,75 +44,106 @@ export function FormLogin() {
       password: data.password,
     });
 
-    setLoading(false);
-
     if (error) {
-      setAuthError(error.message);
-    } else {
-      router.refresh();
-      router.push("/dashboard");
+      setLoading(false);
+      setAuthError("Email o contraseña incorrectos. Revisá los datos e intentá de nuevo.");
+      return;
     }
+
+    // Mantenemos loading hasta que navega para que el botón no "rebote"
+    router.refresh();
+    router.push("/dashboard");
   };
 
   return (
-    <>
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-        {/* Email */}
-        <div>
-          <label
-            htmlFor="email"
-            className="block text-sm font-medium text-zinc-300 "
-          >
-            Email
-          </label>
-          <input
-            id="email"
-            type="email"
-            {...register("email")}
-            className="mt-1 block w-full px-3 py-2 text-zinc-300 border border-main rounded-md shadow-sm placeholder-zinc-400 bg-gray-900/70 focus:outline-none focus:ringmain focus:bordermain"
-          />
-          {errors.email && (
-            <p className="mt-2 text-sm text-red-600">{errors.email.message}</p>
-          )}
+    <form
+      onSubmit={handleSubmit(onSubmit)}
+      noValidate
+      className="space-y-5"
+    >
+      {authError && (
+        <div
+          role="alert"
+          className="flex items-start gap-2.5 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2.5 text-sm text-destructive"
+        >
+          <AlertCircle className="mt-0.5 size-4 shrink-0" aria-hidden />
+          <p>{authError}</p>
         </div>
+      )}
 
-        {/* Password */}
-        <div>
-          <label
-            htmlFor="password"
-            className="block text-sm font-medium text-zinc-300"
-          >
-            Contraseña
-          </label>
-          <input
+      {/* Email */}
+      <div className="space-y-2">
+        <Label htmlFor="email">Email</Label>
+        <Input
+          id="email"
+          type="email"
+          autoComplete="email"
+          inputMode="email"
+          autoFocus
+          placeholder="vos@inmobiliaria.com"
+          aria-invalid={!!errors.email}
+          aria-describedby={errors.email ? "email-error" : undefined}
+          className="h-9"
+          {...register("email")}
+        />
+        {errors.email && (
+          <p id="email-error" className="text-xs text-destructive">
+            {errors.email.message}
+          </p>
+        )}
+      </div>
+
+      {/* Contraseña */}
+      <div className="space-y-2">
+        <Label htmlFor="password">Contraseña</Label>
+        <div className="relative">
+          <Input
             id="password"
-            type="password"
+            type={showPassword ? "text" : "password"}
+            autoComplete="current-password"
+            placeholder="••••••••"
+            aria-invalid={!!errors.password}
+            aria-describedby={errors.password ? "password-error" : undefined}
+            className="h-9 pr-9"
             {...register("password")}
-            className="mt-1 block w-full px-3 py-2 text-zinc-300 border border-main rounded-md shadow-sm placeholder-zinc-400 bg-gray-900/70 focus:outline-none focus:ringmain focus:bordermain"
           />
-          {errors.password && (
-            <p className="mt-2 text-sm text-red-600">
-              {errors.password.message}
-            </p>
-          )}
-        </div>
-
-        {/* Botón de Submit y Error General */}
-        <div>
-          {authError && (
-            <div className="my-4 text-center text-red-600 bg-red-50 p-3 rounded-md">
-              <p>Error al ingresar: Las credenciales son incorrectas.</p>
-            </div>
-          )}
           <button
-            type="submit"
-            disabled={loading}
-            className="cursor-pointer w-full flex justify-center py-3 px-4 border border-transparent rounded-md font-clash font-medium transition-colors duration-500 text-white bg-main hover:bg-main/80 disabled:bg-zinc-400"
+            type="button"
+            onClick={() => setShowPassword((v) => !v)}
+            aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+            aria-pressed={showPassword}
+            tabIndex={-1}
+            className="absolute inset-y-0 right-0 flex w-9 cursor-pointer items-center justify-center text-muted-foreground transition-colors hover:text-foreground"
           >
-            {loading ? "Ingresando..." : "Iniciar Sesión"}
+            {showPassword ? (
+              <EyeOff className="size-4" aria-hidden />
+            ) : (
+              <Eye className="size-4" aria-hidden />
+            )}
           </button>
         </div>
-      </form>
-    </>
+        {errors.password && (
+          <p id="password-error" className="text-xs text-destructive">
+            {errors.password.message}
+          </p>
+        )}
+      </div>
+
+      <Button
+        type="submit"
+        size="lg"
+        disabled={loading}
+        className="mt-2 w-full cursor-pointer"
+      >
+        {loading ? (
+          <>
+            <Loader2 className="animate-spin" aria-hidden />
+            Ingresando…
+          </>
+        ) : (
+          "Iniciar sesión"
+        )}
+      </Button>
+    </form>
   );
 }

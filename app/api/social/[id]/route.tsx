@@ -4,6 +4,7 @@ import { createClientServer } from "@/lib/supabase";
 import {
   getSocialProperty,
   PropertySocialCard,
+  parseOptions,
 } from "@/features/social/propertyCard";
 
 export const runtime = "nodejs";
@@ -38,9 +39,10 @@ export async function GET(
   const format = (formatParam in FORMATS ? formatParam : "square") as SocialFormat;
   const { width, height } = FORMATS[format];
   const download = req.nextUrl.searchParams.get("download") === "1";
+  const options = parseOptions(req.nextUrl.searchParams);
 
   const image = new ImageResponse(
-    <PropertySocialCard p={p} width={width} height={height} />,
+    <PropertySocialCard p={p} width={width} height={height} options={options} />,
     { width, height }
   );
 

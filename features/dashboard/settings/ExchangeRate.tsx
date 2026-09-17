@@ -34,9 +34,9 @@ export function ExchangeRateManager({ currentRate }: ExchangeRateManagerProps) {
   }, [formState]);
 
   return (
-    <Card className="rounded-md shadow-none">
+    <Card>
       <CardHeader>
-        <CardTitle className="font-serif text-2xl">Gestionar Tasa de Cambio</CardTitle>
+        <CardTitle>Tasa de cambio</CardTitle>
         <CardDescription>
           Actualiza el valor del USD a ARS. Esto recalculará los precios de
           todas las propiedades en USD para el ordenamiento.
@@ -58,7 +58,7 @@ export function ExchangeRateManager({ currentRate }: ExchangeRateManagerProps) {
               required
             />
           </div>
-          <Button type="submit" className="w-full cursor-pointer">
+          <Button type="submit" className="self-start">
             Actualizar Tasa y Recalcular Propiedades
           </Button>
         </form>

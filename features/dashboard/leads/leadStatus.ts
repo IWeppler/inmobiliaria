@@ -11,6 +11,7 @@ import {
   Snowflake,
 } from "lucide-react";
 import type { Database } from "@/app/types/supabase";
+import type { StatusTone } from "@/shared/components/StatusBadge";
 
 export type LeadStatus = Database["public"]["Enums"]["lead_status"];
 
@@ -30,6 +31,7 @@ export const LEAD_STATUSES: {
   icon: StatusIcon;
   color: string;
   bg: string;
+  tone: StatusTone;
 }[] = [
   {
     value: "NUEVO",
@@ -37,6 +39,7 @@ export const LEAD_STATUSES: {
     icon: Sparkles,
     color: "var(--color-lead-nuevo)",
     bg: "var(--color-lead-nuevo-bg)",
+    tone: "accent",
   },
   {
     value: "CONTACTADO",
@@ -44,6 +47,7 @@ export const LEAD_STATUSES: {
     icon: PhoneCall,
     color: "var(--color-lead-contactado)",
     bg: "var(--color-lead-contactado-bg)",
+    tone: "neutral",
   },
   {
     value: "VISITA PROGRAMADA",
@@ -51,6 +55,7 @@ export const LEAD_STATUSES: {
     icon: CalendarClock,
     color: "var(--color-lead-visita)",
     bg: "var(--color-lead-visita-bg)",
+    tone: "info",
   },
   {
     value: "NEGOCIACIÓN",
@@ -58,6 +63,7 @@ export const LEAD_STATUSES: {
     icon: Handshake,
     color: "var(--color-lead-negociacion)",
     bg: "var(--color-lead-negociacion-bg)",
+    tone: "warning",
   },
   {
     value: "CERRADO",
@@ -65,6 +71,7 @@ export const LEAD_STATUSES: {
     icon: CheckCircle2,
     color: "var(--color-lead-cerrado)",
     bg: "var(--color-lead-cerrado-bg)",
+    tone: "success",
   },
   {
     value: "DESCARTADO",
@@ -72,6 +79,7 @@ export const LEAD_STATUSES: {
     icon: XCircle,
     color: "var(--color-lead-descartado)",
     bg: "var(--color-lead-descartado-bg)",
+    tone: "neutral",
   },
 ];
 
@@ -143,23 +151,12 @@ export function getLeadTemperature(
 
 export const TEMPERATURE_META: Record<
   LeadTemperature,
-  { label: string; icon: StatusIcon; className: string }
+  { label: string; icon: StatusIcon; color: string }
 > = {
-  caliente: {
-    label: "Caliente",
-    icon: Flame,
-    className: "text-orange-600 bg-orange-50 border-orange-200",
-  },
-  tibio: {
-    label: "Tibio",
-    icon: Thermometer,
-    className: "text-amber-600 bg-amber-50 border-amber-200",
-  },
-  frio: {
-    label: "Frío",
-    icon: Snowflake,
-    className: "text-sky-600 bg-sky-50 border-sky-200",
-  },
+  // Colores vivid (ver globals.css): van en el ícono y en el borde del badge.
+  caliente: { label: "Caliente", icon: Flame, color: "var(--warning-vivid)" },
+  tibio: { label: "Tibio", icon: Thermometer, color: "var(--neutral-vivid)" },
+  frio: { label: "Frío", icon: Snowflake, color: "var(--info-vivid)" },
 };
 
 export function daysBetween(from: string | Date, to: Date = new Date()) {

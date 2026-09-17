@@ -1,6 +1,9 @@
 import { createClientServer } from "@/lib/supabase";
 import { notFound, redirect } from "next/navigation";
+import type { Metadata } from "next";
 import { InstagramPieceClient } from "@/features/social/InstagramPieceClient";
+
+export const metadata: Metadata = { title: "Pieza para Instagram" };
 
 // E2.2: pieza para Instagram desde la ficha de propiedad.
 export default async function InstagramPiecePage({
@@ -18,10 +21,21 @@ export default async function InstagramPiecePage({
 
   const { data: property } = await supabase
     .from("properties")
-    .select("id, title")
+    .select("id, title, property_images(image_url, order)")
     .eq("id", id)
     .single();
   if (!property) notFound();
 
-  return <InstagramPieceClient propertyId={property.id} title={property.title} />;
+  const images = [...(property.property_images ?? [])]
+    .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
+    .map((i) => i.image_url)
+    .filter((u): u is string => !!u);
+
+  return (
+    <InstagramPieceClient
+      propertyId={property.id}
+      title={property.title}
+      images={images}
+    />
+  );
 }

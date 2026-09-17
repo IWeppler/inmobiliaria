@@ -9,7 +9,7 @@ import {
 import { Integrations } from "@/features/dashboard/settings/Integrations";
 import { IndexValues, type IndexValueRow } from "@/features/dashboard/settings/IndexValues";
 import { whatsappEnabled } from "@/lib/whatsapp";
-import { aiAgentEnabled } from "@/features/whatsapp/agent";
+import { Page, PageHeader } from "@/shared/components/PageShell";
 
 export default async function DashboardPage() {
   const supabase = await createClientServer();
@@ -44,33 +44,26 @@ export default async function DashboardPage() {
     .filter((n): n is string => !!n);
 
   return (
-    <div className="theme-tn flex min-h-screen items-start justify-center">
-      <main className="w-full max-w-5xl p-4 space-y-12">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
-          <AddPropertyTypeForm />
-          <AddAmenityForm />
-        </div>
-        <div>
-          <ExchangeRateManager currentRate={currentRate} />
-        </div>
-        <div>
-          <AssignmentRules
-            initialRules={(rules ?? []) as unknown as AssignmentRule[]}
-            agents={agents ?? []}
-            cities={cities}
-            propertyTypes={propertyTypes}
-          />
-        </div>
-        <div>
-          <IndexValues initial={(indexRows ?? []) as IndexValueRow[]} />
-        </div>
-        <div>
-          <Integrations
-            whatsappEnabled={whatsappEnabled}
-            aiAgentEnabled={aiAgentEnabled}
-          />
-        </div>
-      </main>
-    </div>
+    <Page width="narrow">
+      <PageHeader
+        title="Ajustes"
+        description="Catálogos, tasa de cambio, reglas de asignación e integraciones."
+      />
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <AddPropertyTypeForm />
+        <AddAmenityForm />
+      </div>
+      <ExchangeRateManager currentRate={currentRate} />
+      <AssignmentRules
+        initialRules={(rules ?? []) as unknown as AssignmentRule[]}
+        agents={agents ?? []}
+        cities={cities}
+        propertyTypes={propertyTypes}
+      />
+      <IndexValues initial={(indexRows ?? []) as IndexValueRow[]} />
+      <Integrations
+        whatsappEnabled={whatsappEnabled}
+      />
+    </Page>
   );
 }

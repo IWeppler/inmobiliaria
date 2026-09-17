@@ -27,11 +27,11 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <section className="bg-card rounded-md border border-border shadow-none overflow-hidden">
-      <div className="py-4 px-4 border-b border-border">
-        <h3 className="font-serif font-semibold text-foreground">{title}</h3>
+    <section className="overflow-hidden rounded-lg border border-border bg-card">
+      <div className="border-b border-border px-4 py-3">
+        <h2 className="text-lg font-semibold tracking-tight">{title}</h2>
         {subtitle && (
-          <p className="text-xs text-muted-foreground mt-0.5">{subtitle}</p>
+          <p className="mt-0.5 text-xs text-muted-foreground">{subtitle}</p>
         )}
       </div>
       <div className="p-4">{children}</div>
@@ -42,19 +42,24 @@ function Section({
 // E1.5 — Funnel. Una sola serie (una etapa tras otra), un solo tono: la
 // magnitud la lleva el largo de la barra, la etiqueta y el % respecto a la
 // etapa anterior van como texto, no como color.
+// Las etapas difieren en órdenes de magnitud (miles de vistas vs. unidades
+// de cierres), así que el largo va en escala logarítmica: todas las barras
+// se ven y la lectura fina la dan los números.
 function Funnel({ stages }: { stages: ReportData["funnel"] }) {
   const max = Math.max(1, ...stages.map((s) => s.count));
+  const scale = (n: number) =>
+    max <= 1 ? 0 : (Math.log10(n + 1) / Math.log10(max + 1)) * 100;
   return (
     <ol className="flex flex-col gap-3">
       {stages.map((s, i) => {
         const prev = i > 0 ? stages[i - 1].count : null;
         const pct =
           prev && prev > 0 ? Math.round((s.count / prev) * 100) : null;
-        const width = Math.max(2, (s.count / max) * 100);
+        const width = s.count > 0 ? Math.max(3, scale(s.count)) : 0;
         return (
           <li key={s.key} className="grid grid-cols-[130px_1fr_auto] items-center gap-3">
             <span className="text-sm text-foreground">{s.label}</span>
-            <div className="h-5 w-full bg-secondary/60 rounded-sm overflow-hidden">
+            <div className="h-5 w-full overflow-hidden rounded-sm bg-muted">
               <div
                 className="h-full bg-primary rounded-r-sm"
                 style={{ width: `${width}%` }}
@@ -91,8 +96,8 @@ function Revenue({ revenue }: { revenue: ReportData["revenue"] }) {
     if (before === 0 && now === 0)
       return <Minus className="size-3.5 text-muted-foreground" />;
     if (now >= before)
-      return <ArrowUpRight className="size-3.5 text-emerald-700" />;
-    return <ArrowDownRight className="size-3.5 text-red-700" />;
+      return <ArrowUpRight className="size-3.5 text-success" />;
+    return <ArrowDownRight className="size-3.5 text-danger" />;
   };
 
   return (
@@ -100,19 +105,19 @@ function Revenue({ revenue }: { revenue: ReportData["revenue"] }) {
       {[current, previous].map((m) => (
         <div
           key={m.label}
-          className="rounded-md border border-border p-4 flex flex-col gap-2"
+          className="flex flex-col gap-1 rounded-lg border border-border px-4 py-3"
         >
-          <span className="text-sm font-medium text-muted-foreground">
+          <span className="text-xs font-medium text-muted-foreground">
             {m.label}
           </span>
           {currencies.length === 0 ? (
-            <span className="text-[28px] leading-none font-serif font-medium tracking-tight text-foreground">
+            <span className="text-2xl font-semibold tracking-tight text-foreground">
               —
             </span>
           ) : (
             currencies.map((c) => (
               <div key={c} className="flex items-center gap-2">
-                <span className="text-[28px] leading-none font-serif font-medium tracking-tight text-foreground">
+                <span className="text-2xl font-semibold tracking-tight text-foreground">
                   {fmtMoney(c, m.byCurrency[c] ?? 0)}
                 </span>
                 {m === current && (
@@ -148,12 +153,12 @@ export function ReportsView({ data }: { data: ReportData }) {
         ].map((t) => (
           <div
             key={t.label}
-            className="bg-card p-5 rounded-md border border-border shadow-none"
+            className="flex flex-col gap-1 rounded-lg border border-border bg-card px-4 py-3"
           >
-            <span className="text-sm font-medium text-muted-foreground block mb-3">
+            <span className="text-xs font-medium text-muted-foreground">
               {t.label}
             </span>
-            <span className="text-[36px] leading-none font-serif font-medium tracking-tight text-foreground">
+            <span className="text-2xl font-semibold tracking-tight text-foreground">
               {t.value}
             </span>
           </div>
@@ -163,7 +168,7 @@ export function ReportsView({ data }: { data: ReportData }) {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Section
           title="Funnel de conversión"
-          subtitle="Vistas → Leads → Visita agendada → Cerrado. Porcentaje respecto a la etapa anterior."
+          subtitle="Vistas → Leads → Visita agendada → Cerrado. Porcentaje respecto a la etapa anterior; barras en escala logarítmica."
         >
           <Funnel stages={data.funnel} />
         </Section>
@@ -201,10 +206,10 @@ export function ReportsView({ data }: { data: ReportData }) {
                 <TableRow key={p.id}>
                   <TableCell className="font-medium">
                     <Link
-                      href={`/dashboard/propiedades/editar/${p.id}`}
-                      className="hover:underline hover:text-primary inline-flex items-center gap-2"
+                      href={`/dashboard/propiedades/${p.id}`}
+                      className="inline-flex items-center gap-2 underline-offset-4 hover:underline"
                     >
-                      <AlertTriangle className="size-3.5 text-amber-600 shrink-0" />
+                      <AlertTriangle className="size-3.5 shrink-0 text-warning" />
                       {p.title}
                     </Link>
                   </TableCell>

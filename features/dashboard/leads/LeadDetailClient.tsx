@@ -11,25 +11,14 @@ import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import Link from "next/link";
 import {
-  ArrowLeft,
   Send,
-  User as UserIcon,
   Mail,
   Phone,
-  Home,
-  RefreshCw,
-  Users,
-  PlusCircle,
 } from "lucide-react";
 import type { User } from "@supabase/supabase-js";
 
 import { LeadWithDetails, Note } from "@/app/types";
-import {
-  statusLabels,
-  statusIcons,
-  statusIconColors,
-  FallbackStatusIcon,
-} from "@/features/dashboard/leads/leadStatus";
+import { statusMeta } from "@/features/dashboard/leads/leadStatus";
 import { ScheduleVisitCard } from "@/features/dashboard/leads/ScheduleVisitCard";
 
 // UI Components
@@ -56,6 +45,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/shared/components/ui/select";
+import { Page, PageHeader } from "@/shared/components/PageShell";
+import { StatusBadge } from "@/shared/components/StatusBadge";
 import { Label } from "@/shared/components/ui/label";
 
 const noteSchema = z.object({
@@ -167,45 +158,27 @@ export function LeadDetailClient({
     setIsAssigningProperty(false);
   };
 
-  const StatusIcon = statusIcons[lead.status ?? ""] || FallbackStatusIcon;
-  const statusIconColor =
-    statusIconColors[lead.status ?? ""] || "var(--muted-foreground)";
+  const meta = statusMeta(lead.status);
 
   return (
-    <div className="theme-tn p-4 md:p-8 max-w-6xl mx-auto">
-      {/* Header */}
-      <div className="flex items-center gap-4 mb-6">
-        <Button variant="outline" size="icon" onClick={() => router.back()}>
-          <ArrowLeft className="h-4 w-4" />
-        </Button>
-        <div>
-          <h1 className="text-3xl font-serif font-semibold text-foreground">
-            {lead.name}
-          </h1>
-          <div className="flex items-center gap-2 mt-2">
-            <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-2.5 py-0.5 text-xs font-medium text-foreground">
-              <StatusIcon
-                className="size-3 shrink-0"
-                style={{ color: statusIconColor }}
-              />
-              {statusLabels[lead.status ?? ""] || lead.status}
-            </span>
-            <span className="text-muted-foreground text-sm">
-              Fuente: {lead.source?.toLowerCase() ?? ""} •{" "}
-              {format(new Date(lead.created_at), "dd MMM yyyy", { locale: es })}
-            </span>
-          </div>
-        </div>
-      </div>
+    <Page>
+      <PageHeader
+        backHref="/dashboard/leads"
+        title={lead.name}
+        aside={
+          <StatusBadge tone={meta.tone} icon={meta.icon}>
+            {meta.label}
+          </StatusBadge>
+        }
+        description={`Fuente: ${lead.source?.toLowerCase() ?? ""} · ${format(new Date(lead.created_at), "dd MMM yyyy", { locale: es })}`}
+      />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* COLUMNA PRINCIPAL (Notas) */}
         <div className="lg:col-span-2 space-y-6">
-          <Card className="shadow-none border-border rounded-md">
+          <Card>
             <CardHeader>
-              <CardTitle className="font-serif font-semibold text-foreground">
-                Agregar Nota Interna
-              </CardTitle>
+              <CardTitle>Nueva nota</CardTitle>
             </CardHeader>
             <CardContent>
               <Form {...form}>
@@ -220,8 +193,8 @@ export function LeadDetailClient({
                       <FormItem>
                         <FormControl>
                           <Textarea
-                            placeholder="Escribe un comentario..."
-                            className="resize-none bg-white"
+                            placeholder="Qué pasó con este lead…"
+                            className="resize-none"
                             rows={3}
                             {...field}
                           />
@@ -235,58 +208,48 @@ export function LeadDetailClient({
                     disabled={form.formState.isSubmitting}
                     className="self-end"
                   >
-                    <Send className="mr-2 h-4 w-4" />
-                    {form.formState.isSubmitting
-                      ? "Guardando..."
-                      : "Enviar Nota"}
+                    <Send />
+                    {form.formState.isSubmitting ? "Guardando…" : "Guardar nota"}
                   </Button>
                 </form>
               </Form>
             </CardContent>
           </Card>
 
-          <Card className="shadow-none border-border rounded-md">
+          <Card>
             <CardHeader>
-              <CardTitle className="font-serif font-semibold text-foreground">
-                Historial
-              </CardTitle>
+              <CardTitle>Historial</CardTitle>
             </CardHeader>
             <CardContent>
-              <ul className="space-y-6">
+              {/* Timeline plano: fecha a la izquierda, contenido a la derecha */}
+              <ul className="divide-y divide-border-subtle">
                 {lead.notes && (
-                  <li className="flex gap-3">
-                    <div className="h-8 w-8 rounded-full bg-gray-200 flex items-center justify-center shrink-0">
-                      <UserIcon className="h-4 w-4 text-gray-600" />
-                    </div>
-                    <div className="space-y-1">
-                      <div className="text-sm font-medium">
-                        Cliente (Mensaje Original)
-                      </div>
-                      <p className="text-sm text-muted-foreground italic">
-                        &ldquo;{lead.notes}&rdquo;
-                      </p>
-                    </div>
+                  <li className="flex gap-4 py-3 first:pt-0">
+                    <span className="w-24 shrink-0 text-xs text-muted-foreground">
+                      Mensaje original
+                    </span>
+                    <p className="text-sm text-fg-secondary whitespace-pre-wrap">
+                      {lead.notes}
+                    </p>
                   </li>
                 )}
-                {lead.notes && <Separator />}
+
+                {notes.length === 0 && !lead.notes && (
+                  <li className="py-3 text-sm text-muted-foreground">
+                    Todavía no hay notas.
+                  </li>
+                )}
 
                 {notes.map((note) => (
-                  <li key={note.id} className="flex gap-3">
-                    <div className="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center shrink-0">
-                      <UserIcon className="h-4 w-4 text-blue-600" />
-                    </div>
-                    <div className="flex-1 bg-zinc-50 p-3 rounded-lg border">
-                      <p className="text-sm text-zinc-800 whitespace-pre-wrap">
-                        {note.content}
-                      </p>
-                      <div className="mt-2 flex justify-end">
-                        <span className="text-[10px] text-zinc-400">
-                          {format(new Date(note.created_at), "dd MMM HH:mm", {
-                            locale: es,
-                          })}
-                        </span>
-                      </div>
-                    </div>
+                  <li key={note.id} className="flex gap-4 py-3 first:pt-0 last:pb-0">
+                    <span className="w-24 shrink-0 text-xs text-muted-foreground">
+                      {format(new Date(note.created_at), "d MMM HH:mm", {
+                        locale: es,
+                      })}
+                    </span>
+                    <p className="text-sm text-foreground whitespace-pre-wrap">
+                      {note.content}
+                    </p>
                   </li>
                 ))}
               </ul>
@@ -297,12 +260,9 @@ export function LeadDetailClient({
         {/* COLUMNA LATERAL */}
         <div className="space-y-4">
           {/* 1. CARD: RESPONSABLE DEL LEAD (Layout Expandible) */}
-          <Card className="shadow-none border-border rounded-md">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base font-serif font-semibold text-foreground flex items-center gap-2">
-                <Users className="h-4 w-4 text-muted-foreground" />
-                Responsable del Lead
-              </CardTitle>
+          <Card>
+            <CardHeader>
+              <CardTitle>Responsable</CardTitle>
             </CardHeader>
             <CardContent className="space-y-2">
               <div className="flex items-center justify-between">
@@ -314,20 +274,18 @@ export function LeadDetailClient({
                   <Button
                     variant="outline"
                     size="sm"
-                    className="h-8 text-xs"
                     onClick={() => setIsReassignOpen((prev) => !prev)}
                   >
-                    <RefreshCw className="mr-2 h-3 w-3" />
                     {isReassignOpen ? "Cerrar" : "Cambiar"}
                   </Button>
                 )}
               </div>
 
               {isReassignOpen && (
-                <div className="pt-4 space-y-4 animate-in slide-in-from-top-2 duration-200">
+                <div className="pt-4 space-y-4">
                   <Separator />
                   <div>
-                    <h3 className="text-md font-semibold">Reasignar Lead</h3>
+                    <h3 className="text-sm font-medium">Reasignar lead</h3>
                     <p className="text-sm text-muted-foreground mt-1">
                       Selecciona qué agente gestionará a {lead.name}.
                     </p>
@@ -368,25 +326,22 @@ export function LeadDetailClient({
           <ScheduleVisitCard lead={lead} currentUserId={currentUser.id} />
 
           {/* 2. CARD: PROPIEDAD DE INTERÉS (Layout Expandible Idéntico) */}
-          <Card className="shadow-none border-border rounded-md">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base font-serif font-semibold text-foreground flex items-center gap-2">
-                <Home className="h-4 w-4 text-muted-foreground" />
-                Propiedad de Interés
-              </CardTitle>
+          <Card>
+            <CardHeader>
+              <CardTitle>Interesado en</CardTitle>
             </CardHeader>
             <CardContent className="space-y-2">
               <div className="flex items-center justify-between gap-2">
                 {lead.properties ? (
                   <Link
-                    href={`/dashboard/propiedades/editar/${lead.properties.id}`}
-                    className="text-sm font-medium hover:underline hover:text-primary truncate"
+                    href={`/dashboard/propiedades/${lead.properties.id}`}
+                    className="truncate text-sm font-medium underline-offset-4 hover:underline"
                     title={lead.properties.title}
                   >
                     {lead.properties.title}
                   </Link>
                 ) : (
-                  <span className="text-sm text-muted-foreground italic">
+                  <span className="text-sm text-muted-foreground">
                     Sin asignar
                   </span>
                 )}
@@ -395,14 +350,9 @@ export function LeadDetailClient({
                 <Button
                   variant="outline"
                   size="sm"
-                  className="h-8 text-xs shrink-0"
+                  className="shrink-0"
                   onClick={() => setIsAssignPropertyOpen((prev) => !prev)}
                 >
-                  {lead.properties ? (
-                    <RefreshCw className="mr-2 h-3 w-3" />
-                  ) : (
-                    <PlusCircle className="mr-2 h-3 w-3" />
-                  )}
                   {isAssignPropertyOpen
                     ? "Cerrar"
                     : lead.properties
@@ -412,7 +362,7 @@ export function LeadDetailClient({
               </div>
 
               {isAssignPropertyOpen && (
-                <div className="pt-4 space-y-4 animate-in slide-in-from-top-2 duration-200">
+                <div className="pt-4 space-y-4">
                   <Separator />
                   <div>
                     <h3 className="text-sm font-semibold">
@@ -456,9 +406,9 @@ export function LeadDetailClient({
           </Card>
 
           {/* 3. CARD: CONTACTO (Simple) */}
-          <Card className="shadow-none border-border rounded-md">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base font-serif font-semibold text-foreground">
+          <Card>
+            <CardHeader>
+              <CardTitle>
                 Datos de Contacto
               </CardTitle>
             </CardHeader>
@@ -486,6 +436,6 @@ export function LeadDetailClient({
           </Card>
         </div>
       </div>
-    </div>
+    </Page>
   );
 }

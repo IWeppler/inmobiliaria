@@ -1,9 +1,10 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { PlusCircle, AlertTriangle, CalendarClock, TrendingUp, FileText } from "lucide-react";
+import { Plus, AlertTriangle, CalendarClock, TrendingUp, FileText } from "lucide-react";
 import { createClientServer } from "@/lib/supabase";
 import { ymdInAppTz } from "@/lib/dates";
 import { Button } from "@/shared/components/ui/button";
+import { Page, PageHeader } from "@/shared/components/PageShell";
 import {
   Table,
   TableBody,
@@ -12,9 +13,11 @@ import {
   TableHeader,
   TableRow,
 } from "@/shared/components/ui/table";
+import { StatusBadge } from "@/shared/components/StatusBadge";
 import {
   ADJUSTMENT_ALERT_DAYS,
   CONTRACT_STATUS_LABELS,
+  CONTRACT_STATUS_TONE,
   EXPIRY_ALERT_DAYS,
   daysBetween,
   formatDate,
@@ -92,77 +95,71 @@ export default async function AlquileresPage() {
       icon: AlertTriangle,
       label: "Cuotas vencidas",
       value: overdue.length,
-      tone: "text-red-700 bg-red-50",
+      tone: "text-danger",
     },
     {
       icon: CalendarClock,
       label: `Vencen en ≤ ${EXPIRY_ALERT_DAYS} días`,
       value: expiring.length,
-      tone: "text-amber-700 bg-amber-50",
+      tone: "text-warning",
     },
     {
       icon: TrendingUp,
       label: `Ajuste en ≤ ${ADJUSTMENT_ALERT_DAYS} días`,
       value: adjusting.length,
-      tone: "text-blue-700 bg-blue-50",
+      tone: "text-info",
     },
     {
       icon: FileText,
       label: "Contratos activos",
       value: active.length,
-      tone: "text-emerald-700 bg-emerald-50",
+      tone: "text-muted-foreground",
     },
   ];
 
   return (
-    <div className="theme-tn flex flex-col w-full max-w-[1600px] mx-auto px-4 py-6 gap-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-[26px] font-serif font-semibold tracking-tight text-foreground">
-            Alquileres
-          </h1>
-          <p className="text-muted-foreground text-sm mt-1">
-            Contratos, cobranzas y liquidaciones.
-          </p>
-        </div>
-        <Button asChild className="rounded-sm shadow-none">
-          <Link href="/dashboard/alquileres/nuevo">
-            <PlusCircle className="mr-2 h-4 w-4" />
-            <span className="hidden sm:inline">Nuevo contrato</span>
-          </Link>
-        </Button>
-      </div>
+    <Page>
+      <PageHeader
+        title="Alquileres"
+        description="Contratos, cobranzas y liquidaciones."
+        actions={
+          <Button asChild>
+            <Link href="/dashboard/alquileres/nuevo">
+              <Plus />
+              Nuevo contrato
+            </Link>
+          </Button>
+        }
+      />
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         {alerts.map((a) => (
           <div
             key={a.label}
-            className="bg-card border border-border rounded-md p-4 flex items-center gap-3"
+            className="flex flex-col gap-1 rounded-lg border border-border bg-card px-4 py-3"
           >
-            <div className={`p-2.5 rounded-full ${a.tone}`}>
-              <a.icon className="size-4" />
-            </div>
-            <div>
-              <p className="text-xs text-muted-foreground">{a.label}</p>
-              <p className="text-2xl font-serif font-semibold">{a.value}</p>
-            </div>
+            <span className="text-xs font-medium text-muted-foreground">{a.label}</span>
+            {/* El color solo aparece cuando hay algo que atender */}
+            <span className={`text-2xl font-semibold tracking-tight ${a.value > 0 ? a.tone : "text-foreground"}`}>
+              {a.value}
+            </span>
           </div>
         ))}
       </div>
 
       {(overdue.length > 0 || expiring.length > 0 || adjusting.length > 0) && (
-        <section className="bg-card rounded-md border border-border overflow-hidden">
-          <div className="py-3 px-4 border-b border-border">
-            <h3 className="font-serif font-semibold text-foreground">Requiere acción</h3>
+        <section className="overflow-hidden rounded-lg border border-border bg-card">
+          <div className="border-b border-border px-4 py-3">
+            <h2 className="text-lg font-semibold tracking-tight">Requiere acción</h2>
           </div>
-          <ul className="divide-y divide-border text-sm">
+          <ul className="divide-y divide-border-subtle text-sm">
             {overdue.map((p) => {
               const c = byId.get(p.contract_id);
               return (
-                <li key={p.id} className="px-4 py-2.5 flex items-center justify-between gap-3">
+                <li key={p.id} className="flex h-10 items-center justify-between gap-3 px-4">
                   <span className="flex items-center gap-2 min-w-0">
-                    <AlertTriangle className="size-4 text-red-600 shrink-0" />
-                    <Link href={`/dashboard/alquileres/${p.contract_id}`} className="font-medium hover:underline truncate">
+                    <AlertTriangle className="size-4 shrink-0 text-danger" />
+                    <Link href={`/dashboard/alquileres/${p.contract_id}`} className="truncate font-medium underline-offset-4 hover:underline">
                       {c?.properties?.title ?? "Contrato"}
                     </Link>
                     <span className="text-muted-foreground truncate">
@@ -174,10 +171,10 @@ export default async function AlquileresPage() {
               );
             })}
             {adjusting.map((c) => (
-              <li key={`adj-${c.id}`} className="px-4 py-2.5 flex items-center justify-between gap-3">
+              <li key={`adj-${c.id}`} className="flex h-10 items-center justify-between gap-3 px-4">
                 <span className="flex items-center gap-2 min-w-0">
-                  <TrendingUp className="size-4 text-blue-600 shrink-0" />
-                  <Link href={`/dashboard/alquileres/${c.id}`} className="font-medium hover:underline truncate">
+                  <TrendingUp className="size-4 shrink-0 text-info" />
+                  <Link href={`/dashboard/alquileres/${c.id}`} className="truncate font-medium underline-offset-4 hover:underline">
                     {c.properties?.title ?? "Contrato"}
                   </Link>
                   <span className="text-muted-foreground truncate">
@@ -187,10 +184,10 @@ export default async function AlquileresPage() {
               </li>
             ))}
             {expiring.map((c) => (
-              <li key={`exp-${c.id}`} className="px-4 py-2.5 flex items-center justify-between gap-3">
+              <li key={`exp-${c.id}`} className="flex h-10 items-center justify-between gap-3 px-4">
                 <span className="flex items-center gap-2 min-w-0">
-                  <CalendarClock className="size-4 text-amber-600 shrink-0" />
-                  <Link href={`/dashboard/alquileres/${c.id}`} className="font-medium hover:underline truncate">
+                  <CalendarClock className="size-4 shrink-0 text-warning" />
+                  <Link href={`/dashboard/alquileres/${c.id}`} className="truncate font-medium underline-offset-4 hover:underline">
                     {c.properties?.title ?? "Contrato"}
                   </Link>
                   <span className="text-muted-foreground truncate">
@@ -203,12 +200,12 @@ export default async function AlquileresPage() {
         </section>
       )}
 
-      <section className="bg-card rounded-md border border-border overflow-hidden">
-        <div className="py-3 px-4 border-b border-border">
-          <h3 className="font-serif font-semibold text-foreground">Contratos</h3>
+      <section className="overflow-hidden rounded-lg border border-border bg-card">
+        <div className="border-b border-border px-4 py-3">
+          <h2 className="text-lg font-semibold tracking-tight">Contratos</h2>
         </div>
         {contracts.length === 0 ? (
-          <p className="p-6 text-sm text-muted-foreground">
+          <p className="px-4 py-6 text-sm text-muted-foreground">
             Todavía no hay contratos. Creá el primero con &ldquo;Nuevo contrato&rdquo;.
           </p>
         ) : (
@@ -231,9 +228,9 @@ export default async function AlquileresPage() {
                       {c.properties?.title ?? "—"}
                     </Link>
                     {overdueByContract.get(c.id) && (
-                      <span className="ml-2 text-[11px] text-red-700 bg-red-50 px-1.5 py-0.5 rounded-full">
+                      <StatusBadge tone="danger" className="ml-2">
                         {overdueByContract.get(c.id)} en mora
-                      </span>
+                      </StatusBadge>
                     )}
                   </TableCell>
                   <TableCell className="hidden md:table-cell text-muted-foreground">
@@ -247,9 +244,9 @@ export default async function AlquileresPage() {
                     {formatDate(c.start_date)} → {formatDate(c.end_date)}
                   </TableCell>
                   <TableCell>
-                    <span className="inline-flex rounded-full border border-border px-2.5 py-0.5 text-xs font-medium">
+                    <StatusBadge tone={CONTRACT_STATUS_TONE[c.status] ?? "neutral"}>
                       {CONTRACT_STATUS_LABELS[c.status] ?? c.status}
-                    </span>
+                    </StatusBadge>
                   </TableCell>
                 </TableRow>
               ))}
@@ -257,6 +254,6 @@ export default async function AlquileresPage() {
           </Table>
         )}
       </section>
-    </div>
+    </Page>
   );
 }

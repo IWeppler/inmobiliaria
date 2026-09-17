@@ -230,6 +230,7 @@ export type Database = {
           notes: string | null
           phone: string | null
           property_id: string | null
+          read_at: string | null
           source: string | null
           status: Database["public"]["Enums"]["lead_status"] | null
         }
@@ -243,6 +244,7 @@ export type Database = {
           notes?: string | null
           phone?: string | null
           property_id?: string | null
+          read_at?: string | null
           source?: string | null
           status?: Database["public"]["Enums"]["lead_status"] | null
         }
@@ -256,6 +258,7 @@ export type Database = {
           notes?: string | null
           phone?: string | null
           property_id?: string | null
+          read_at?: string | null
           source?: string | null
           status?: Database["public"]["Enums"]["lead_status"] | null
         }

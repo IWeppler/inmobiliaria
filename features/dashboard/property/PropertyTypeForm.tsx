@@ -82,9 +82,9 @@ export function AddPropertyTypeForm() {
   };
 
   return (
-    <Card className="rounded-md shadow-none">
+    <Card>
       <CardHeader>
-        <CardTitle className="font-serif text-2xl">Gestionar Tipos de Inmuebles</CardTitle>
+        <CardTitle>Tipos de inmueble</CardTitle>
         <CardDescription>
           Añade nuevos tipos de propiedad para el formulario principal.
         </CardDescription>
@@ -115,7 +115,7 @@ export function AddPropertyTypeForm() {
             <Button
               type="submit"
               disabled={typeForm.formState.isSubmitting}
-              className="w-full cursor-pointer"
+              className="self-start"
             >
               {typeForm.formState.isSubmitting ? "Creando..." : "Crear Tipo"}
             </Button>

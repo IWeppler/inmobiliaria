@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { createClientBrowser } from "@/lib/supabase-browser";
 import { toast } from "sonner";
-import { User, Home, Clock } from "lucide-react";
+import { STATUS_TONE_COLOR } from "@/shared/components/StatusBadge";
 import { cn } from "@/lib/utils";
 import type { LeadWithDetails } from "@/app/types";
 import {
@@ -68,8 +68,8 @@ export function LeadBoard({ initialLeads, isAdmin }: LeadBoardProps) {
           <div
             key={col.value}
             className={cn(
-              "flex min-w-[220px] flex-1 basis-0 flex-col rounded-md border border-border bg-secondary/40 transition-colors",
-              isOver && "border-ring bg-secondary"
+              "flex min-w-[220px] flex-1 basis-0 flex-col rounded-lg bg-sunken transition-colors",
+              isOver && "ring-2 ring-ring/40"
             )}
             onDragOver={(e) => {
               e.preventDefault();
@@ -89,12 +89,12 @@ export function LeadBoard({ initialLeads, isAdmin }: LeadBoardProps) {
               if (id) moveLead(id, col.value);
             }}
           >
-            <div className="flex items-center justify-between px-3 py-2.5 border-b border-border">
+            <div className="flex items-center justify-between px-3 py-2">
               <div className="flex items-center gap-2 text-sm font-medium text-foreground">
-                <Icon className="size-3.5" style={{ color: col.color }} />
+                <Icon className="size-3.5" style={{ color: STATUS_TONE_COLOR[col.tone] }} />
                 {col.label}
               </div>
-              <span className="text-xs text-muted-foreground tabular-nums">
+              <span className="text-xs text-muted-foreground">
                 {items.length}
               </span>
             </div>
@@ -119,14 +119,14 @@ export function LeadBoard({ initialLeads, isAdmin }: LeadBoardProps) {
                     setOverColumn(null);
                   }}
                   className={cn(
-                    "rounded-md border border-border bg-card p-3 shadow-none cursor-grab active:cursor-grabbing",
+                    "rounded-md border border-border bg-card px-3 py-2.5 cursor-grab active:cursor-grabbing transition-colors hover:border-border-strong",
                     draggingId === lead.id && "opacity-50"
                   )}
                 >
                   <div className="flex items-start justify-between gap-2">
                     <Link
                       href={`/dashboard/leads/${lead.id}`}
-                      className="font-medium text-sm text-foreground hover:underline hover:text-primary leading-tight"
+                      className="truncate text-sm font-medium leading-tight text-foreground underline-offset-4 hover:underline"
                     >
                       {lead.name}
                     </Link>
@@ -138,33 +138,29 @@ export function LeadBoard({ initialLeads, isAdmin }: LeadBoardProps) {
                   </div>
 
                   {lead.properties?.title && (
-                    <p className="mt-1.5 flex items-center gap-1 text-xs text-muted-foreground truncate">
-                      <Home className="size-3 shrink-0" />
-                      <span className="truncate">{lead.properties.title}</span>
+                    <p className="mt-1 truncate text-xs text-fg-secondary">
+                      <Link
+                        href={`/dashboard/propiedades/${lead.properties.id}`}
+                        className="underline-offset-4 hover:underline"
+                      >
+                        {lead.properties.title}
+                      </Link>
                     </p>
                   )}
 
-                  <div className="mt-2 flex items-center justify-between text-[11px] text-muted-foreground">
-                    <span className="capitalize">
-                      {lead.source?.toLowerCase() ?? "—"}
+                  <div className="mt-2 flex items-center justify-between gap-2 text-xs text-muted-foreground">
+                    <span className="truncate capitalize">
+                      {lead.source?.toLowerCase().replaceAll("_", " ") ?? "—"}
+                      {isAdmin && lead.agents?.full_name && (
+                        <> · {lead.agents.full_name}</>
+                      )}
                     </span>
                     {lead.status_since && (
-                      <span
-                        className="flex items-center gap-1"
-                        title="Días en este estado"
-                      >
-                        <Clock className="size-3" />
-                        {daysBetween(lead.status_since)}d
+                      <span className="shrink-0" title="Días en este estado">
+                        {daysBetween(lead.status_since)} d
                       </span>
                     )}
                   </div>
-
-                  {isAdmin && (
-                    <p className="mt-2 flex items-center gap-1 text-[11px] text-muted-foreground border-t border-border pt-2">
-                      <User className="size-3" />
-                      {lead.agents?.full_name ?? "Sin asignar"}
-                    </p>
-                  )}
                 </article>
               ))}
             </div>

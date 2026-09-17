@@ -6,17 +6,12 @@ import {
   CardHeader,
   CardTitle,
 } from "@/shared/components/ui/card";
+import { StatusBadge } from "@/shared/components/StatusBadge";
 import { BRAND } from "@/lib/brand";
 
 // Tier 3: estado y URLs de las integraciones. Solo lectura -- la
 // configuración real vive en variables de entorno del deployment.
-export function Integrations({
-  whatsappEnabled,
-  aiAgentEnabled,
-}: {
-  whatsappEnabled: boolean;
-  aiAgentEnabled: boolean;
-}) {
+export function Integrations({ whatsappEnabled }: { whatsappEnabled: boolean }) {
   const rows = [
     {
       icon: Rss,
@@ -39,11 +34,7 @@ export function Integrations({
       icon: MessageCircle,
       title: "WhatsApp Business",
       description: whatsappEnabled
-        ? `Conectado. Confirmaciones de visita por plantilla y mensajes entrantes como notas del lead.${
-            aiAgentEnabled
-              ? " Agente IA activo: responde consultas y deriva al asesor."
-              : " Agente IA desactivado (WHATSAPP_AI_AGENT)."
-          }`
+        ? "Conectado. Confirmaciones de visita por plantilla y mensajes entrantes como notas del lead."
         : "No configurado. Requiere WHATSAPP_ACCESS_TOKEN, WHATSAPP_PHONE_NUMBER_ID y WHATSAPP_VERIFY_TOKEN en el deployment, y el webhook apuntando a la URL de abajo.",
       value: `${BRAND.siteUrl}/api/whatsapp/webhook`,
       status: whatsappEnabled ? "Conectado" : "Pendiente",
@@ -51,9 +42,9 @@ export function Integrations({
   ];
 
   return (
-    <Card className="rounded-md shadow-none">
+    <Card>
       <CardHeader>
-        <CardTitle className="font-serif text-2xl">Integraciones</CardTitle>
+        <CardTitle>Integraciones</CardTitle>
         <CardDescription>
           Portales, agenda pública y WhatsApp.
         </CardDescription>
@@ -62,21 +53,12 @@ export function Integrations({
         <ul className="divide-y divide-border">
           {rows.map((r) => (
             <li key={r.title} className="py-4 first:pt-0 last:pb-0 flex gap-3">
-              <div className="p-2 rounded-full bg-secondary text-muted-foreground h-fit">
-                <r.icon className="size-4" />
-              </div>
               <div className="min-w-0 flex-1">
                 <div className="flex items-center justify-between gap-2">
                   <p className="font-medium text-sm">{r.title}</p>
-                  <span
-                    className={`text-xs px-2 py-0.5 rounded-full ${
-                      r.status === "Pendiente"
-                        ? "bg-amber-100 text-amber-800"
-                        : "bg-emerald-100 text-emerald-800"
-                    }`}
-                  >
+                  <StatusBadge tone={r.status === "Pendiente" ? "warning" : "success"}>
                     {r.status}
-                  </span>
+                  </StatusBadge>
                 </div>
                 <p className="text-sm text-muted-foreground mt-1">{r.description}</p>
                 <code className="block mt-2 text-xs bg-secondary rounded px-2 py-1 break-all">

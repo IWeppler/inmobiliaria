@@ -5,7 +5,6 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
-  ArrowLeft,
   CheckCircle2,
   FileText,
   Loader2,
@@ -41,9 +40,12 @@ import {
   setContractStatusAction,
   undoPaymentAction,
 } from "@/features/rentals/actions";
+import { Page, PageHeader } from "@/shared/components/PageShell";
+import { StatusBadge, type StatusTone } from "@/shared/components/StatusBadge";
 import {
   ADJUSTMENT_LABELS,
   CONTRACT_STATUS_LABELS,
+  CONTRACT_STATUS_TONE,
   PAYMENT_STATUS_LABELS,
   computeSettlement,
   formatDate,
@@ -95,11 +97,12 @@ export type ContractDetailData = {
   today: string;
 };
 
-const STATUS_TONE: Record<string, string> = {
-  pagado: "text-emerald-700 bg-emerald-50 border-emerald-200",
-  parcial: "text-amber-700 bg-amber-50 border-amber-200",
-  vencido: "text-red-700 bg-red-50 border-red-200",
-  pendiente: "text-zinc-700 bg-zinc-50 border-zinc-200",
+// Estado de cuota → tono semántico (StatusBadge).
+const PAYMENT_TONE: Record<string, StatusTone> = {
+  pagado: "success",
+  parcial: "warning",
+  vencido: "danger",
+  pendiente: "neutral",
 };
 
 export function ContractDetail({ c }: { c: ContractDetailData }) {
@@ -140,54 +143,58 @@ export function ContractDetail({ c }: { c: ContractDetailData }) {
     : null;
 
   return (
-    <div className="theme-tn flex flex-col w-full max-w-[1400px] mx-auto px-4 py-6 gap-6">
-      <div className="flex items-start gap-4">
-        <Button asChild variant="outline" size="icon">
-          <Link href="/dashboard/alquileres">
-            <ArrowLeft className="h-4 w-4" />
-          </Link>
-        </Button>
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <h1 className="text-[26px] font-serif font-semibold tracking-tight text-foreground truncate">
-              {c.property?.title ?? "Contrato"}
-            </h1>
-            <span className="inline-flex rounded-full border border-border px-2.5 py-0.5 text-xs font-medium">
-              {CONTRACT_STATUS_LABELS[c.status] ?? c.status}
-            </span>
-          </div>
-          <p className="text-muted-foreground text-sm mt-1">
+    <Page>
+      <PageHeader
+        backHref="/dashboard/alquileres"
+        title={
+          c.property ? (
+            <Link href={`/dashboard/propiedades/${c.property.id}`} className="underline-offset-4 hover:underline">
+              {c.property.title}
+            </Link>
+          ) : (
+            "Contrato"
+          )
+        }
+        aside={
+          <StatusBadge tone={CONTRACT_STATUS_TONE[c.status] ?? "neutral"}>
+            {CONTRACT_STATUS_LABELS[c.status] ?? c.status}
+          </StatusBadge>
+        }
+        description={
+          <>
             {formatDate(c.start_date)} → {formatDate(c.end_date)} · vence el día {c.payment_due_day} ·{" "}
             {ADJUSTMENT_LABELS[c.adjustment_index as AdjustmentIndex]} cada {c.adjustment_months} meses
-          </p>
-        </div>
-        {c.status === "ACTIVO" && (
-          <Select
-            onValueChange={(s) =>
-              run("status", () => setContractStatusAction(c.id, s as "FINALIZADO" | "RESCINDIDO"))
-            }
-          >
-            <SelectTrigger className="w-[160px]">
-              <SelectValue placeholder="Cerrar contrato" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="FINALIZADO">Finalizar</SelectItem>
-              <SelectItem value="RESCINDIDO">Rescindir</SelectItem>
-            </SelectContent>
-          </Select>
-        )}
-      </div>
+          </>
+        }
+        actions={
+          c.status === "ACTIVO" ? (
+            <Select
+              onValueChange={(s) =>
+                run("status", () => setContractStatusAction(c.id, s as "FINALIZADO" | "RESCINDIDO"))
+              }
+            >
+              <SelectTrigger className="w-[160px]">
+                <SelectValue placeholder="Cerrar contrato" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="FINALIZADO">Finalizar</SelectItem>
+                <SelectItem value="RESCINDIDO">Rescindir</SelectItem>
+              </SelectContent>
+            </Select>
+          ) : undefined
+        }
+      />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
         <div className="lg:col-span-2 space-y-6">
           {/* E4.3 — Cobranzas */}
-          <Card className="shadow-none border-border rounded-md">
+          <Card>
             <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle className="font-serif font-semibold">Cuotas</CardTitle>
+              <CardTitle>Cuotas</CardTitle>
               <span className="text-xs text-muted-foreground">
                 Cobrado {money(paidTotal, c.currency)}
                 {overdueCount > 0 && (
-                  <span className="ml-2 text-red-700">· {overdueCount} en mora</span>
+                  <span className="ml-2 text-sm font-normal text-danger">· {overdueCount} en mora</span>
                 )}
               </span>
             </CardHeader>
@@ -226,14 +233,9 @@ export function ContractDetail({ c }: { c: ContractDetailData }) {
                           {fee > 0 ? money(fee, p.currency) : "—"}
                         </TableCell>
                         <TableCell>
-                          <span
-                            className={cn(
-                              "inline-flex rounded-full border px-2 py-0.5 text-[11px] font-medium",
-                              STATUS_TONE[st]
-                            )}
-                          >
+                          <StatusBadge tone={PAYMENT_TONE[st] ?? "neutral"}>
                             {PAYMENT_STATUS_LABELS[st]}
-                          </span>
+                          </StatusBadge>
                         </TableCell>
                         <TableCell className="text-right">
                           {p.paid_at ? (
@@ -325,9 +327,9 @@ export function ContractDetail({ c }: { c: ContractDetailData }) {
 
           {/* E4.4 — Liquidación */}
           {settlingPeriod && settlingPayment && settlementCalc && (
-            <Card className="shadow-none border-border rounded-md">
+            <Card>
               <CardHeader>
-                <CardTitle className="font-serif font-semibold capitalize">
+                <CardTitle className="capitalize">
                   Liquidar {formatPeriod(settlingPeriod)} al propietario
                 </CardTitle>
               </CardHeader>
@@ -402,9 +404,9 @@ export function ContractDetail({ c }: { c: ContractDetailData }) {
             </Card>
           )}
 
-          <Card className="shadow-none border-border rounded-md">
+          <Card>
             <CardHeader>
-              <CardTitle className="font-serif font-semibold">Liquidaciones emitidas</CardTitle>
+              <CardTitle>Liquidaciones emitidas</CardTitle>
             </CardHeader>
             <CardContent className="p-0">
               {c.settlements.length === 0 ? (
@@ -437,14 +439,14 @@ export function ContractDetail({ c }: { c: ContractDetailData }) {
 
         <div className="space-y-6">
           {/* E4.2 — Ajuste */}
-          <Card className="shadow-none border-border rounded-md">
+          <Card>
             <CardHeader>
-              <CardTitle className="text-base font-serif font-semibold flex items-center gap-2">
+              <CardTitle className="flex items-center gap-2">
                 <TrendingUp className="size-4 text-muted-foreground" /> Canon y ajuste
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3 text-sm">
-              <p className="text-2xl font-serif font-semibold tabular-nums">
+              <p className="text-2xl font-semibold tabular-nums">
                 {money(c.rent_amount, c.currency)}
               </p>
               {c.adjustment_index === "NINGUNO" ? (
@@ -459,7 +461,7 @@ export function ContractDetail({ c }: { c: ContractDetailData }) {
                     Base: {money(c.rent_amount, c.currency)} ({formatPeriod(c.base_period)})
                   </p>
                   {c.adjustmentPreview && "error" in c.adjustmentPreview ? (
-                    <p className="text-amber-700 text-xs">
+                    <p className="text-xs text-warning">
                       {c.adjustmentPreview.error}{" "}
                       <Link href="/dashboard/ajustes" className="underline">
                         Cargar índices
@@ -495,9 +497,9 @@ export function ContractDetail({ c }: { c: ContractDetailData }) {
             </CardContent>
           </Card>
 
-          <Card className="shadow-none border-border rounded-md">
+          <Card>
             <CardHeader>
-              <CardTitle className="text-base font-serif font-semibold">Partes</CardTitle>
+              <CardTitle className="text-base font-semibold">Partes</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4 text-sm">
               {[
@@ -525,6 +527,6 @@ export function ContractDetail({ c }: { c: ContractDetailData }) {
           </Card>
         </div>
       </div>
-    </div>
+    </Page>
   );
 }

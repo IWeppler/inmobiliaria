@@ -79,7 +79,7 @@ export function ProfileForm({ agent }: { agent: Agent }) {
           </CardDescription>
         </CardHeader>
         <CardContent className="flex items-center gap-6">
-          <div className="relative w-24 h-24 rounded-full overflow-hidden border-2 border-zinc-100 bg-zinc-50 shadow-sm">
+          <div className="relative size-20 overflow-hidden rounded-full border border-border bg-muted">
             {previewUrl ? (
               <Image
                 src={previewUrl}
@@ -88,7 +88,7 @@ export function ProfileForm({ agent }: { agent: Agent }) {
                 className="object-cover"
               />
             ) : (
-              <div className="w-full h-full flex items-center justify-center text-zinc-400 font-bold text-2xl">
+              <div className="flex h-full w-full items-center justify-center text-xl font-medium text-muted-foreground">
                 {agent.full_name?.[0]}
               </div>
             )}
@@ -98,7 +98,7 @@ export function ProfileForm({ agent }: { agent: Agent }) {
               htmlFor="avatar-upload"
               className="cursor-pointer inline-flex"
             >
-              <div className="flex items-center gap-2 bg-white border border-zinc-200 hover:bg-zinc-50 px-4 py-2 rounded-md text-sm font-medium transition-colors">
+              <div className="inline-flex h-8 items-center gap-2 rounded-md border border-border bg-card px-3 text-sm font-medium transition-colors hover:bg-muted">
                 <Camera className="w-4 h-4" />
                 Cambiar Foto
               </div>
@@ -142,7 +142,6 @@ export function ProfileForm({ agent }: { agent: Agent }) {
                     : "Agente Inmobiliario"
                 }
                 disabled
-                className="bg-zinc-50 text-zinc-500"
               />
             </div>
           </div>
@@ -153,7 +152,6 @@ export function ProfileForm({ agent }: { agent: Agent }) {
               <Input
                 value={agent.email}
                 disabled
-                className="bg-zinc-50 text-zinc-500"
               />
               <p className="text-[10px] text-muted-foreground">
                 Para cambiar tu email, contacta al soporte.

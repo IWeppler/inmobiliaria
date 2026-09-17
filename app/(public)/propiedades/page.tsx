@@ -111,7 +111,7 @@ export default async function PropiedadesPage({
         </div>
 
         {/* --- Layout de Grilla  --- */}
-        <div className="grid grid-cols-1 md:grid-cols-[280px_1fr] gap-8">
+        <div className="grid grid-cols-1 md:grid-cols-[280px_1fr] gap-2">
           {/* Sidebar */}
           <aside
             className="
@@ -137,7 +137,7 @@ export default async function PropiedadesPage({
         "
           >
             {properties.length > 0 ? (
-              <div className="grid grid-cols-1 sm:grid-cols-1 md:grid-cols-1 lg:grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 sm:grid-cols-1 md:grid-cols-1 lg:grid-cols-3 gap-2">
                 {properties.map((property) => (
                   <PropertyCard
                     key={property.id}

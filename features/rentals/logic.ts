@@ -17,6 +17,13 @@ export const CONTRACT_STATUS_LABELS: Record<string, string> = {
   RESCINDIDO: "Rescindido",
 };
 
+// Tono semántico del estado de contrato (ver StatusBadge).
+export const CONTRACT_STATUS_TONE: Record<string, "success" | "neutral" | "danger"> = {
+  ACTIVO: "success",
+  FINALIZADO: "neutral",
+  RESCINDIDO: "danger",
+};
+
 export function ymd(d: Date) {
   return d.toISOString().slice(0, 10);
 }

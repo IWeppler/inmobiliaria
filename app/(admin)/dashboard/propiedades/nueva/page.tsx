@@ -1,14 +1,25 @@
+import type { Metadata } from "next";
+import { createClientServer } from "@/lib/supabase";
 import { PropertyForm } from "@/features/dashboard/property/PropertyForm";
+import { Page, PageHeader } from "@/shared/components/PageShell";
 
-export default function DashboardPage() {
+export const metadata: Metadata = { title: "Nueva propiedad" };
+
+export default async function NewPropertyPage() {
+  const supabase = await createClientServer();
+  const { data: types } = await supabase
+    .from("property_types")
+    .select("id, name")
+    .order("name");
+
   return (
-    <div className="theme-tn flex min-h-screen items-start justify-center font-sans">
-      <main className="w-full max-w-6xl p-4 md:p-8">
-        <h1 className="text-4xl font-serif font-semibold text-center mb-8 text-foreground">
-          Formulario de Nueva Propiedad
-        </h1>
-        <PropertyForm propertyTypes={[]} />
-      </main>
-    </div>
+    <Page>
+      <PageHeader
+        backHref="/dashboard/propiedades"
+        title="Nueva propiedad"
+        description="Completá lo básico, marcá la ubicación y subí fotos. Todo se puede editar después."
+      />
+      <PropertyForm propertyTypes={types ?? []} />
+    </Page>
   );
 }

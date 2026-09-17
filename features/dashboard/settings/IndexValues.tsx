@@ -59,9 +59,9 @@ export function IndexValues({ initial }: { initial: IndexValueRow[] }) {
   }));
 
   return (
-    <Card className="rounded-md shadow-none">
+    <Card>
       <CardHeader>
-        <CardTitle className="font-serif text-2xl">Índices de ajuste (ICL / IPC)</CardTitle>
+        <CardTitle>Índices de ajuste (ICL / IPC)</CardTitle>
         <CardDescription>
           Cargá el valor mensual publicado. ICL: valor del BCRA al primer día del mes.
           IPC: nivel general del INDEC (número índice). Los contratos ajustan por el
@@ -117,7 +117,7 @@ export function IndexValues({ initial }: { initial: IndexValueRow[] }) {
                         <button
                           type="button"
                           onClick={() => remove(r.id)}
-                          className="text-muted-foreground hover:text-red-600"
+                          className="text-muted-foreground hover:text-danger"
                           aria-label="Eliminar"
                         >
                           <Trash2 className="size-3.5" />

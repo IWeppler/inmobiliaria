@@ -7,11 +7,9 @@ import {
   Trash2,
   Shield,
   User,
-  Phone,
-  Mail,
   Edit,
   Camera,
-  PlusCircle,
+  Plus,
 } from "lucide-react";
 import {
   createAgentAction,
@@ -21,6 +19,7 @@ import {
 
 // UI Components
 import { Button } from "@/shared/components/ui/button";
+import { PageHeader } from "@/shared/components/PageShell";
 import { Input } from "@/shared/components/ui/input";
 import {
   Dialog,
@@ -39,6 +38,7 @@ import {
   SelectValue,
 } from "@/shared/components/ui/select";
 import { Label } from "@/shared/components/ui/label";
+import { StatusBadge } from "@/shared/components/StatusBadge";
 import {
   Table,
   TableBody,
@@ -156,16 +156,21 @@ export function AgentsClientPage({
 
   return (
     <>
-      <div className="flex justify-end mb-6">
-        <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-          <DialogTrigger asChild>
-            <Button onClick={openCreateModal} className="cursor-pointer">
-              <PlusCircle className="w-4 h-4 mr-2" /> Agregar Agente
-            </Button>
-          </DialogTrigger>
+      <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+        <PageHeader
+          title="Equipo"
+          description="Agentes y administradores de la inmobiliaria."
+          actions={
+            <DialogTrigger asChild>
+              <Button onClick={openCreateModal}>
+                <Plus /> Agregar agente
+              </Button>
+            </DialogTrigger>
+          }
+        />
           <DialogContent className="sm:max-w-[425px]">
             <DialogHeader>
-              <DialogTitle className="font-serif">
+              <DialogTitle>
                 {editingAgent ? "Editar Agente" : "Nuevo Miembro"}
               </DialogTitle>
               <DialogDescription>
@@ -178,7 +183,7 @@ export function AgentsClientPage({
             <form onSubmit={handleSubmit} className="space-y-4 py-4">
               {/* IMAGEN DE PERFIL */}
               <div className="flex flex-col items-center gap-4 mb-4">
-                <div className="relative w-20 h-20 rounded-full overflow-hidden bg-zinc-100 border-2 border-dashed border-zinc-300 flex items-center justify-center group">
+                <div className="relative size-20 overflow-hidden rounded-full border border-dashed border-border-strong bg-muted flex items-center justify-center group">
                   {selectedFile ? (
                     <Image
                       src={URL.createObjectURL(selectedFile)}
@@ -194,12 +199,12 @@ export function AgentsClientPage({
                       className="object-cover"
                     />
                   ) : (
-                    <Camera className="text-zinc-400 w-8 h-8" />
+                    <Camera className="size-6 text-muted-foreground" />
                   )}
                 </div>
                 <Label
                   htmlFor="avatar-upload"
-                  className="cursor-pointer text-sm text-blue-600 hover:underline"
+                  className="cursor-pointer text-sm text-primary underline-offset-4 hover:underline"
                 >
                   {editingAgent || selectedFile ? "Cambiar foto" : "Subir foto"}
                 </Label>
@@ -295,13 +300,12 @@ export function AgentsClientPage({
               </DialogFooter>
             </form>
           </DialogContent>
-        </Dialog>
-      </div>
+      </Dialog>
 
-      <div className="border border-border rounded-md overflow-hidden bg-card shadow-none">
+      <div className="overflow-hidden rounded-lg border border-border bg-card">
         <Table>
           <TableHeader>
-            <TableRow className="bg-secondary hover:bg-secondary">
+            <TableRow className="hover:bg-transparent">
               <TableHead className="w-[80px]">Foto</TableHead>
               <TableHead>Nombre</TableHead>
               <TableHead>Contacto</TableHead>
@@ -313,7 +317,7 @@ export function AgentsClientPage({
             {agents.map((agent) => (
               <TableRow key={agent.id}>
                 <TableCell>
-                  <div className="relative w-10 h-10 rounded-full overflow-hidden bg-zinc-200 border">
+                  <div className="relative size-8 overflow-hidden rounded-full bg-muted">
                     {agent.avatar_url ? (
                       <Image
                         src={agent.avatar_url}
@@ -322,7 +326,7 @@ export function AgentsClientPage({
                         className="object-cover"
                       />
                     ) : (
-                      <div className="w-full h-full flex items-center justify-center text-zinc-500 font-bold uppercase">
+                      <div className="flex h-full w-full items-center justify-center text-xs font-medium uppercase text-muted-foreground">
                         {agent.full_name?.[0] || "?"}
                       </div>
                     )}
@@ -332,41 +336,27 @@ export function AgentsClientPage({
                 <TableCell className="font-medium">
                   {agent.full_name || "Sin nombre"}
                   {agent.id === currentUserId && (
-                    <span className="ml-2 text-xs text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">
-                      Tú
-                    </span>
+                    <span className="ml-2 text-xs font-normal text-muted-foreground">(vos)</span>
                   )}
                 </TableCell>
 
                 <TableCell>
-                  <div className="flex flex-col text-sm text-zinc-500 gap-1">
-                    <div className="flex items-center gap-2">
-                      <Mail className="w-3 h-3" /> {agent.email}
-                    </div>
+                  <div className="text-sm text-fg-secondary">
+                    {agent.email}
                     {agent.phone && (
-                      <div className="flex items-center gap-2">
-                        <Phone className="w-3 h-3" /> {agent.phone}
-                      </div>
+                      <span className="text-muted-foreground"> · {agent.phone}</span>
                     )}
                   </div>
                 </TableCell>
                 <TableCell>
                   {agent.role === "admin" ? (
-                    <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-2.5 py-0.5 text-xs font-medium text-foreground">
-                      <Shield
-                        className="w-3 h-3 shrink-0"
-                        style={{ color: "var(--color-tn-ink)" }}
-                      />
+                    <StatusBadge tone="accent" icon={Shield}>
                       Admin
-                    </span>
+                    </StatusBadge>
                   ) : (
-                    <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-2.5 py-0.5 text-xs font-medium text-foreground">
-                      <User
-                        className="w-3 h-3 shrink-0"
-                        style={{ color: "var(--color-tn-text-muted)" }}
-                      />
+                    <StatusBadge tone="neutral" icon={User}>
                       Agente
-                    </span>
+                    </StatusBadge>
                   )}
                 </TableCell>
                 <TableCell className="text-right">
@@ -377,7 +367,7 @@ export function AgentsClientPage({
                       size="icon"
                       onClick={() => openEditModal(agent)}
                     >
-                      <Edit className="w-4 h-4 text-zinc-500" />
+                      <Edit className="size-4 text-muted-foreground" />
                     </Button>
 
                     {/* BOTÓN BORRAR (Protegido) */}
@@ -385,7 +375,7 @@ export function AgentsClientPage({
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                        className="text-muted-foreground hover:text-danger"
                         onClick={() => handleDelete(agent.id)}
                       >
                         <Trash2 className="w-4 h-4" />

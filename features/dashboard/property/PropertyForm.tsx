@@ -4,15 +4,26 @@ import { createClientBrowser } from "@/lib/supabase-browser";
 import { zodResolver } from "@hookform/resolvers/zod";
 import type { Resolver } from "react-hook-form";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { toast } from "sonner";
 import { v4 as uuidv4 } from "uuid";
 import dynamic from "next/dynamic";
+import Image from "next/image";
+import Link from "next/link";
+import {
+  Loader2,
+  Search,
+  Trash2,
+  MapPin,
+  ImagePlus,
+  Check,
+  X,
+  Circle,
+  CheckCircle2,
+} from "lucide-react";
 
-// Importaciones de Shadcn
-import { Checkbox } from "@/shared/components/ui/checkbox";
 import { Button } from "@/shared/components/ui/button";
 import {
   Form,
@@ -30,49 +41,35 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/shared/components/ui/select";
+import { StatusBadge } from "@/shared/components/StatusBadge";
+import { cn } from "@/lib/utils";
+import { Textarea } from "@/shared/components/ui/textarea";
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/shared/components/ui/card";
-import { Loader2, Search, Trash2, MapPin } from "lucide-react";
-import Image from "next/image";
-import { AiDescriptionField } from "./ui/ai-description";
+  PROPERTY_STATUSES,
+  propertyStatusMeta,
+  formatPrice,
+} from "@/features/dashboard/property/propertyStatus";
 import type { GeocodeCandidate } from "@/app/api/geocode/route";
 
-// Importación dinámica del mapa
 const LocationPicker = dynamic(
   () => import("@/features/dashboard/property/LocationPicker"),
   {
     ssr: false,
     loading: () => (
-      <div className="h-[400px] w-full bg-zinc-100 animate-pulse rounded-lg flex items-center justify-center text-zinc-400">
-        Cargando Mapa...
+      <div className="flex h-[360px] w-full animate-pulse items-center justify-center rounded-lg bg-muted text-sm text-muted-foreground">
+        Cargando mapa…
       </div>
     ),
   },
 );
 
 // --- Tipos ---
-type PropertyType = {
-  id: number;
-  name: string;
-};
+type PropertyType = { id: number; name: string };
+type Amenity = { id: number; name: string };
+type Agent = { id: string; full_name: string | null };
+type ExistingImage = { id: string; image_url: string };
 
-type Amenity = {
-  id: number;
-  name: string;
-};
-
-// Tipo para el Agente
-type Agent = {
-  id: string;
-  full_name: string | null;
-};
-
-// --- SCHEMA ZOD ACTUALIZADO ---
+// --- Schema ---
 export const propertySchema = z.object({
   title: z.string().min(5, { message: "El título es muy corto." }),
   description: z.string().optional(),
@@ -82,40 +79,22 @@ export const propertySchema = z.object({
   province: z.string().min(3, "La provincia es muy corta."),
   latitude: z.coerce.number().nullable(),
   longitude: z.coerce.number().nullable(),
-
-  // CORRECCIÓN 1: Agregamos agent_id al esquema
   agent_id: z.string().optional().nullable(),
-
-  property_type_id: z.coerce
-    .number()
-    .min(1, { message: "Debes seleccionar un tipo." }),
-  price: z.coerce
-    .number()
-    .min(0, { message: "El precio no puede ser negativo." }),
-  expensas: z.coerce.number().optional().nullable(),
-  bedrooms: z.coerce.number().min(0),
-  bathrooms: z.coerce.number().min(0),
+  property_type_id: z.coerce.number().min(1, { message: "Elegí un tipo." }),
+  price: z.coerce.number().min(0, { message: "El precio no puede ser negativo." }),
+  expensas: z.coerce.number().min(0).optional().nullable(),
+  bedrooms: z.coerce.number().int().min(0),
+  bathrooms: z.coerce.number().int().min(0),
   rooms: z.coerce.number().int().min(0),
-  total_area: z.coerce.number().min(1),
+  total_area: z.coerce.number().min(1, { message: "Indicá la superficie total." }),
   covered_area: z.coerce.number().min(0),
+  cocheras: z.string().optional().nullable(),
+  antiguedad: z.string().optional().nullable(),
   currency: z.string(),
   operation_type: z.string(),
   amenities: z.array(z.number()).optional(),
-  status: z.enum([
-    "EN_VENTA",
-    "EN_ALQUILER",
-    "RESERVADO",
-    "VENDIDO",
-    "ALQUILADO",
-  ]),
+  status: z.enum(["EN_VENTA", "EN_ALQUILER", "RESERVADO", "VENDIDO", "ALQUILADO"]),
 });
-
-type PropertyForm = z.output<typeof propertySchema>;
-
-type ExistingImage = {
-  id: string;
-  image_url: string;
-};
 
 export type PropertyFormValues = z.output<typeof propertySchema>;
 
@@ -127,13 +106,81 @@ type PropertyFormProps = {
   propertyTypes: PropertyType[];
 };
 
-export function PropertyForm({ initialData }: PropertyFormProps) {
+const FIELD_LABELS: Partial<Record<keyof PropertyFormValues, string>> = {
+  title: "Título",
+  city: "Ciudad",
+  province: "Provincia",
+  property_type_id: "Tipo de propiedad",
+  price: "Precio",
+  total_area: "Superficie total",
+  covered_area: "Superficie cubierta",
+  bedrooms: "Dormitorios",
+  bathrooms: "Baños",
+  rooms: "Ambientes",
+};
+
+const DEFAULT_CENTER: [number, number] = [-29.2333, -61.7667];
+
+// --- UI helpers ---
+function Section({
+  id,
+  title,
+  description,
+  children,
+}: {
+  id: string;
+  title: string;
+  description?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section id={id} className="scroll-mt-20 rounded-lg border border-border bg-card">
+      <div className="border-b border-border px-5 py-3">
+        <h2 className="text-base font-semibold tracking-tight">{title}</h2>
+        {description && <p className="text-xs text-muted-foreground">{description}</p>}
+      </div>
+      <div className="flex flex-col gap-4 px-5 py-4">{children}</div>
+    </section>
+  );
+}
+
+// Input numérico con unidad a la derecha (m², ARS…).
+function UnitInput({
+  unit,
+  className,
+  ...props
+}: React.ComponentProps<typeof Input> & { unit: string }) {
+  return (
+    <div className="relative">
+      <Input type="number" inputMode="decimal" className={cn("pr-12", className)} {...props} />
+      <span className="pointer-events-none absolute inset-y-0 right-2.5 flex items-center text-xs text-muted-foreground">
+        {unit}
+      </span>
+    </div>
+  );
+}
+
+const chipClass = (on: boolean) =>
+  cn(
+    "inline-flex h-7 items-center gap-1 rounded-md border px-2.5 text-xs transition-colors",
+    on ? "border-primary bg-primary/5 text-foreground" : "border-border text-fg-secondary hover:bg-muted/50",
+  );
+
+const thumbButtonClass =
+  "absolute right-1.5 top-1.5 flex size-6 items-center justify-center rounded-sm bg-card/95 text-muted-foreground opacity-0 transition-opacity hover:text-danger group-hover:opacity-100 focus-visible:opacity-100";
+
+export function PropertyForm({ initialData, propertyTypes: initialTypes }: PropertyFormProps) {
   const router = useRouter();
   const supabase = createClientBrowser();
+  const isEditMode = !!initialData;
 
-  const [propertyTypes, setPropertyTypes] = useState<PropertyType[]>([]);
+  const [propertyTypes, setPropertyTypes] = useState<PropertyType[]>(initialTypes);
   const [agents, setAgents] = useState<Agent[]>([]);
-  const [files, setFiles] = useState<File[] | null>(null);
+  const [allAmenities, setAllAmenities] = useState<Amenity[]>([]);
+  const [files, setFiles] = useState<File[]>([]);
+  const [existingImages, setExistingImages] = useState(initialData?.property_images || []);
+  const [dragOver, setDragOver] = useState(false);
+
   const [geocodingLoading, setGeocodingLoading] = useState(false);
   const [geocodeCandidates, setGeocodeCandidates] = useState<GeocodeCandidate[]>([]);
   const [mapZoom, setMapZoom] = useState(13);
@@ -142,24 +189,14 @@ export function PropertyForm({ initialData }: PropertyFormProps) {
       ? [initialData.latitude, initialData.longitude]
       : null,
   );
-  const [allAmenities, setAllAmenities] = useState<Amenity[]>([]);
-
-  const [existingImages, setExistingImages] = useState(
-    initialData?.property_images || [],
-  );
-
   const [mapCenter, setMapCenter] = useState<[number, number]>(
     initialData?.latitude && initialData?.longitude
       ? [initialData.latitude, initialData.longitude]
-      : [-29.2333, -61.7667],
+      : DEFAULT_CENTER,
   );
 
-  const isEditMode = !!initialData;
-
-  const mainForm = useForm<PropertyFormValues>({
-    resolver: zodResolver(
-      propertySchema,
-    ) as unknown as Resolver<PropertyFormValues>,
+  const form = useForm<PropertyFormValues>({
+    resolver: zodResolver(propertySchema) as unknown as Resolver<PropertyFormValues>,
     defaultValues: initialData
       ? {
           ...initialData,
@@ -167,6 +204,11 @@ export function PropertyForm({ initialData }: PropertyFormProps) {
           description: initialData.description || "",
           street_address: initialData.street_address || "",
           agent_id: initialData.agent_id || null,
+          rooms: initialData.rooms ?? 0,
+          expensas: initialData.expensas ?? null,
+          cocheras: initialData.cocheras ?? "",
+          antiguedad: initialData.antiguedad ?? "",
+          amenities: initialData.amenities ?? [],
         }
       : {
           title: "",
@@ -177,82 +219,70 @@ export function PropertyForm({ initialData }: PropertyFormProps) {
           province: "Santa Fe",
           latitude: null,
           longitude: null,
-          agent_id: null, // Default null
+          agent_id: null,
           property_type_id: 0,
           price: 0,
+          expensas: null,
           total_area: 0,
           covered_area: 0,
+          rooms: 0,
+          bedrooms: 0,
+          bathrooms: 0,
+          cocheras: "",
+          antiguedad: "",
           operation_type: "venta",
           status: "EN_VENTA",
           currency: "USD",
-          bedrooms: 1,
-          bathrooms: 1,
+          amenities: [],
         },
   });
 
-  const handleLocationSelect = useCallback(
-    (lat: number, lng: number) => {
-      mainForm.setValue("latitude", lat);
-      mainForm.setValue("longitude", lng);
-    },
-    [mainForm],
-  );
+  // Previews de archivos nuevos (object URLs liberadas al cambiar).
+  const previews = useMemo(() => files.map((f) => URL.createObjectURL(f)), [files]);
+  useEffect(() => () => previews.forEach((u) => URL.revokeObjectURL(u)), [previews]);
 
-  // --- Carga de Datos (Tipos y Agentes) ---
+  // Aviso al salir con cambios sin guardar.
+  const dirty = form.formState.isDirty || files.length > 0;
   useEffect(() => {
-    const loadData = async () => {
-      // 1. Tipos de Propiedad
-      const { data: types } = await supabase
-        .from("property_types")
-        .select("id, name")
-        .order("name", { ascending: true });
+    if (!dirty) return;
+    const onBeforeUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+    };
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return () => window.removeEventListener("beforeunload", onBeforeUnload);
+  }, [dirty]);
+
+  // Catálogos
+  useEffect(() => {
+    const load = async () => {
+      const [{ data: types }, { data: agentsData }, { data: amenities }] = await Promise.all([
+        supabase.from("property_types").select("id, name").order("name"),
+        supabase.from("agents").select("id, full_name").order("full_name"),
+        supabase.from("amenities").select("id, name").order("name"),
+      ]);
       if (types) setPropertyTypes(types);
-
-      // 2. Agentes (CORRECCIÓN: Carga real de datos)
-      const { data: agentsData } = await supabase
-        .from("agents")
-        .select("id, full_name")
-        .order("full_name", { ascending: true });
       if (agentsData) setAgents(agentsData);
+      if (amenities) setAllAmenities(amenities);
     };
-
-    const checkUserAndLoad = async () => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) router.push("/login");
-      await loadData();
-    };
-
-    checkUserAndLoad();
-  }, [supabase, router]);
-
-  // Carga de Amenities
-  useEffect(() => {
-    const fetchAmenities = async () => {
-      const { data } = await supabase
-        .from("amenities")
-        .select("id, name")
-        .order("name", { ascending: true });
-      if (data) setAllAmenities(data);
-    };
-    fetchAmenities();
+    load();
   }, [supabase]);
 
+  const handleLocationSelect = useCallback(
+    (lat: number, lng: number) => {
+      form.setValue("latitude", lat, { shouldDirty: true });
+      form.setValue("longitude", lng, { shouldDirty: true });
+      setSelectedPoint([lat, lng]);
+    },
+    [form],
+  );
+
   // --- Geocoding (E2.3) ---
-  // Va por /api/geocode (server-side, estructurado, solo Argentina). Si
-  // hay un único candidato se aplica directo; si hay varios se listan para
-  // que el agente elija. La precisión decide el zoom y si se marca el
-  // punto (solo con precisión de calle; con ciudad, solo se centra).
   const applyCandidate = (c: GeocodeCandidate) => {
     setMapCenter([c.lat, c.lon]);
     setMapZoom(c.precision === "street" ? 16 : c.precision === "locality" ? 13 : 9);
     setGeocodeCandidates([]);
-
     if (c.precision === "street") {
-      setSelectedPoint([c.lat, c.lon]);
-      mainForm.setValue("latitude", c.lat);
-      mainForm.setValue("longitude", c.lon);
+      handleLocationSelect(c.lat, c.lon);
       toast.success("Ubicación marcada. Arrastrá el marcador si hace falta.");
     } else {
       toast.info("Mapa centrado en la zona. Hacé click para marcar el punto exacto.");
@@ -260,345 +290,205 @@ export function PropertyForm({ initialData }: PropertyFormProps) {
   };
 
   const handleGeocode = async () => {
-    setGeocodingLoading(true);
-    const { street_address, city, province } = mainForm.getValues();
-
+    const { street_address, city, province } = form.getValues();
     if (!city || !province) {
-      toast.error(
-        "Ingresa al menos Ciudad y Provincia para buscar en el mapa.",
-      );
-      setGeocodingLoading(false);
+      toast.error("Ingresá al menos ciudad y provincia para buscar en el mapa.");
       return;
     }
-
-    const params = new URLSearchParams({
-      street: street_address ?? "",
-      city,
-      province,
-    });
-
+    setGeocodingLoading(true);
     try {
+      const params = new URLSearchParams({ street: street_address ?? "", city, province });
       const response = await fetch(`/api/geocode?${params.toString()}`);
       if (!response.ok) throw new Error(await response.text());
-      const { candidates } = (await response.json()) as {
-        candidates: GeocodeCandidate[];
-      };
-
+      const { candidates } = (await response.json()) as { candidates: GeocodeCandidate[] };
       if (candidates.length === 0) {
         toast.error("No se encontró la zona. Probá con menos detalle o marcá a mano.");
       } else if (candidates.length === 1) {
         applyCandidate(candidates[0]);
       } else {
         setGeocodeCandidates(candidates);
-        toast.info(`${candidates.length} resultados: elegí el correcto.`);
       }
-    } catch (error) {
-      console.log(error);
+    } catch {
       toast.error("Error de conexión con el servicio de mapas.");
+    } finally {
+      setGeocodingLoading(false);
     }
-    setGeocodingLoading(false);
   };
 
+  // --- Fotos ---
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const addFiles = (list: FileList | File[] | null) => {
+    if (!list) return;
+    const incoming = Array.from(list).filter((f) => f.type.startsWith("image/"));
+    if (incoming.length === 0) return;
+    setFiles((prev) => [...prev, ...incoming]);
+  };
+  const removeFile = (i: number) => setFiles((prev) => prev.filter((_, idx) => idx !== i));
+
   const handleDeleteImage = async (image: ExistingImage) => {
-    const toastId = toast.loading("Eliminando imagen...");
+    const toastId = toast.loading("Eliminando foto…");
     const path = image.image_url.split("/properties/").pop();
     if (path) await supabase.storage.from("properties").remove([path]);
     await supabase.from("property_images").delete().eq("id", image.id);
     setExistingImages((prev) => prev.filter((img) => img.id !== image.id));
-    toast.success("Imagen eliminada.", { id: toastId });
+    toast.success("Foto eliminada.", { id: toastId });
   };
 
   // --- Submit ---
-  const onSubmitProperty = async (data: PropertyFormValues) => {
+  const onInvalid = (errors: Record<string, unknown>) => {
+    const keys = Object.keys(errors);
+    const names = keys.map((k) => FIELD_LABELS[k as keyof PropertyFormValues] ?? k).slice(0, 4);
+    toast.error(`Revisá: ${names.join(", ")}${keys.length > 4 ? "…" : ""}`);
+  };
+
+  const onSubmit = async (data: PropertyFormValues) => {
     const {
       data: { user },
     } = await supabase.auth.getUser();
     if (!user) {
-      toast.error("Error: No estás autenticado.");
+      toast.error("No estás autenticado.");
       return;
     }
-
     if (!data.latitude || !data.longitude) {
-      toast.error("Por favor, marca la ubicación en el mapa.");
+      toast.error("Marcá la ubicación en el mapa.");
+      document.getElementById("ubicacion")?.scrollIntoView({ behavior: "smooth", block: "start" });
       return;
     }
 
-    const toastId = isEditMode ? "update" : "create";
-    toast.loading(isEditMode ? "Actualizando..." : "Creando...", {
-      id: toastId,
-    });
-
+    const toastId = toast.loading(isEditMode ? "Guardando cambios…" : "Creando propiedad…");
     const { amenities, ...propertyData } = data;
+    const payload = {
+      ...propertyData,
+      cocheras: propertyData.cocheras || null,
+      antiguedad: propertyData.antiguedad || null,
+      expensas: propertyData.expensas ?? null,
+    };
 
-    // Subida de Imágenes
-    const newImagePaths: { path: string; publicUrl: string }[] = [];
-    if (files && files.length > 0) {
-      for (const file of files) {
-        const filePath = `${user.id}/${uuidv4()}-${file.name}`;
-        const { data: uploadData, error: uploadError } = await supabase.storage
-          .from("properties")
-          .upload(filePath, file);
-
-        if (uploadError) {
-          toast.error(`Error imagen: ${uploadError.message}`, { id: toastId });
-          continue;
-        }
-        const { data: publicUrlData } = supabase.storage
-          .from("properties")
-          .getPublicUrl(uploadData.path);
-        newImagePaths.push({
-          path: uploadData.path,
-          publicUrl: publicUrlData.publicUrl,
-        });
+    // Fotos nuevas
+    const newImagePaths: string[] = [];
+    for (const file of files) {
+      const filePath = `${user.id}/${uuidv4()}-${file.name}`;
+      const { data: up, error } = await supabase.storage.from("properties").upload(filePath, file);
+      if (error) {
+        toast.error(`No se pudo subir ${file.name}: ${error.message}`, { id: toastId });
+        continue;
       }
+      newImagePaths.push(supabase.storage.from("properties").getPublicUrl(up.path).data.publicUrl);
     }
 
-    // Insert / Update Propiedad
     let propertyId = initialData?.id;
-
     if (isEditMode && initialData) {
-      // UPDATE
-      const { error } = await supabase
-        .from("properties")
-        .update(propertyData)
-        .eq("id", initialData.id);
-
+      const { error } = await supabase.from("properties").update(payload).eq("id", initialData.id);
       if (error) {
         toast.error(error.message, { id: toastId });
         return;
       }
     } else {
-      const finalAgentId = propertyData.agent_id
-        ? propertyData.agent_id
-        : user.id;
-
-      const { data: newProperty, error } = await supabase
+      const { data: created, error } = await supabase
         .from("properties")
-        .insert({
-          ...propertyData,
-          agent_id: finalAgentId,
-        })
-        .select()
+        .insert({ ...payload, agent_id: payload.agent_id || user.id })
+        .select("id")
         .single();
-
       if (error) {
         toast.error(error.message, { id: toastId });
         return;
       }
-      propertyId = newProperty.id;
+      propertyId = created.id;
     }
 
-    // Amenities
     if (propertyId) {
-      await supabase
-        .from("property_amenities")
-        .delete()
-        .eq("property_id", propertyId);
+      await supabase.from("property_amenities").delete().eq("property_id", propertyId);
       if (amenities && amenities.length > 0) {
-        const newLinks = amenities.map((id) => ({
-          property_id: propertyId,
-          amenity_id: id,
-        }));
-        await supabase.from("property_amenities").insert(newLinks);
+        await supabase
+          .from("property_amenities")
+          .insert(amenities.map((id) => ({ property_id: propertyId!, amenity_id: id })));
+      }
+      if (newImagePaths.length > 0) {
+        await supabase.from("property_images").insert(
+          newImagePaths.map((url, index) => ({
+            property_id: propertyId!,
+            image_url: url,
+            order: existingImages.length + index,
+          })),
+        );
       }
     }
 
-    // Imágenes
-    if (propertyId && newImagePaths.length > 0) {
-      const imagesToInsert = newImagePaths.map((img, index) => ({
-        property_id: propertyId!,
-        image_url: img.publicUrl,
-        order: existingImages.length + index,
-      }));
-      await supabase.from("property_images").insert(imagesToInsert);
-    }
-
-    toast.success("¡Listo!", { id: toastId });
-    if (!isEditMode) {
-      mainForm.reset();
-      setFiles(null);
-      setMapCenter([-29.2333, -61.7667]);
-    }
-    router.push("/dashboard");
+    toast.success(isEditMode ? "Cambios guardados." : "Propiedad creada.", { id: toastId });
+    form.reset(data);
+    setFiles([]);
+    router.push(`/dashboard/propiedades/${propertyId}`);
     router.refresh();
   };
 
-  return (
-    <Card className="rounded-md shadow-none">
-      <CardHeader>
-        <CardTitle className="font-serif font-semibold text-xl">
-          {isEditMode ? "Editar Propiedad" : "Cargar Nueva Propiedad"}
-        </CardTitle>
-        <CardDescription>
-          Completa los datos. Usa el mapa para ubicar campos o lotes.
-        </CardDescription>
-      </CardHeader>
+  // --- Resumen / checklist (en vivo) ---
+  const w = form.watch();
+  const cover = existingImages[0]?.image_url ?? previews[0] ?? null;
+  const photoCount = existingImages.length + files.length;
+  const meta = propertyStatusMeta(w.status);
+  const typeName = propertyTypes.find((t) => t.id === Number(w.property_type_id))?.name;
+  const checklist = [
+    { label: "Título", ok: (w.title ?? "").length >= 5 },
+    { label: "Tipo y operación", ok: Number(w.property_type_id) > 0 },
+    { label: "Precio", ok: Number(w.price) > 0, hint: Number(w.price) > 0 ? undefined : "0 = a consultar" },
+    { label: "Ubicación en el mapa", ok: !!w.latitude && !!w.longitude },
+    { label: "Superficie", ok: Number(w.total_area) > 0 },
+    { label: "Fotos", ok: photoCount > 0, hint: photoCount > 0 && photoCount < 3 ? "mejor con 3 o más" : undefined },
+    { label: "Descripción", ok: (w.description ?? "").trim().length > 40 },
+  ];
+  const done = checklist.filter((c) => c.ok).length;
+  const submitting = form.formState.isSubmitting;
+  const cancelHref = initialData ? `/dashboard/propiedades/${initialData.id}` : "/dashboard/propiedades";
 
-      <CardContent>
-        <Form {...mainForm}>
-          <form
-            onSubmit={mainForm.handleSubmit(onSubmitProperty)}
-            className="space-y-8"
-          >
-            {/* 1. Datos Básicos */}
-            <div className="space-y-4">
+  const actions = (
+    <>
+      <Button asChild variant="outline" type="button">
+        <Link href={cancelHref}>Cancelar</Link>
+      </Button>
+      <Button type="submit" form="property-form" disabled={submitting}>
+        {submitting ? <Loader2 className="animate-spin" /> : <Check />}
+        {isEditMode ? "Guardar cambios" : "Crear propiedad"}
+      </Button>
+    </>
+  );
+
+  return (
+    <Form {...form}>
+      <form id="property-form" onSubmit={form.handleSubmit(onSubmit, onInvalid)} className="contents">
+        <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
+          {/* ===================== COLUMNA PRINCIPAL ===================== */}
+          <div className="flex min-w-0 flex-col gap-4">
+            {/* 1. Lo básico */}
+            <Section id="basico" title="Lo básico" description="Cómo se va a llamar y qué es.">
               <FormField
-                control={mainForm.control}
+                control={form.control}
                 name="title"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Título Publicación</FormLabel>
+                    <FormLabel>Título de la publicación</FormLabel>
                     <FormControl>
-                      <Input placeholder="Ej: Campo 500 Has..." {...field} />
+                      <Input placeholder="Ej.: Casa 3 dormitorios con pileta en Fisherton" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
-              <AiDescriptionField form={mainForm} />
-            </div>
-
-            {/* 2. UBICACIÓN Y MAPA */}
-            <div className="space-y-4 p-4 border border-border rounded-md bg-secondary/50">
-              <div className="flex items-center gap-2 mb-2">
-                <MapPin className="h-5 w-5 text-primary" />
-                <h3 className="font-serif font-semibold text-xl">
-                  Ubicación & Mapa
-                </h3>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
                 <FormField
-                  control={mainForm.control}
-                  name="province"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Provincia</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Santa Fe" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={mainForm.control}
-                  name="city"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Ciudad / Localidad</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Tostado" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <FormField
-                  control={mainForm.control}
-                  name="street_address"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Dirección / Referencia</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Ej: Ruta 95 Km 10" {...field} />
-                      </FormControl>
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={mainForm.control}
-                  name="neighborhood"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Barrio / Paraje</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Ej: Paraje El Tigre" {...field} />
-                      </FormControl>
-                    </FormItem>
-                  )}
-                />
-              </div>
-
-              <Button
-                type="button"
-                variant="default"
-                onClick={handleGeocode}
-                disabled={geocodingLoading}
-              >
-                {geocodingLoading ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : (
-                  <Search className="mr-2 h-4 w-4" />
-                )}
-                Buscar Zona en Mapa
-              </Button>
-
-              {geocodeCandidates.length > 0 && (
-                <ul className="rounded-md border border-border bg-card divide-y divide-border text-sm">
-                  {geocodeCandidates.map((c) => (
-                    <li key={`${c.lat},${c.lon}`}>
-                      <button
-                        type="button"
-                        onClick={() => applyCandidate(c)}
-                        className="w-full text-left px-3 py-2 hover:bg-secondary flex items-start gap-2"
-                      >
-                        <MapPin className="size-4 mt-0.5 shrink-0 text-muted-foreground" />
-                        <span className="flex-1">{c.label}</span>
-                        <span className="text-xs text-muted-foreground shrink-0">
-                          {c.precision === "street" ? "calle" : c.precision === "locality" ? "localidad" : "zona"}
-                        </span>
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              )}
-
-              <div className="space-y-2 pt-2">
-                <FormLabel className="text-base font-medium text-black">
-                  Marca el punto exacto en el mapa:
-                </FormLabel>
-                <div className="border border-border rounded-md overflow-hidden shadow-none">
-                  <LocationPicker
-                    initialLat={initialData?.latitude || undefined}
-                    initialLng={initialData?.longitude || undefined}
-                    cityCoordinates={mapCenter}
-                    zoom={mapZoom}
-                    selected={selectedPoint}
-                    onLocationSelect={handleLocationSelect}
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* 3. Detalles y Operación */}
-            <div className="space-y-4 p-4 border border-border rounded-md bg-secondary/50">
-              <h3 className="font-serif font-semibold text-xl">Detalles</h3>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                <FormField
-                  control={mainForm.control}
+                  control={form.control}
                   name="property_type_id"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Tipo de Propiedad</FormLabel>
-                      <Select
-                        onValueChange={field.onChange}
-                        defaultValue={String(field.value)}
-                      >
+                      <FormLabel>Tipo</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value ? String(field.value) : undefined}>
                         <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Tipo..." />
+                          <SelectTrigger className="w-full">
+                            <SelectValue placeholder="Elegí un tipo" />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          {propertyTypes.map((type) => (
-                            <SelectItem key={type.id} value={String(type.id)}>
-                              {type.name}
-                            </SelectItem>
+                          {propertyTypes.map((t) => (
+                            <SelectItem key={t.id} value={String(t.id)}>{t.name}</SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
@@ -606,52 +496,15 @@ export function PropertyForm({ initialData }: PropertyFormProps) {
                     </FormItem>
                   )}
                 />
-
-                {/* SELECT DE AGENTE RESPONSABLE */}
                 <FormField
-                  control={mainForm.control}
-                  name="agent_id"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Agente Responsable</FormLabel>
-                      <Select
-                        onValueChange={field.onChange}
-                        defaultValue={field.value || undefined}
-                        value={field.value || undefined}
-                      >
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Seleccionar agente" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {agents.map((agent) => (
-                            <SelectItem key={agent.id} value={agent.id}>
-                              {agent.full_name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                {/* Operación y Estado */}
-                <FormField
-                  control={mainForm.control}
+                  control={form.control}
                   name="operation_type"
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Operación</FormLabel>
-                      <Select
-                        onValueChange={field.onChange}
-                        defaultValue={field.value}
-                      >
+                      <Select onValueChange={field.onChange} value={field.value}>
                         <FormControl>
-                          <SelectTrigger>
-                            <SelectValue />
-                          </SelectTrigger>
+                          <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
                         </FormControl>
                         <SelectContent>
                           <SelectItem value="venta">Venta</SelectItem>
@@ -662,68 +515,80 @@ export function PropertyForm({ initialData }: PropertyFormProps) {
                   )}
                 />
                 <FormField
-                  control={mainForm.control}
+                  control={form.control}
                   name="status"
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Estado</FormLabel>
-                      <Select
-                        onValueChange={field.onChange}
-                        defaultValue={field.value}
-                      >
+                      <Select onValueChange={field.onChange} value={field.value}>
                         <FormControl>
-                          <SelectTrigger>
-                            <SelectValue />
+                          <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {PROPERTY_STATUSES.map((s) => (
+                            <SelectItem key={s.value} value={s.value}>
+                              <span className="flex items-center gap-2">
+                                <s.icon className="size-3.5" style={{ color: s.color }} />
+                                {s.label}
+                              </span>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="agent_id"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Responsable</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value ?? undefined}>
+                        <FormControl>
+                          <SelectTrigger className="w-full">
+                            <SelectValue placeholder={isEditMode ? "Sin asignar" : "Vos"} />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          <SelectItem value="EN_VENTA">En Venta</SelectItem>
-                          <SelectItem value="EN_ALQUILER">
-                            En Alquiler
-                          </SelectItem>
-                          <SelectItem value="RESERVADO">Reservado</SelectItem>
-                          <SelectItem value="VENDIDO">Vendido</SelectItem>
-                          <SelectItem value="ALQUILADO">Alquilado</SelectItem>
+                          {agents.map((a) => (
+                            <SelectItem key={a.id} value={a.id}>{a.full_name ?? a.id}</SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
                     </FormItem>
                   )}
                 />
               </div>
+            </Section>
 
-              {/* Precios y Medidas */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* 2. Precio */}
+            <Section id="precio" title="Precio">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-[1fr_120px_1fr]">
                 <FormField
-                  control={mainForm.control}
+                  control={form.control}
                   name="price"
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>
-                        Precio{" "}
-                        <span className="text-zinc-400 font-normal ml-1">
-                          (0 = Consultar)
-                        </span>
+                        Precio <span className="font-normal text-muted-foreground">(0 = a consultar)</span>
                       </FormLabel>
                       <FormControl>
-                        <Input type="number" {...field} />
+                        <Input type="number" inputMode="decimal" min={0} {...field} />
                       </FormControl>
+                      <FormMessage />
                     </FormItem>
                   )}
                 />
                 <FormField
-                  control={mainForm.control}
+                  control={form.control}
                   name="currency"
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Moneda</FormLabel>
-                      <Select
-                        onValueChange={field.onChange}
-                        defaultValue={field.value}
-                      >
+                      <Select onValueChange={field.onChange} value={field.value}>
                         <FormControl>
-                          <SelectTrigger>
-                            <SelectValue />
-                          </SelectTrigger>
+                          <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
                         </FormControl>
                         <SelectContent>
                           <SelectItem value="USD">USD</SelectItem>
@@ -733,180 +598,408 @@ export function PropertyForm({ initialData }: PropertyFormProps) {
                     </FormItem>
                   )}
                 />
+                <FormField
+                  control={form.control}
+                  name="expensas"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>
+                        Expensas <span className="font-normal text-muted-foreground">(opcional)</span>
+                      </FormLabel>
+                      <FormControl>
+                        <UnitInput
+                          unit="ARS"
+                          min={0}
+                          name={field.name}
+                          onBlur={field.onBlur}
+                          ref={field.ref}
+                          value={field.value ?? ""}
+                          onChange={(e) => field.onChange(e.target.value === "" ? null : e.target.value)}
+                        />
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
               </div>
+            </Section>
 
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {/* 3. Características */}
+            <Section id="caracteristicas" title="Características">
+              <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
+                {(
+                  [
+                    ["rooms", "Ambientes"],
+                    ["bedrooms", "Dormitorios"],
+                    ["bathrooms", "Baños"],
+                  ] as const
+                ).map(([name, label]) => (
+                  <FormField
+                    key={name}
+                    control={form.control}
+                    name={name}
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>{label}</FormLabel>
+                        <FormControl>
+                          <Input type="number" inputMode="numeric" min={0} {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                ))}
                 <FormField
-                  control={mainForm.control}
-                  name="bedrooms"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Dorm.</FormLabel>
-                      <FormControl>
-                        <Input type="number" {...field} />
-                      </FormControl>
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={mainForm.control}
-                  name="bathrooms"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Baños</FormLabel>
-                      <FormControl>
-                        <Input type="number" {...field} />
-                      </FormControl>
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={mainForm.control}
+                  control={form.control}
                   name="total_area"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Total (m²)</FormLabel>
-                      <FormControl>
-                        <Input type="number" {...field} />
-                      </FormControl>
+                      <FormLabel>Sup. total</FormLabel>
+                      <FormControl><UnitInput unit="m²" min={0} {...field} /></FormControl>
+                      <FormMessage />
                     </FormItem>
                   )}
                 />
                 <FormField
-                  control={mainForm.control}
+                  control={form.control}
                   name="covered_area"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Cub. (m²)</FormLabel>
+                      <FormLabel>Sup. cubierta</FormLabel>
+                      <FormControl><UnitInput unit="m²" min={0} {...field} /></FormControl>
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="cocheras"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Cocheras</FormLabel>
                       <FormControl>
-                        <Input type="number" {...field} />
+                        <Input placeholder="Ej.: 1 cubierta" {...field} value={field.value ?? ""} />
                       </FormControl>
                     </FormItem>
                   )}
                 />
               </div>
-            </div>
-
-            {/* Amenities */}
-            <div className="space-y-4 p-4 border border-border rounded-md bg-secondary/50">
-              <FormLabel className="font-serif font-semibold text-xl">
-                Amenities
-              </FormLabel>
               <FormField
-                control={mainForm.control}
-                name="amenities"
+                control={form.control}
+                name="antiguedad"
                 render={({ field }) => (
-                  <FormItem>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                      {allAmenities.map((amenity) => (
-                        <FormItem
-                          key={amenity.id}
-                          className="flex flex-row items-start space-x-3 space-y-0"
-                        >
-                          <FormControl>
-                            <Checkbox
-                              checked={field.value?.includes(amenity.id)}
-                              onCheckedChange={(checked) => {
-                                return checked
-                                  ? field.onChange([
-                                      ...(field.value || []),
-                                      amenity.id,
-                                    ])
-                                  : field.onChange(
-                                      (field.value || []).filter(
-                                        (id) => id !== amenity.id,
-                                      ),
-                                    );
-                              }}
-                            />
-                          </FormControl>
-                          <FormLabel className="font-normal cursor-pointer">
-                            {amenity.name}
-                          </FormLabel>
-                        </FormItem>
-                      ))}
-                    </div>
+                  <FormItem className="sm:max-w-xs">
+                    <FormLabel>Antigüedad</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Ej.: A estrenar · 10 años" {...field} value={field.value ?? ""} />
+                    </FormControl>
                   </FormItem>
                 )}
               />
-            </div>
 
-            {/* Imágenes */}
-            <div className="space-y-4 p-4 border border-border rounded-md bg-secondary/50">
-              <h3 className="font-serif font-semibold text-xl">Imágenes</h3>
-              {/* Galería Existente */}
-              {isEditMode && existingImages.length > 0 && (
-                <div className="flex flex-wrap gap-2 mb-4">
-                  {existingImages.map((image) => (
-                    <div key={image.id} className="relative w-24 h-24 group">
-                      <Image
-                        src={image.image_url}
-                        alt="propiedad"
-                        fill
-                        className="rounded-md object-cover"
-                      />
-                      <Button
-                        type="button"
-                        variant="destructive"
-                        size="icon"
-                        className="absolute top-1 right-1 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
-                        onClick={() => handleDeleteImage(image)}
-                      >
-                        <Trash2 className="h-3 w-3" />
-                      </Button>
-                    </div>
-                  ))}
-                </div>
+              {allAmenities.length > 0 && (
+                <FormField
+                  control={form.control}
+                  name="amenities"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>
+                        Amenities{" "}
+                        {field.value && field.value.length > 0 && (
+                          <span className="font-normal text-muted-foreground">· {field.value.length}</span>
+                        )}
+                      </FormLabel>
+                      <div className="flex flex-wrap gap-1.5">
+                        {allAmenities.map((a) => {
+                          const on = field.value?.includes(a.id) ?? false;
+                          return (
+                            <button
+                              key={a.id}
+                              type="button"
+                              aria-pressed={on}
+                              onClick={() =>
+                                field.onChange(
+                                  on
+                                    ? (field.value ?? []).filter((id) => id !== a.id)
+                                    : [...(field.value ?? []), a.id],
+                                )
+                              }
+                              className={chipClass(on)}
+                            >
+                              {on && <Check className="size-3" />}
+                              {a.name}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </FormItem>
+                  )}
+                />
               )}
-              {/* Input Nueva Imagen */}
-              <FormItem>
-                <FormLabel>Subir Nuevas</FormLabel>
-                <FormControl>
-                  <Input
-                    type="file"
-                    multiple
-                    accept="image/*"
-                    onChange={(e) =>
-                      setFiles(
-                        e.target.files ? Array.from(e.target.files) : null,
-                      )
-                    }
-                  />
-                </FormControl>
-              </FormItem>
-              {/* Preview */}
-              {files && files.length > 0 && (
-                <div className="flex flex-wrap gap-2 mt-2">
-                  {files.map((file, i) => (
-                    <div key={i} className="relative w-20 h-20">
-                      <Image
-                        src={URL.createObjectURL(file)}
-                        alt="preview"
-                        fill
-                        className="rounded-md object-cover"
-                      />
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
+            </Section>
 
-            <Button
-              type="submit"
-              disabled={mainForm.formState.isSubmitting}
-              className="w-full text-lg py-6"
+            {/* 4. Descripción */}
+            <Section id="descripcion" title="Descripción" description="Lo que ve el interesado en la ficha pública y en los portales.">
+              <FormField
+                control={form.control}
+                name="description"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormControl>
+                      <Textarea
+                        rows={8}
+                        placeholder="Distribución, estado, orientación, servicios, entorno, forma de pago…"
+                        className="min-h-40 resize-y"
+                        {...field}
+                      />
+                    </FormControl>
+                    <p className="text-xs text-muted-foreground">
+                      {(field.value ?? "").length} caracteres
+                    </p>
+                  </FormItem>
+                )}
+              />
+            </Section>
+
+            {/* 5. Ubicación */}
+            <Section
+              id="ubicacion"
+              title="Ubicación"
+              description="Buscá la dirección y ajustá el punto en el mapa. El punto es obligatorio."
             >
-              {mainForm.formState.isSubmitting ? (
-                <Loader2 className="mr-2 h-6 w-6 animate-spin" />
-              ) : isEditMode ? (
-                "Guardar Cambios"
-              ) : (
-                "Crear Propiedad"
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <FormField
+                  control={form.control}
+                  name="province"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Provincia</FormLabel>
+                      <FormControl><Input {...field} /></FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="city"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Ciudad / localidad</FormLabel>
+                      <FormControl><Input placeholder="Ej.: Rosario" {...field} /></FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="street_address"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Dirección o referencia</FormLabel>
+                      <FormControl><Input placeholder="Ej.: Belgrano 830 · Ruta 95 Km 10" {...field} /></FormControl>
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="neighborhood"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Barrio / paraje</FormLabel>
+                      <FormControl><Input placeholder="Ej.: Fisherton" {...field} /></FormControl>
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <div className="flex flex-wrap items-center gap-3">
+                <Button type="button" variant="outline" onClick={handleGeocode} disabled={geocodingLoading}>
+                  {geocodingLoading ? <Loader2 className="animate-spin" /> : <Search />}
+                  Buscar en el mapa
+                </Button>
+                <span className="text-xs text-muted-foreground">
+                  {selectedPoint ? (
+                    <span className="inline-flex items-center gap-1 text-success">
+                      <CheckCircle2 className="size-3.5" /> Punto marcado
+                    </span>
+                  ) : (
+                    "Después de buscar, hacé click en el mapa para marcar el punto exacto."
+                  )}
+                </span>
+              </div>
+
+              {geocodeCandidates.length > 0 && (
+                <ul className="divide-y divide-border rounded-md border border-border bg-card text-sm">
+                  {geocodeCandidates.map((c) => (
+                    <li key={`${c.lat},${c.lon}`}>
+                      <button
+                        type="button"
+                        onClick={() => applyCandidate(c)}
+                        className="flex w-full items-start gap-2 px-3 py-2 text-left hover:bg-muted/50"
+                      >
+                        <MapPin className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+                        <span className="flex-1">{c.label}</span>
+                        <span className="shrink-0 text-xs text-muted-foreground">
+                          {c.precision === "street" ? "calle" : c.precision === "locality" ? "localidad" : "zona"}
+                        </span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
               )}
-            </Button>
-          </form>
-        </Form>
-      </CardContent>
-    </Card>
+
+              <div className="overflow-hidden rounded-lg border border-border">
+                <LocationPicker
+                  initialLat={initialData?.latitude || undefined}
+                  initialLng={initialData?.longitude || undefined}
+                  cityCoordinates={mapCenter}
+                  zoom={mapZoom}
+                  selected={selectedPoint}
+                  onLocationSelect={handleLocationSelect}
+                />
+              </div>
+            </Section>
+
+            {/* 6. Fotos */}
+            <Section
+              id="fotos"
+              title="Fotos"
+              description="La primera es la portada. Arrastrá archivos o hacé click para elegir."
+            >
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  setDragOver(true);
+                }}
+                onDragLeave={() => setDragOver(false)}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  setDragOver(false);
+                  addFiles(e.dataTransfer.files);
+                }}
+                className={cn(
+                  "flex h-28 w-full flex-col items-center justify-center gap-1 rounded-lg border border-dashed text-sm transition-colors",
+                  dragOver ? "border-primary bg-primary/5" : "border-border-strong bg-sunken hover:bg-muted",
+                )}
+              >
+                <ImagePlus className="size-5 text-muted-foreground" />
+                <span className="text-fg-secondary">Soltá las fotos acá o hacé click</span>
+                <span className="text-xs text-muted-foreground">JPG o PNG · varias a la vez</span>
+              </button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                multiple
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => {
+                  addFiles(e.target.files);
+                  e.target.value = "";
+                }}
+              />
+
+              {(existingImages.length > 0 || files.length > 0) && (
+                <ul className="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-6">
+                  {existingImages.map((img, i) => (
+                    <li key={img.id} className="group relative aspect-square overflow-hidden rounded-md bg-muted">
+                      <Image src={img.image_url} alt="" fill sizes="160px" className="object-cover" unoptimized />
+                      {i === 0 && (
+                        <span className="absolute left-1.5 top-1.5 rounded-sm bg-card/95 px-1.5 text-[11px] font-medium text-foreground">
+                          Portada
+                        </span>
+                      )}
+                      <button type="button" aria-label="Eliminar foto" onClick={() => handleDeleteImage(img)} className={thumbButtonClass}>
+                        <Trash2 className="size-3.5" />
+                      </button>
+                    </li>
+                  ))}
+                  {files.map((f, i) => (
+                    <li key={`${f.name}-${i}`} className="group relative aspect-square overflow-hidden rounded-md bg-muted">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={previews[i]} alt="" className="h-full w-full object-cover" />
+                      {existingImages.length === 0 && i === 0 && (
+                        <span className="absolute left-1.5 top-1.5 rounded-sm bg-card/95 px-1.5 text-[11px] font-medium text-foreground">
+                          Portada
+                        </span>
+                      )}
+                      <span className="absolute bottom-1.5 left-1.5 rounded-sm bg-primary px-1.5 text-[11px] font-medium text-primary-foreground">
+                        Nueva
+                      </span>
+                      <button type="button" aria-label="Quitar" onClick={() => removeFile(i)} className={thumbButtonClass}>
+                        <X className="size-3.5" />
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </Section>
+          </div>
+
+          {/* ===================== RESUMEN (sticky) ===================== */}
+          <aside className="flex flex-col gap-4 lg:sticky lg:top-[68px]">
+            <div className="overflow-hidden rounded-lg border border-border bg-card">
+              <div className="relative aspect-[16/10] bg-muted">
+                {cover ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={cover} alt="" className="h-full w-full object-cover" />
+                ) : (
+                  <div className="flex h-full items-center justify-center text-xs text-muted-foreground">Sin portada</div>
+                )}
+              </div>
+              <div className="flex flex-col gap-1.5 p-4">
+                <div className="flex items-start justify-between gap-2">
+                  <p className="line-clamp-2 text-sm font-medium text-foreground">
+                    {w.title?.trim() || <span className="text-muted-foreground">Sin título</span>}
+                  </p>
+                  <StatusBadge tone={meta.tone} color={meta.color} icon={meta.icon} className="shrink-0">
+                    {meta.label}
+                  </StatusBadge>
+                </div>
+                <p className="text-lg font-semibold tracking-tight text-foreground">
+                  {formatPrice(Number(w.price), w.currency) ?? "A consultar"}
+                </p>
+                <p className="truncate text-xs text-muted-foreground">
+                  {[typeName, w.operation_type === "alquiler" ? "Alquiler" : "Venta"].filter(Boolean).join(" · ")}
+                  {(w.street_address || w.city) && ` · ${[w.street_address, w.city].filter(Boolean).join(", ")}`}
+                </p>
+              </div>
+            </div>
+
+            <div className="rounded-lg border border-border bg-card p-4">
+              <div className="mb-2 flex items-baseline justify-between">
+                <h3 className="text-sm font-semibold">Completitud</h3>
+                <span className="text-xs text-muted-foreground">{done} de {checklist.length}</span>
+              </div>
+              <div className="mb-3 h-1 overflow-hidden rounded-full bg-muted">
+                <div
+                  className="h-full rounded-full bg-primary transition-[width]"
+                  style={{ width: `${(done / checklist.length) * 100}%` }}
+                />
+              </div>
+              <ul className="flex flex-col gap-1">
+                {checklist.map((c) => (
+                  <li key={c.label} className="flex items-center gap-2 text-sm">
+                    {c.ok ? (
+                      <CheckCircle2 className="size-4 shrink-0 text-success" />
+                    ) : (
+                      <Circle className="size-4 shrink-0 text-border-strong" />
+                    )}
+                    <span className={c.ok ? "text-fg-secondary" : "text-foreground"}>{c.label}</span>
+                    {c.hint && <span className="text-xs text-muted-foreground">· {c.hint}</span>}
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            <div className="hidden items-center justify-end gap-2 lg:flex">{actions}</div>
+          </aside>
+        </div>
+
+        {/* Barra de acciones fija en mobile */}
+        <div className="sticky bottom-0 -mx-4 mt-4 flex items-center justify-end gap-2 border-t border-border bg-card px-4 py-3 lg:hidden">
+          {actions}
+        </div>
+      </form>
+    </Form>
   );
 }

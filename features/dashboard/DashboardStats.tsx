@@ -1,70 +1,40 @@
-import { Building2, Users, Eye, Activity } from "lucide-react";
-import { Card, CardContent } from "@/shared/components/ui/card";
+import Link from "next/link";
 
-// E1.3: el dashboard queda solo con métricas operativas. Ingresos,
-// funnel y comparaciones viven en /dashboard/reportes.
+// KPIs operativos en una fila baja: label 12px arriba, valor 20px abajo.
+// Sin íconos ni hints; el detalle vive en cada sección.
 type StatsProps = {
   stats: {
     totalProperties: number;
     totalViews: number;
     activeProperties: number;
     newLeadsCount: number;
+    visitsThisWeek: number;
   };
 };
 
+const nf = new Intl.NumberFormat("es-AR");
+
 export function DashboardStats({ stats }: StatsProps) {
-  const operationalItems = [
-    {
-      label: "Propiedades Totales",
-      value: stats.totalProperties,
-      icon: Building2,
-      color: "text-blue-600",
-      bg: "bg-blue-50",
-    },
-    {
-      label: "Propiedades Activas",
-      value: stats.activeProperties,
-      icon: Activity,
-      color: "text-green-600",
-      bg: "bg-green-50",
-    },
-    {
-      label: "Vistas Totales",
-      value: stats.totalViews,
-      icon: Eye,
-      color: "text-purple-600",
-      bg: "bg-purple-50",
-    },
-    {
-      label: "Leads Nuevos",
-      value: stats.newLeadsCount,
-      icon: Users,
-      color: "text-orange-600",
-      bg: "bg-orange-50",
-    },
+  const items = [
+    { label: "Propiedades activas", value: stats.activeProperties, href: "/dashboard/propiedades" },
+    { label: "Leads sin contactar", value: stats.newLeadsCount, href: "/dashboard/leads" },
+    { label: "Visitas esta semana", value: stats.visitsThisWeek, href: "/dashboard/agenda" },
+    { label: "Vistas del sitio", value: stats.totalViews, href: "/dashboard/reportes" },
   ];
 
   return (
-    <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-      {operationalItems.map((item) => (
-        <Card
+    <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+      {items.map((item) => (
+        <Link
           key={item.label}
-          className="border-border shadow-none rounded-md py-4"
+          href={item.href}
+          className="flex h-16 flex-col justify-center gap-0.5 rounded-lg border border-border bg-card px-4 transition-colors hover:border-border-strong"
         >
-          <CardContent className="flex items-center gap-2">
-            <div className={`p-3 rounded-full ${item.bg} ${item.color}`}>
-              <item.icon className="w-5 h-5" />
-            </div>
-            <div>
-              <p className="text-xs md:text-sm text-muted-foreground font-medium">
-                {item.label}
-              </p>
-              <h4 className="text-xl md:text-2xl font-semibold font-serif">
-                {item.value}
-              </h4>
-            </div>
-          </CardContent>
-        </Card>
+          <span className="truncate text-xs font-medium text-muted-foreground">{item.label}</span>
+          <span className="text-xl font-semibold leading-none tracking-tight text-foreground">
+            {nf.format(item.value)}
+          </span>
+        </Link>
       ))}
     </div>
   );

@@ -113,9 +113,9 @@ export function AssignmentRules({
   };
 
   return (
-    <Card className="rounded-md shadow-none">
+    <Card>
       <CardHeader>
-        <CardTitle className="font-serif text-2xl">
+        <CardTitle>
           Reglas de asignación de leads
         </CardTitle>
         <CardDescription>
@@ -221,7 +221,7 @@ export function AssignmentRules({
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-8 w-8 text-red-500 hover:text-red-600"
+                    className="text-muted-foreground hover:text-danger"
                     onClick={() => handleDelete(r.id)}
                     aria-label="Eliminar regla"
                   >

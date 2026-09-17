@@ -21,6 +21,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
   DropdownMenuSub,
   DropdownMenuSubContent,
@@ -37,14 +38,10 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/shared/components/ui/alert-dialog";
-import { MoreHorizontal, Trash2, Edit, User } from "lucide-react";
+import { MoreHorizontal, Trash2, Edit } from "lucide-react";
 import Link from "next/link";
-import {
-  statusLabels,
-  statusIcons,
-  statusIconColors,
-  FallbackStatusIcon,
-} from "@/features/dashboard/leads/leadStatus";
+import { statusLabels, statusMeta } from "@/features/dashboard/leads/leadStatus";
+import { StatusBadge } from "@/shared/components/StatusBadge";
 import { TemperatureBadge } from "@/features/dashboard/leads/TemperatureBadge";
 
 // Props que recibe el componente
@@ -114,113 +111,100 @@ export function LeadTable({ initialLeads, userRole }: LeadTableProps) {
 
   return (
     <>
-      <div className="bg-card rounded-md border border-border shadow-none">
+      <div className="overflow-hidden rounded-lg border border-border bg-card">
         <Table>
           <TableHeader>
-            <TableRow>
-              <TableHead>Nombre</TableHead>
-              {isAdmin && <TableHead>Agente Asignado</TableHead>}
-              <TableHead className="hidden md:table-cell">
-                Propiedad de Interés
-              </TableHead>
+            <TableRow className="hover:bg-transparent">
+              <TableHead>Lead</TableHead>
               <TableHead>Estado</TableHead>
+              <TableHead className="hidden md:table-cell">Propiedad de interés</TableHead>
               <TableHead className="hidden lg:table-cell">Contacto</TableHead>
-              <TableHead className="hidden lg:table-cell">Fuente</TableHead>
+              <TableHead className="hidden xl:table-cell">Fuente</TableHead>
+              {isAdmin && <TableHead className="hidden lg:table-cell">Responsable</TableHead>}
               <TableHead className="hidden md:table-cell">Fecha</TableHead>
-              <TableHead className="w-[50px]">Acciones</TableHead>
+              <TableHead className="w-10" />
             </TableRow>
           </TableHeader>
           <TableBody>
             {leads.map((lead) => {
-              const StatusIcon =
-                statusIcons[lead.status ?? ""] || FallbackStatusIcon;
-              const statusIconColor =
-                statusIconColors[lead.status ?? ""] ||
-                "var(--muted-foreground)";
+              const meta = statusMeta(lead.status);
 
               return (
-              <TableRow key={lead.id}>
-                {/* Nombre */}
-                <TableCell className="font-medium">
+              <TableRow key={lead.id} className="group">
+                <TableCell className="max-w-[220px] font-medium">
                   <Link
                     href={`/dashboard/leads/${lead.id}`}
-                    className="hover:underline hover:text-primary"
+                    className="block truncate text-foreground underline-offset-4 hover:underline"
                   >
                     {lead.name}
                   </Link>
                 </TableCell>
 
+                {/* Estado + temperatura (E1.8) */}
+                <TableCell>
+                  <span className="inline-flex items-center gap-1.5">
+                    <StatusBadge tone={meta.tone} icon={meta.icon}>
+                      {meta.label}
+                    </StatusBadge>
+                    <TemperatureBadge
+                      status={lead.status}
+                      lastActivityAt={lead.last_activity_at}
+                      iconOnly
+                    />
+                  </span>
+                </TableCell>
+
+                <TableCell className="hidden max-w-[260px] truncate text-fg-secondary md:table-cell">
+                  {lead.properties ? (
+                    <Link
+                      href={`/dashboard/propiedades/${lead.properties.id}`}
+                      className="underline-offset-4 hover:underline"
+                    >
+                      {lead.properties.title}
+                    </Link>
+                  ) : (
+                    <span className="text-muted-foreground">Sin propiedad</span>
+                  )}
+                </TableCell>
+
+                {/* Un solo dato de contacto por fila; el resto vive en el detalle */}
+                <TableCell className="hidden max-w-[220px] truncate text-fg-secondary lg:table-cell">
+                  {lead.phone || lead.email || <span className="text-muted-foreground">—</span>}
+                </TableCell>
+
+                <TableCell className="hidden capitalize text-fg-secondary xl:table-cell">
+                  {lead.source?.toLowerCase().replaceAll("_", " ") ?? ""}
+                </TableCell>
+
                 {isAdmin && (
-                  <TableCell>
-                    {lead.agents ? (
-                      <div className="flex items-center gap-2 text-sm font-medium">
-                        <div className="bg-zinc-100 p-1 rounded-full">
-                          <User className="h-3 w-3 text-zinc-500" />
-                        </div>
-                        {lead.agents.full_name}
-                      </div>
-                    ) : (
-                      <span className="text-zinc-400 text-xs italic">
-                        Sin asignar
-                      </span>
-                    )}
+                  <TableCell className="hidden max-w-[160px] truncate text-fg-secondary lg:table-cell">
+                    {lead.agents?.full_name ?? <span className="text-muted-foreground">Sin asignar</span>}
                   </TableCell>
                 )}
 
-                {/* Propiedad de Interés */}
-                <TableCell className="hidden md:table-cell text-muted-foreground">
-                  {lead.properties?.title || "Sin propiedad asignada"}
-                </TableCell>
-
-                {/* Estado + temperatura (E1.8) */}
-                <TableCell>
-                  <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-2.5 py-0.5 text-xs font-medium text-foreground">
-                    <StatusIcon
-                      className="size-3 shrink-0"
-                      style={{ color: statusIconColor }}
-                    />
-                    {statusLabels[lead.status ?? ""] || lead.status}
-                  </span>
-                  <TemperatureBadge
-                    status={lead.status}
-                    lastActivityAt={lead.last_activity_at}
-                    className="ml-1.5"
-                  />
-                </TableCell>
-
-                {/* Contacto */}
-                <TableCell className="hidden lg:table-cell text-muted-foreground">
-                  <div className="flex flex-col">
-                    <span>{lead.email}</span>
-                    <span className="text-xs">{lead.phone}</span>
-                  </div>
-                </TableCell>
-
-                {/* Fuente */}
-                <TableCell className="hidden lg:table-cell text-muted-foreground capitalize">
-                  {lead.source?.toLowerCase() ?? ""}
-                </TableCell>
-
-                {/* Fecha */}
-                <TableCell className="hidden md:table-cell text-muted-foreground">
-                  {format(new Date(lead.created_at), "dd MMM yyyy", {
+                <TableCell className="hidden text-muted-foreground md:table-cell">
+                  {format(new Date(lead.created_at), "d MMM yyyy", {
                     locale: es,
                   })}
                 </TableCell>
 
-                {/* Acciones */}
-                <TableCell>
+                <TableCell className="py-0 pr-2">
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon">
-                        <MoreHorizontal className="h-4 w-4" />
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        aria-label="Más acciones"
+                        className="text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 data-[state=open]:opacity-100"
+                      >
+                        <MoreHorizontal />
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
                       <DropdownMenuSub>
                         <DropdownMenuSubTrigger>
-                          <Edit className="mr-2 h-4 w-4" />
-                          <span>Cambiar Estado</span>
+                          <Edit />
+                          <span>Cambiar estado</span>
                         </DropdownMenuSubTrigger>
                         <DropdownMenuPortal>
                           <DropdownMenuSubContent>
@@ -243,11 +227,12 @@ export function LeadTable({ initialLeads, userRole }: LeadTableProps) {
                           </DropdownMenuSubContent>
                         </DropdownMenuPortal>
                       </DropdownMenuSub>
+                      <DropdownMenuSeparator />
                       <DropdownMenuItem
-                        className="text-red-500"
+                        variant="destructive"
                         onClick={() => setLeadToDelete(lead)}
                       >
-                        <Trash2 className="mr-2 h-4 w-4" />
+                        <Trash2 />
                         Eliminar
                       </DropdownMenuItem>
                     </DropdownMenuContent>
@@ -267,12 +252,11 @@ export function LeadTable({ initialLeads, userRole }: LeadTableProps) {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle className="font-serif">
-              ¿Estás seguro?
-            </AlertDialogTitle>
+            <AlertDialogTitle>Eliminar lead</AlertDialogTitle>
             <AlertDialogDescription>
-              Esta acción no se puede deshacer. Esto eliminará permanentemente
-              el lead de <strong>{leadToDelete?.name}</strong>.
+              Se elimina{" "}
+              <span className="font-medium text-foreground">{leadToDelete?.name}</span>{" "}
+              con sus notas e historial. Esta acción no se puede deshacer.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -282,9 +266,9 @@ export function LeadTable({ initialLeads, userRole }: LeadTableProps) {
             <AlertDialogAction
               onClick={handleDeleteLead}
               disabled={isDeleting}
-              className="bg-red-600 hover:bg-red-700"
+              className="bg-destructive text-white hover:bg-destructive/90"
             >
-              {isDeleting ? "Eliminando..." : "Sí, eliminar"}
+              {isDeleting ? "Eliminando…" : "Eliminar"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

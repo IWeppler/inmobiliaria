@@ -12,6 +12,7 @@ export type LeadWithDetails = LeadRow & {
   properties: {
     id: string;
     title: string;
+    operation_type?: string | null;
   } | null;
 
   agents: {

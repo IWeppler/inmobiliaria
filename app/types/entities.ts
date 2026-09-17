@@ -14,6 +14,8 @@ export type PropertyWithDetails = Property & {
   property_types: Pick<PropertyType, "name"> | null;
   property_images: Pick<PropertyImage, "image_url">[] | null;
   agent: Agent | null;
+  // Alias de la relación tal como la devuelve el select `agents(full_name)`.
+  agents?: Pick<Agent, "full_name"> | null;
 };
 
 export type PropertyCardData = Pick<

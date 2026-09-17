@@ -104,9 +104,9 @@ export function ScheduleVisitCard({ lead, currentUserId }: Props) {
   };
 
   return (
-    <Card className="shadow-none border-border rounded-md">
+    <Card>
       <CardHeader className="pb-3">
-        <CardTitle className="text-base font-serif font-semibold text-foreground flex items-center gap-2">
+        <CardTitle className="text-base font-semibold text-foreground flex items-center gap-2">
           <CalendarClock className="h-4 w-4 text-muted-foreground" />
           Visitas
         </CardTitle>

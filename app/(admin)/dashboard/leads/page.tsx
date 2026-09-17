@@ -2,9 +2,15 @@ import { createClientServer } from "@/lib/supabase";
 import { LeadsView } from "@/features/dashboard/leads/LeadsView";
 import { enrichLeadsWithActivity } from "@/features/dashboard/leads/enrichLeads";
 import type { LeadWithDetails } from "@/app/types";
+import { Page } from "@/shared/components/PageShell";
 import { redirect } from "next/navigation";
 
-export default async function LeadsPage() {
+export default async function LeadsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ estado?: string }>;
+}) {
+  const { estado } = await searchParams;
   const supabase = await createClientServer();
 
   // 1. Usuario
@@ -31,7 +37,7 @@ export default async function LeadsPage() {
     .select(
       `
       *,
-      properties ( id, title ),
+      properties ( id, title, operation_type ),
       agents ( full_name )
     `
     )
@@ -57,10 +63,8 @@ export default async function LeadsPage() {
   );
 
   return (
-    <div className="theme-tn flex min-h-screen w-full min-w-0 flex-col">
-      <main className="flex flex-1 min-w-0 flex-col gap-4 p-4 md:gap-8 md:p-8">
-        <LeadsView leads={enriched} userRole={agentProfile?.role || "agente"} />
-      </main>
-    </div>
+    <Page>
+      <LeadsView leads={enriched} userRole={agentProfile?.role || "agente"} initialStatus={estado} />
+    </Page>
   );
 }

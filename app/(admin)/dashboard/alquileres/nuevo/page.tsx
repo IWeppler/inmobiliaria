@@ -1,9 +1,7 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
-import { ArrowLeft } from "lucide-react";
 import { createClientServer } from "@/lib/supabase";
-import { Button } from "@/shared/components/ui/button";
 import { ContractForm } from "@/features/rentals/ContractForm";
+import { Page, PageHeader } from "@/shared/components/PageShell";
 
 export default async function NuevoContratoPage() {
   const supabase = await createClientServer();
@@ -26,22 +24,12 @@ export default async function NuevoContratoPage() {
   const opts = (contacts ?? []) as { id: string; full_name: string; kind: string }[];
 
   return (
-    <div className="theme-tn flex flex-col w-full max-w-5xl mx-auto px-4 py-6 gap-6">
-      <div className="flex items-center gap-4">
-        <Button asChild variant="outline" size="icon">
-          <Link href="/dashboard/alquileres">
-            <ArrowLeft className="h-4 w-4" />
-          </Link>
-        </Button>
-        <div>
-          <h1 className="text-[26px] font-serif font-semibold tracking-tight text-foreground">
-            Nuevo contrato
-          </h1>
-          <p className="text-muted-foreground text-sm mt-1">
-            Se generan las cuotas mensuales automáticamente y la propiedad pasa a Alquilada.
-          </p>
-        </div>
-      </div>
+    <Page width="narrow">
+      <PageHeader
+        backHref="/dashboard/alquileres"
+        title="Nuevo contrato"
+        description="Se generan las cuotas mensuales automáticamente y la propiedad pasa a Alquilada."
+      />
       <ContractForm
         properties={((properties ?? []) as { id: string; title: string; status: string }[]).map(
           (p) => ({
@@ -52,6 +40,6 @@ export default async function NuevoContratoPage() {
         owners={opts.filter((c) => c.kind === "owner").map((c) => ({ id: c.id, label: c.full_name }))}
         tenants={opts.filter((c) => c.kind === "tenant").map((c) => ({ id: c.id, label: c.full_name }))}
       />
-    </div>
+    </Page>
   );
 }

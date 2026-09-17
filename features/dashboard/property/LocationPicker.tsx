@@ -147,7 +147,7 @@ export default function LocationPicker({
   };
 
   return (
-    <div className="h-[400px] w-full rounded-lg overflow-hidden border border-zinc-300 z-0 relative isolate">
+    <div className="h-[400px] w-full rounded-lg overflow-hidden border border-border z-0 relative isolate">
       <MapContainer
         center={center}
         zoom={effectiveZoom}
@@ -171,7 +171,7 @@ export default function LocationPicker({
       </MapContainer>
 
       {/* Overlay de instrucciones */}
-      <div className="absolute bottom-4 left-4 bg-white/90 p-2 rounded-md text-xs font-medium z-500 shadow-md text-black pointer-events-none">
+      <div className="absolute bottom-4 left-4 rounded-md border border-border bg-card/95 px-2 py-1 text-xs font-medium text-foreground shadow-md z-500 pointer-events-none">
         {position
           ? "Arrastrá el marcador para ajustar"
           : "Hacé click para marcar la ubicación"}
@@ -181,7 +181,7 @@ export default function LocationPicker({
         type="button"
         onClick={useMyLocation}
         disabled={locating}
-        className="absolute top-4 right-4 z-500 inline-flex items-center gap-1.5 rounded-md bg-white/95 px-2.5 py-1.5 text-xs font-medium text-black shadow-md hover:bg-white disabled:opacity-60"
+        className="absolute top-4 right-4 z-500 inline-flex h-7 items-center gap-1.5 rounded-md border border-border bg-card/95 px-2.5 text-xs font-medium text-foreground shadow-md hover:bg-card disabled:opacity-60"
       >
         {locating ? (
           <Loader2 className="size-3.5 animate-spin" />
@@ -192,7 +192,7 @@ export default function LocationPicker({
       </button>
 
       {position && (
-        <div className="absolute bottom-4 right-4 bg-white/90 px-2 py-1 rounded-md text-[11px] tabular-nums z-500 shadow-md text-zinc-700 pointer-events-none">
+        <div className="absolute bottom-4 right-4 rounded-md border border-border bg-card/95 px-2 py-1 text-xs text-fg-secondary shadow-md z-500 pointer-events-none">
           {position.lat.toFixed(5)}, {position.lng.toFixed(5)}
         </div>
       )}

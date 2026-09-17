@@ -88,9 +88,9 @@ export function AddAmenityForm() {
   };
 
   return (
-    <Card className="rounded-md shadow-none">
+    <Card>
       <CardHeader>
-        <CardTitle className="font-serif text-2xl">Gestionar Amenities</CardTitle>
+        <CardTitle>Amenities</CardTitle>
         <CardDescription>
           Añade nuevos amenities para el formulario principal.
         </CardDescription>
@@ -121,7 +121,7 @@ export function AddAmenityForm() {
             <Button
               type="submit"
               disabled={amenityForm.formState.isSubmitting}
-              className="w-full cursor-pointer"
+              className="self-start"
             >
               {amenityForm.formState.isSubmitting
                 ? "Creando..."

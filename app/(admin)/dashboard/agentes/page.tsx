@@ -1,5 +1,6 @@
 import { createClientServer } from "@/lib/supabase";
 import { redirect } from "next/navigation";
+import { Page } from "@/shared/components/PageShell";
 import { AgentsClientPage } from "@/features/dashboard/agents/AgentsClientPage";
 
 export default async function AgentsPage() {
@@ -28,21 +29,11 @@ export default async function AgentsPage() {
     .order("created_at", { ascending: false });
 
   return (
-    <div className="theme-tn p-6">
-      <div className="flex flex-col justify-between items-center mb-2">
-          <h1 className="text-3xl font-serif font-semibold text-foreground">
-            Gestión de Equipo
-          </h1>
-          <p className="text-muted-foreground">
-            Administra a tus agentes y administradores.
-          </p>
-      </div>
-
-      {/* Pasamos la data al cliente */}
+    <Page>
       <AgentsClientPage
         initialAgents={agents || []}
         currentUserId={user?.id || ""}
       />
-    </div>
+    </Page>
   );
 }

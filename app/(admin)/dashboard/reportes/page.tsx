@@ -2,6 +2,7 @@ import { createClientServer } from "@/lib/supabase";
 import { redirect } from "next/navigation";
 import { getReportData } from "@/features/dashboard/reports/getReportData";
 import { ReportsView } from "@/features/dashboard/reports/ReportsView";
+import { Page, PageHeader } from "@/shared/components/PageShell";
 
 // E1.3: vista analítica separada del dashboard operativo. Tendencias y
 // comparaciones -- lo que no hace falta mirar todos los días.
@@ -25,16 +26,12 @@ export default async function ReportesPage() {
   });
 
   return (
-    <div className="theme-tn flex flex-col w-full max-w-[1600px] mx-auto px-4 py-6 gap-6">
-      <div>
-        <h1 className="text-[26px] font-serif font-semibold tracking-tight text-foreground">
-          Reportes
-        </h1>
-        <p className="text-muted-foreground text-sm mt-1">
-          Conversión, ingresos y señales de alerta sobre tu cartera.
-        </p>
-      </div>
+    <Page>
+      <PageHeader
+        title="Reportes"
+        description="Conversión, ingresos y señales de alerta sobre tu cartera."
+      />
       <ReportsView data={data} />
-    </div>
+    </Page>
   );
 }
