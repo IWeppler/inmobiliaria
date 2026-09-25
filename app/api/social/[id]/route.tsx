@@ -1,5 +1,7 @@
 import { ImageResponse } from "next/og";
 import { NextRequest } from "next/server";
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
 import { createClientServer } from "@/lib/supabase";
 import {
   getSocialProperty,
@@ -41,9 +43,13 @@ export async function GET(
   const download = req.nextUrl.searchParams.get("download") === "1";
   const options = parseOptions(req.nextUrl.searchParams);
 
+  const fontFamily = options.font === "serif" ? "Crimson Text" : "IBM Plex Mono";
+  const fontPrefix = options.font === "serif" ? "CrimsonText" : "IBMPlexMono";
+  const fontFiles = options.font === "sans" ? null : await Promise.all(["Regular", "Bold"].map((weight) => readFile(join(process.cwd(), "public", "fonts", "social", `${fontPrefix}-${weight}.ttf`))));
+
   const image = new ImageResponse(
     <PropertySocialCard p={p} width={width} height={height} options={options} />,
-    { width, height }
+    { width, height, ...(fontFiles ? { fonts: fontFiles.map((data, index) => ({ name: fontFamily, data: new Uint8Array(data).buffer, weight: (index === 0 ? 400 : 700) as 400 | 700, style: "normal" as const })) } : {}) }
   );
 
   if (!download) return image;

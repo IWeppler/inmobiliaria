@@ -2,6 +2,7 @@ import { createClientServer } from "@/lib/supabase";
 import { redirect } from "next/navigation";
 import { Page } from "@/shared/components/PageShell";
 import { AgentsClientPage } from "@/features/dashboard/agents/AgentsClientPage";
+import { getAgentMetrics } from "@/features/dashboard/agents/getAgentMetrics";
 
 export default async function AgentsPage() {
   const supabase = await createClientServer();
@@ -28,11 +29,15 @@ export default async function AgentsPage() {
     .select("*")
     .order("created_at", { ascending: false });
 
+  const metrics = await getAgentMetrics(supabase, (agents ?? []).map((agent) => agent.id));
+
   return (
     <Page>
       <AgentsClientPage
         initialAgents={agents || []}
         currentUserId={user?.id || ""}
+        metrics={metrics}
+        asOf={new Date().toISOString()}
       />
     </Page>
   );

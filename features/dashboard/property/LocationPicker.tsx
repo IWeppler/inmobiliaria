@@ -1,69 +1,53 @@
 "use client";
 
-import { useState, useEffect, useRef, useMemo } from "react";
-import {
-  MapContainer,
-  TileLayer,
-  Marker,
-  useMapEvents,
-  useMap,
-} from "react-leaflet";
-import "leaflet/dist/leaflet.css";
-import L from "leaflet";
-import { LocateFixed, Loader2 } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import type { StyleSpecification } from "maplibre-gl";
+import { LocateFixed, Loader2, MapPin } from "lucide-react";
 import { toast } from "sonner";
-
-const defaultMarkerIcon = L.icon({
-  iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
-  iconRetinaUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
-  shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
-  popupAnchor: [1, -34],
-  shadowSize: [41, 41],
-});
+import { Map, MapControls, MapMarker, MarkerContent, useMap } from "@/shared/components/ui/map";
 
 type LatLngTuple = [number, number];
+type Coordinates = { lat: number; lng: number };
 
-// Marcador: click para colocar, arrastrar para ajustar (E2.3).
-function LocationMarker({
-  position,
-  onChange,
-}: {
-  position: L.LatLng | null;
-  onChange: (latlng: L.LatLng) => void;
-}) {
-  const markerRef = useRef<L.Marker>(null);
-
-  useMapEvents({
-    click(e) {
-      onChange(e.latlng);
+const PICKER_STYLE: StyleSpecification = {
+  version: 8,
+  sources: {
+    satellite: {
+      type: "raster",
+      tiles: ["https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"],
+      tileSize: 256,
+      attribution: "Tiles © Esri — Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community",
     },
-  });
+    streets: {
+      type: "raster",
+      tiles: ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"],
+      tileSize: 256,
+      attribution: "© OpenStreetMap contributors",
+    },
+  },
+  layers: [
+    { id: "satellite", type: "raster", source: "satellite" },
+    { id: "streets", type: "raster", source: "streets", paint: { "raster-opacity": 0.4 } },
+  ],
+};
 
-  return position === null ? null : (
-    <Marker
-      ref={markerRef}
-      position={position}
-      icon={defaultMarkerIcon}
-      draggable
-      eventHandlers={{
-        dragend() {
-          const m = markerRef.current;
-          if (m) onChange(m.getLatLng());
-        },
-      }}
-    />
-  );
+function MapUpdater({ center, zoom }: { center: [number, number]; zoom: number }) {
+  const { map, isLoaded } = useMap();
+  useEffect(() => {
+    if (!map || !isLoaded) return;
+    map.flyTo({ center, zoom, duration: 600 });
+  }, [map, isLoaded, center, zoom]);
+  return null;
 }
 
-// Centra el mapa cuando cambia el destino (geocode / GPS), con el zoom
-// que corresponda a la precisión: calle -> 16, ciudad -> 13, región -> 9.
-function MapUpdater({ center, zoom }: { center: LatLngTuple; zoom: number }) {
-  const map = useMap();
+function MapClickHandler({ onChange }: { onChange: (point: Coordinates) => void }) {
+  const { map } = useMap();
   useEffect(() => {
-    map.flyTo(center, zoom, { duration: 0.6 });
-  }, [center, zoom, map]);
+    if (!map) return;
+    const handleClick = (event: { lngLat: Coordinates }) => onChange(event.lngLat);
+    map.on("click", handleClick);
+    return () => { map.off("click", handleClick); };
+  }, [map, onChange]);
   return null;
 }
 
@@ -71,7 +55,6 @@ interface LocationPickerProps {
   initialLat?: number;
   initialLng?: number;
   cityCoordinates?: LatLngTuple;
-  // Marcador controlado desde afuera (ej. geocode con precisión de calle).
   selected?: LatLngTuple | null;
   zoom?: number;
   onLocationSelect: (lat: number, lng: number) => void;
@@ -80,45 +63,34 @@ interface LocationPickerProps {
 export default function LocationPicker({
   initialLat,
   initialLng,
-  // Coordenadas por defecto (si fallan las de la ciudad, va a Santa Fe centro)
   cityCoordinates = [-31.6107, -60.6973],
   selected,
   zoom = 13,
   onLocationSelect,
 }: LocationPickerProps) {
-  const [position, setPosition] = useState<L.LatLng | null>(
-    initialLat && initialLng ? new L.LatLng(initialLat, initialLng) : null
+  const [position, setPosition] = useState<Coordinates | null>(
+    initialLat != null && initialLng != null ? { lat: initialLat, lng: initialLng } : null,
   );
   const [locating, setLocating] = useState(false);
 
-  // Sincroniza el marcador con `selected` (patrón "derivar estado durante
-  // el render", sin efecto): solo cuando la prop cambia de valor.
   const [prevSelected, setPrevSelected] = useState(selected);
-  if (
-    selected?.[0] !== prevSelected?.[0] ||
-    selected?.[1] !== prevSelected?.[1]
-  ) {
+  if (selected?.[0] !== prevSelected?.[0] || selected?.[1] !== prevSelected?.[1]) {
     setPrevSelected(selected);
-    if (selected) setPosition(new L.LatLng(selected[0], selected[1]));
+    if (selected) setPosition({ lat: selected[0], lng: selected[1] });
   }
 
-  // El centro sigue a cityCoordinates (geocode) o al marcador si existe.
-  // Memoizado por valor: un array nuevo en cada render dispararía flyTo
-  // en cada render.
   const [cityLat, cityLng] = cityCoordinates;
-  const center = useMemo<LatLngTuple>(
-    () => (position ? [position.lat, position.lng] : [cityLat, cityLng]),
-    [position, cityLat, cityLng]
+  const center = useMemo<[number, number]>(
+    () => position ? [position.lng, position.lat] : [cityLng, cityLat],
+    [position, cityLng, cityLat],
   );
   const effectiveZoom = position ? Math.max(zoom, 15) : zoom;
 
-  const handleChange = (latlng: L.LatLng) => {
-    setPosition(latlng);
-    onLocationSelect(latlng.lat, latlng.lng);
+  const handleChange = (point: Coordinates) => {
+    setPosition(point);
+    onLocationSelect(point.lat, point.lng);
   };
 
-  // E2.3: el agente cargando la propiedad desde el lugar (campo, lote sin
-  // calle) marca el punto con el GPS del teléfono.
   const useMyLocation = () => {
     if (!navigator.geolocation) {
       toast.error("Tu navegador no soporta geolocalización.");
@@ -126,73 +98,55 @@ export default function LocationPicker({
     }
     setLocating(true);
     navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        const latlng = new L.LatLng(pos.coords.latitude, pos.coords.longitude);
-        handleChange(latlng);
+      (result) => {
+        handleChange({ lat: result.coords.latitude, lng: result.coords.longitude });
         setLocating(false);
-        toast.success(
-          `Ubicación marcada (precisión ±${Math.round(pos.coords.accuracy)} m).`
-        );
+        toast.success(`Ubicación marcada (precisión ±${Math.round(result.coords.accuracy)} m).`);
       },
-      (err) => {
+      (error) => {
         setLocating(false);
-        toast.error(
-          err.code === err.PERMISSION_DENIED
-            ? "Permiso de ubicación denegado."
-            : "No se pudo obtener tu ubicación."
-        );
+        toast.error(error.code === error.PERMISSION_DENIED
+          ? "Permiso de ubicación denegado."
+          : "No se pudo obtener tu ubicación.");
       },
-      { enableHighAccuracy: true, timeout: 10000 }
+      { enableHighAccuracy: true, timeout: 10000 },
     );
   };
 
   return (
-    <div className="h-[400px] w-full rounded-lg overflow-hidden border border-border z-0 relative isolate">
-      <MapContainer
+    <div className="relative isolate h-[400px] w-full overflow-hidden rounded-lg border border-border">
+      <Map
         center={center}
         zoom={effectiveZoom}
-        scrollWheelZoom={true}
-        style={{ height: "100%", width: "100%" }}
+        styles={{ light: PICKER_STYLE, dark: PICKER_STYLE }}
+        className="h-full w-full"
       >
-        <TileLayer
-          attribution="Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community"
-          url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
-        />
-
-        <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-          opacity={0.4}
-        />
-
         <MapUpdater center={center} zoom={effectiveZoom} />
+        <MapClickHandler onChange={handleChange} />
+        <MapControls position="top-left" showZoom />
+        {position && (
+          <MapMarker longitude={position.lng} latitude={position.lat} draggable onDragEnd={handleChange}>
+            <MarkerContent>
+              <MapPin className="size-9 cursor-move fill-primary text-white drop-shadow-md" aria-label="Ubicación elegida" />
+            </MarkerContent>
+          </MapMarker>
+        )}
+      </Map>
 
-        <LocationMarker position={position} onChange={handleChange} />
-      </MapContainer>
-
-      {/* Overlay de instrucciones */}
-      <div className="absolute bottom-4 left-4 rounded-md border border-border bg-card/95 px-2 py-1 text-xs font-medium text-foreground shadow-md z-500 pointer-events-none">
-        {position
-          ? "Arrastrá el marcador para ajustar"
-          : "Hacé click para marcar la ubicación"}
+      <div className="pointer-events-none absolute bottom-4 left-4 z-10 rounded-md border border-border bg-card/95 px-2 py-1 text-xs font-medium text-foreground shadow-md">
+        {position ? "Arrastrá el marcador para ajustar" : "Hacé click para marcar la ubicación"}
       </div>
-
       <button
         type="button"
         onClick={useMyLocation}
         disabled={locating}
-        className="absolute top-4 right-4 z-500 inline-flex h-7 items-center gap-1.5 rounded-md border border-border bg-card/95 px-2.5 text-xs font-medium text-foreground shadow-md hover:bg-card disabled:opacity-60"
+        className="absolute right-4 top-4 z-10 inline-flex h-7 items-center gap-1.5 rounded-md border border-border bg-card/95 px-2.5 text-xs font-medium text-foreground shadow-md hover:bg-card disabled:opacity-60"
       >
-        {locating ? (
-          <Loader2 className="size-3.5 animate-spin" />
-        ) : (
-          <LocateFixed className="size-3.5" />
-        )}
+        {locating ? <Loader2 className="size-3.5 animate-spin" /> : <LocateFixed className="size-3.5" />}
         Usar mi ubicación
       </button>
-
       {position && (
-        <div className="absolute bottom-4 right-4 rounded-md border border-border bg-card/95 px-2 py-1 text-xs text-fg-secondary shadow-md z-500 pointer-events-none">
+        <div className="pointer-events-none absolute bottom-4 right-4 z-10 rounded-md border border-border bg-card/95 px-2 py-1 text-xs text-fg-secondary shadow-md">
           {position.lat.toFixed(5)}, {position.lng.toFixed(5)}
         </div>
       )}

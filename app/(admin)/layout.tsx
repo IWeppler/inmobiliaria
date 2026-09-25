@@ -4,16 +4,17 @@ import {
 } from "@/shared/components/ui/sidebar";
 import { AppSidebar } from "@/shared/components/app-sidebar";
 import { NotificationsMenu } from "@/shared/components/NotificationsMenu";
-import { GlobalSearch } from "@/shared/components/GlobalSearch";
+import { UserMenu } from "@/shared/components/UserMenu";
+import { ThemeToggle } from "@/shared/components/ThemeToggle";
 
 // Shell del panel: sidebar + topbar de 48px (colapsar sidebar a la
-// izquierda, notificaciones a la derecha) + contenido.
+// izquierda, tema + notificaciones + usuario a la derecha) + contenido.
 export default function Layout({ children }: { children: React.ReactNode }) {
   return (
     <SidebarProvider>
       <AppSidebar />
       <div className="flex min-w-0 flex-1 flex-col bg-background">
-        <header className="sticky top-0 z-20 flex h-12 shrink-0 items-center gap-2 border-b border-border bg-card px-3">
+        <header className="sticky top-0 z-20 flex h-12 shrink-0 items-center gap-2 border-b border-border bg-background px-3">
           <SidebarTrigger
             className="text-muted-foreground hover:text-foreground"
             aria-label="Mostrar u ocultar menú"
@@ -22,8 +23,9 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             TerraNova
           </span>
           <div className="ml-auto flex items-center gap-2">
-            <GlobalSearch />
+            <ThemeToggle />
             <NotificationsMenu />
+            <UserMenu />
           </div>
         </header>
         <main className="min-w-0 flex-1">{children}</main>

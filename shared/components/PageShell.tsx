@@ -39,6 +39,7 @@ type PageHeaderProps = {
   className?: string;
 };
 
+
 export function PageHeader({
   title,
   description,
@@ -75,9 +76,7 @@ export function PageHeader({
             </h1>
             {aside}
           </div>
-          {description && (
-            <p className="mt-0.5 text-sm text-fg-secondary">{description}</p>
-          )}
+          {description && <p className="text-[13px] text-muted-foreground">{description}</p>}
         </div>
       </div>
       {actions && (

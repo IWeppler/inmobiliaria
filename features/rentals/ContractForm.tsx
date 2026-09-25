@@ -29,6 +29,7 @@ type Props = {
   properties: Option[];
   owners: Option[];
   tenants: Option[];
+  initial?: Partial<ContractInput>;
 };
 
 // Selector de contacto con alta inline ("+ Nuevo") para no salir del
@@ -132,7 +133,7 @@ function ContactPicker({
 
 const today = new Date().toISOString().slice(0, 10);
 
-export function ContractForm({ properties, owners, tenants }: Props) {
+export function ContractForm({ properties, owners, tenants, initial }: Props) {
   const router = useRouter();
   const [saving, setSaving] = useState(false);
   const [v, setV] = useState<ContractInput>({
@@ -146,10 +147,15 @@ export function ContractForm({ properties, owners, tenants }: Props) {
     adjustment_index: "ICL",
     adjustment_months: 3,
     adjustment_pct: 0,
+    guarantee_type: "NINGUNA",
+    guarantee_detail: "",
+    deposit_amount: 0,
     commission_pct: 8,
     late_fee_pct_daily: 0.1,
+    late_fee_fixed: 0,
     payment_due_day: 10,
     notes: "",
+    ...initial,
   });
   const set = <K extends keyof ContractInput>(k: K, val: ContractInput[K]) =>
     setV((p) => ({ ...p, [k]: val }));
@@ -261,17 +267,7 @@ export function ContractForm({ properties, owners, tenants }: Props) {
               </SelectContent>
             </Select>
           </div>
-          <div className="space-y-2">
-            <Label>Cada (meses)</Label>
-            <Input
-              type="number"
-              min={1}
-              max={36}
-              value={v.adjustment_months}
-              onChange={(e) => set("adjustment_months", Number(e.target.value))}
-              disabled={v.adjustment_index === "NINGUNO"}
-            />
-          </div>
+          <div className="space-y-2"><Label>Periodicidad</Label><Select value={String(v.adjustment_months)} onValueChange={(value) => set("adjustment_months", Number(value))} disabled={v.adjustment_index === "NINGUNO"}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="3">Trimestral</SelectItem><SelectItem value="4">Cuatrimestral</SelectItem><SelectItem value="6">Semestral</SelectItem><SelectItem value="12">Anual</SelectItem></SelectContent></Select></div>
           <div className="space-y-2">
             <Label>% fijo por ajuste</Label>
             <Input
@@ -315,6 +311,10 @@ export function ContractForm({ properties, owners, tenants }: Props) {
               onChange={(e) => set("late_fee_pct_daily", Number(e.target.value))}
             />
           </div>
+          <div className="space-y-2"><Label>Punitorio fijo</Label><Input type="number" min={0} step="0.01" value={v.late_fee_fixed} onChange={(e) => set("late_fee_fixed", Number(e.target.value))} /></div>
+          <div className="space-y-2"><Label>Depósito ({v.currency})</Label><Input type="number" min={0} step="0.01" value={v.deposit_amount} onChange={(e) => set("deposit_amount", Number(e.target.value))} /></div>
+          <div className="space-y-2"><Label>Garantía</Label><Select value={v.guarantee_type} onValueChange={(value) => set("guarantee_type", value as ContractInput["guarantee_type"])}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="NINGUNA">Sin garantía</SelectItem><SelectItem value="GARANTE">Garante</SelectItem><SelectItem value="CAUCION">Seguro de caución</SelectItem></SelectContent></Select></div>
+          {v.guarantee_type !== "NINGUNA" && <div className="space-y-2"><Label>{v.guarantee_type === "GARANTE" ? "Nombre del garante" : "Aseguradora y póliza"}</Label><Input value={v.guarantee_detail ?? ""} onChange={(e) => set("guarantee_detail", e.target.value)} /></div>}
           <div className="space-y-2 col-span-2">
             <Label>Notas</Label>
             <Textarea rows={2} value={v.notes ?? ""} onChange={(e) => set("notes", e.target.value)} />

@@ -25,6 +25,7 @@ type Settlement = {
   id: string;
   period: string;
   rent_amount: number;
+  other_collected_amount: number;
   commission_amount: number;
   expenses: SettlementExpense[];
   expenses_amount: number;
@@ -98,6 +99,10 @@ function SettlementPdf({ d }: { d: Settlement }) {
             <Text>Alquiler cobrado</Text>
             <Text>{money(d.rent_amount, d.currency)}</Text>
           </View>
+          {d.other_collected_amount > 0 && <View style={s.row}>
+            <Text>Otros cargos cobrados</Text>
+            <Text>{money(d.other_collected_amount, d.currency)}</Text>
+          </View>}
           <View style={s.row}>
             <Text>Honorarios de administración ({c?.commission_pct ?? 0} %)</Text>
             <Text>− {money(d.commission_amount, d.currency)}</Text>
@@ -139,7 +144,7 @@ export default function LiquidacionPdfPage() {
     supabase
       .from("rental_settlements")
       .select(
-        `id, period, rent_amount, commission_amount, expenses, expenses_amount, net_amount, currency, issued_at, notes,
+        `id, period, rent_amount, other_collected_amount, commission_amount, expenses, expenses_amount, net_amount, currency, issued_at, notes,
          rental_contracts(commission_pct, properties(title, street_address, city),
            owner:rental_contacts!rental_contracts_owner_id_fkey(full_name, document),
            tenant:rental_contacts!rental_contracts_tenant_id_fkey(full_name))`

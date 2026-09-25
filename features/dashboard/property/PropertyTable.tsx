@@ -21,6 +21,10 @@ import {
   ArrowDown,
   List,
   Map as MapIcon,
+  Building2,
+  MessageCircleOff,
+  Clock3,
+  BookmarkCheck,
 } from "lucide-react";
 import {
   Table,
@@ -60,7 +64,6 @@ import { StatusBadge } from "@/shared/components/StatusBadge";
 import {
   PROPERTY_STATUSES,
   propertyStatusMeta,
-  operationLabel,
   formatPrice,
   type PropertyStatus,
 } from "@/features/dashboard/property/propertyStatus";
@@ -77,11 +80,30 @@ type PropertyTableProps = {
   pageSize?: number;
   /** Filtro de estado inicial (p. ej. desde ?estado= en la URL). */
   initialStatus?: string;
+  /** IDs de propiedades con al menos un lead creado en los últimos 30 días. */
+  recentInquiryPropertyIds?: string[];
+  asOf?: string;
 };
 
 const ALL = "__all__";
+type QuickFilter = "cartera" | "sin_consultas" | "estancadas" | "reservadas";
+const IN_PORTFOLIO = new Set(["EN_VENTA", "EN_ALQUILER", "RESERVADO"]);
 
-type SortKey = "created_at" | "title" | "city" | "operation_type" | "price" | "status" | "agent" | "views_count";
+function matchesQuickFilter(
+  property: PropertyWithDetails,
+  filter: QuickFilter,
+  recentInquiryIds: Set<string>,
+  asOf: string | undefined,
+) {
+  const inPortfolio = IN_PORTFOLIO.has(property.status);
+  if (filter === "cartera") return inPortfolio;
+  if (filter === "reservadas") return property.status === "RESERVADO";
+  if (filter === "sin_consultas") return inPortfolio && !recentInquiryIds.has(property.id);
+  const days = asOf ? Math.max(0, Math.floor((new Date(asOf).getTime() - new Date(property.created_at).getTime()) / 86400000)) : 0;
+  return inPortfolio && days > 90;
+}
+
+type SortKey = "created_at" | "title" | "price" | "status" | "agent" | "views_count";
 type Sort = { key: SortKey; dir: "asc" | "desc" };
 
 // Header clickeable: primer click ordena asc (desc para fecha/precio/vistas),
@@ -118,9 +140,8 @@ function SortableHead({
   );
 }
 
-// Lectura de una propiedad en una fila: foto → nombre → ubicación →
-// operación → precio → estado → responsable → acciones. Filas de 40px,
-// thumbnail de 32, acciones visibles al hover.
+// Lectura de una propiedad en una fila: foto → nombre y dirección →
+// precio → estado → responsable → acciones.
 export function PropertyTable({
   initialProperties,
   currentUserId,
@@ -128,6 +149,8 @@ export function PropertyTable({
   compact,
   pageSize = 25,
   initialStatus,
+  recentInquiryPropertyIds = [],
+  asOf,
 }: PropertyTableProps) {
   const supabase = createClientBrowser();
   const router = useRouter();
@@ -141,26 +164,49 @@ export function PropertyTable({
   const [statusFilter, setStatusFilter] = useState(
     initialStatus && PROPERTY_STATUSES.some((s) => s.value === initialStatus) ? initialStatus : ALL,
   );
+  const [cityFilter, setCityFilter] = useState(ALL);
   const [operationFilter, setOperationFilter] = useState(ALL);
   const [sort, setSort] = useState<Sort>({ key: "created_at", dir: "desc" });
   const [page, setPage] = useState(0);
   const [view, setView] = useState<"list" | "map">("list");
+  const [quickFilter, setQuickFilter] = useState<QuickFilter | null>(null);
+  const recentInquiryIds = useMemo(() => new Set(recentInquiryPropertyIds), [recentInquiryPropertyIds]);
+  const quickCards = !compact && asOf ? ([
+    { key: "cartera", label: "En cartera", detail: "Incluye reservadas", icon: Building2 },
+    { key: "sin_consultas", label: "Sin consultas", detail: "Últimos 30 días", icon: MessageCircleOff },
+    { key: "estancadas", label: "Más de 90 días", detail: "Desde el alta", icon: Clock3 },
+    { key: "reservadas", label: "Reservadas", detail: "Operaciones en curso", icon: BookmarkCheck },
+  ] as const).map((card) => ({ ...card, count: properties.filter((property) => matchesQuickFilter(property, card.key, recentInquiryIds, asOf)).length })) : [];
+
+  const selectQuickFilter = (filter: QuickFilter) => {
+    setQuickFilter((current) => current === filter ? null : filter);
+    setFilterText("");
+    setStatusFilter(ALL);
+    setCityFilter(ALL);
+    setOperationFilter(ALL);
+    setPage(0);
+  };
 
   const isAdmin = currentUserRole === "admin";
+  const cities = useMemo(
+    () => [...new Set(properties.map((p) => p.city?.trim()).filter((city): city is string => Boolean(city)))].sort((a, b) => a.localeCompare(b, "es")),
+    [properties],
+  );
 
   const rows = useMemo(() => {
     const q = filterText.trim().toLowerCase();
     const filtered = properties.filter((p) => {
+      if (quickFilter && !matchesQuickFilter(p, quickFilter, recentInquiryIds, asOf)) return false;
       if (
         q &&
         !(
-          p.title?.toLowerCase().includes(q) ||
-          p.street_address?.toLowerCase().includes(q) ||
-          p.city?.toLowerCase().includes(q)
+          [p.title, p.street_address, p.neighborhood, p.city, p.province]
+            .some((value) => value?.toLowerCase().includes(q))
         )
       )
         return false;
       if (statusFilter !== ALL && p.status !== statusFilter) return false;
+      if (cityFilter !== ALL && p.city?.trim() !== cityFilter) return false;
       if (
         operationFilter !== ALL &&
         p.operation_type?.toLowerCase() !== operationFilter
@@ -175,10 +221,6 @@ export function PropertyTable({
       switch (sort.key) {
         case "title":
           return dir * str(a.title).localeCompare(str(b.title));
-        case "city":
-          return dir * str(a.city).localeCompare(str(b.city));
-        case "operation_type":
-          return dir * str(a.operation_type).localeCompare(str(b.operation_type));
         case "price":
           return dir * ((a.price || 0) - (b.price || 0));
         case "status":
@@ -192,7 +234,7 @@ export function PropertyTable({
       }
     });
     return filtered;
-  }, [properties, filterText, statusFilter, operationFilter, sort]);
+  }, [properties, filterText, statusFilter, cityFilter, operationFilter, quickFilter, recentInquiryIds, asOf, sort]);
 
   const toggleSort = (key: SortKey) => {
     setPage(0);
@@ -271,7 +313,7 @@ export function PropertyTable({
   };
 
   const hasFilters =
-    filterText.trim() !== "" || statusFilter !== ALL || operationFilter !== ALL;
+    filterText.trim() !== "" || statusFilter !== ALL || cityFilter !== ALL || operationFilter !== ALL || quickFilter !== null;
   const unlocated = rows.filter(
     (p) => typeof p.latitude !== "number" || typeof p.longitude !== "number",
   ).length;
@@ -286,7 +328,23 @@ export function PropertyTable({
 
   return (
     <div className="flex flex-col gap-3">
+      {quickCards.length > 0 && (
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4" role="group" aria-label="Filtros rápidos de propiedades">
+          {quickCards.map((card) => <button
+            key={card.key}
+            type="button"
+            aria-pressed={quickFilter === card.key}
+            onClick={() => selectQuickFilter(card.key)}
+            className={cn("rounded-lg border bg-card p-4 text-left transition-colors hover:border-primary/60 hover:bg-muted/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring", quickFilter === card.key && "border-primary bg-primary/5 ring-1 ring-primary")}
+          >
+            <span className="flex items-center justify-between gap-2 text-sm font-medium"><span>{card.label}</span><card.icon className="size-4 text-muted-foreground" aria-hidden /></span>
+            <span className="mt-2 block text-2xl font-semibold tabular-nums">{card.count.toLocaleString("es-AR")}</span>
+            <span className="text-xs text-muted-foreground">{card.detail}</span>
+          </button>)}
+        </div>
+      )}
       {/* Toolbar: búsqueda, filtros, orden, conteo */}
+      {!compact && (
       <div className="flex flex-wrap items-center gap-2">
         <div className="relative w-full sm:w-72">
           <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
@@ -298,7 +356,7 @@ export function PropertyTable({
               setPage(0);
             }}
             className="pl-8"
-            aria-label="Buscar por título, dirección o ciudad"
+            aria-label="Buscar por título, dirección, barrio, ciudad o provincia"
           />
         </div>
 
@@ -314,6 +372,18 @@ export function PropertyTable({
                   <SelectItem key={s.value} value={s.value}>
                     {s.label}
                   </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Select value={cityFilter} onValueChange={(v) => { setCityFilter(v); setPage(0); }}>
+              <SelectTrigger className="w-[180px]" aria-label="Ubicación">
+                <SelectValue placeholder="Ubicación" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={ALL}>Todas las ubicaciones</SelectItem>
+                {cities.map((city) => (
+                  <SelectItem key={city} value={city}>{city}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -338,6 +408,19 @@ export function PropertyTable({
             <span title="Propiedades sin coordenadas cargadas"> · {unlocated} sin ubicación</span>
           )}
         </span>
+
+        {hasFilters && (
+          <Button variant="ghost" size="sm" onClick={() => {
+            setQuickFilter(null);
+            setFilterText("");
+            setStatusFilter(ALL);
+            setCityFilter(ALL);
+            setOperationFilter(ALL);
+            setPage(0);
+          }}>
+            Limpiar filtros
+          </Button>
+        )}
 
         {!compact && (
           <div className="flex rounded-md border border-border bg-card p-0.5" role="group" aria-label="Vista">
@@ -364,6 +447,7 @@ export function PropertyTable({
           </div>
         )}
       </div>
+      )}
 
       {view === "map" ? (
         <PropertiesMapView properties={rows} />
@@ -375,8 +459,6 @@ export function PropertyTable({
             <TableRow className="hover:bg-transparent">
               <TableHead className="w-12" />
               <SortableHead label="Propiedad" column="title" sort={sort} onSort={toggleSort} />
-              <SortableHead label="Ubicación" column="city" sort={sort} onSort={toggleSort} className="hidden md:table-cell" />
-              <SortableHead label="Operación" column="operation_type" sort={sort} onSort={toggleSort} className="hidden lg:table-cell" />
               <SortableHead label="Precio" column="price" sort={sort} onSort={toggleSort} />
               <SortableHead label="Estado" column="status" sort={sort} onSort={toggleSort} />
               <SortableHead label="Responsable" column="agent" sort={sort} onSort={toggleSort} className={cn("hidden", !compact && "xl:table-cell")} />
@@ -388,7 +470,7 @@ export function PropertyTable({
             {rows.length === 0 && (
               <TableRow className="hover:bg-transparent">
                 <TableCell
-                  colSpan={9}
+                  colSpan={7}
                   className="h-24 text-center text-sm text-muted-foreground"
                 >
                   {hasFilters
@@ -433,14 +515,9 @@ export function PropertyTable({
                     >
                       {property.title}
                     </Link>
-                  </TableCell>
-
-                  <TableCell className="hidden max-w-[240px] truncate text-fg-secondary md:table-cell">
-                    {location || "—"}
-                  </TableCell>
-
-                  <TableCell className="hidden text-fg-secondary lg:table-cell">
-                    {operationLabel(property.operation_type)}
+                    <span className="block truncate text-xs font-normal text-fg-secondary" title={location || undefined}>
+                      {location || "Sin dirección"}
+                    </span>
                   </TableCell>
 
                   <TableCell className="font-medium">

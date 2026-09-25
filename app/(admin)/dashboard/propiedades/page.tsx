@@ -7,9 +7,8 @@ import { Page, PageHeader } from "@/shared/components/PageShell";
 import { PropertyTable } from "@/features/dashboard/property/PropertyTable";
 import type { PropertyWithDetails } from "@/app/types/entities";
 
-// E0.3: ruta propia para el listado de propiedades. Misma query y mismos
-// permisos que el bloque "Mis Propiedades" del Dashboard (admin ve todo,
-// agente solo lo suyo), pero a pantalla completa y sin los widgets.
+// Listado operativo: los accesos rápidos y la tabla comparten el mismo
+// conjunto de propiedades visible para cada rol.
 export default async function PropiedadesPage({
   searchParams,
 }: {
@@ -31,24 +30,36 @@ export default async function PropiedadesPage({
 
   const isAdmin = agent?.role === "admin";
 
-  let query = supabase
-    .from("properties")
-    .select(
-      `*, property_types(name), property_images(image_url), agents(full_name), views_count`,
-    )
-    .order("created_at", { ascending: false });
-
-  if (!isAdmin) {
-    query = query.eq("agent_id", user.id);
+  const props: PropertyWithDetails[] = [];
+  for (let from = 0; ; from += 1000) {
+    let query = supabase
+      .from("properties")
+      .select(`*, property_types(name), property_images(image_url), agents(full_name), views_count`)
+      .order("created_at", { ascending: false })
+      .order("id", { ascending: false });
+    if (!isAdmin) query = query.eq("agent_id", user.id);
+    const { data, error } = await query.range(from, from + 999);
+    if (error) return <p>Error al cargar propiedades: {error.message}</p>;
+    props.push(...((data ?? []) as PropertyWithDetails[]));
+    if (!data || data.length < 1000) break;
   }
 
-  const { data: properties, error } = await query;
-
-  if (error) {
-    return <p>Error al cargar: {error.message}</p>;
+  const asOf = new Date();
+  const since = new Date(asOf.getTime() - 30 * 86400000).toISOString();
+  const recentInquiryIds = new Set<string>();
+  for (let from = 0; ; from += 1000) {
+    let query = supabase
+      .from("leads")
+      .select("id, property_id")
+      .gte("created_at", since)
+      .not("property_id", "is", null)
+      .order("id");
+    if (!isAdmin) query = query.eq("agent_id", user.id);
+    const { data, error } = await query.range(from, from + 999);
+    if (error) return <p>Error al cargar consultas recientes: {error.message}</p>;
+    for (const lead of data ?? []) if (lead.property_id) recentInquiryIds.add(lead.property_id);
+    if (!data || data.length < 1000) break;
   }
-
-  const props = (properties || []) as PropertyWithDetails[];
 
   return (
     <Page>
@@ -66,8 +77,11 @@ export default async function PropiedadesPage({
       />
 
       <PropertyTable
+        pageSize={12}
         initialStatus={estado}
         initialProperties={props}
+        recentInquiryPropertyIds={[...recentInquiryIds]}
+        asOf={asOf.toISOString()}
         currentUserId={user.id}
         currentUserRole={agent?.role || "agente"}
       />

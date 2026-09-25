@@ -2,6 +2,8 @@
 
 @import "tw-animate-css";
 
+@custom-variant dark (&:is(.dark *));
+
 /* ============================================================
    TERRANOVA — DESIGN SYSTEM DEL PANEL
    Un solo sistema, definido en :root. Sin scopes por ruta.
@@ -140,7 +142,7 @@ body {
   --shadow-xl: 0 12px 32px rgb(0 0 0 / 0.12);
 
   /* Neutros fríos-suaves */
-  --background: #f8f9fa;
+  --background: #fefeff;
   --foreground: #111418;
   --sunken: #f1f3f5;
   --fg-secondary: #4b5563;
@@ -167,7 +169,6 @@ body {
   --border: #e3e6ea;
   --input: #e3e6ea;
   --ring: #1e4fd8;
-
 
   /* Tonos semánticos: fg (texto, contraste AA) / bg / border. Los *-vivid
      son para íconos y puntos de estado: más saturados, escaneables. */
@@ -219,14 +220,14 @@ body {
   --color-lead-descartado-bg: var(--sunken);
 
   /* Paleta categórica de gráficos (única excepción "no funcional") */
-  --chart-1: #4f58c4;
-  --chart-2: #c05b2e;
-  --chart-3: #12897a;
-  --chart-4: #c28e1b;
-  --chart-5: #6b7280;
+  --chart-1: #b9eb70;
+  --chart-2: #f3951c;
+  --chart-3: #355c9b;
+  --chart-4: #9781fe;
+  --chart-5: #07d0b9;
 
   /* Sidebar: superficie hundida; ítem activo = blanco + borde */
-  --sidebar: #f3f4f6;
+  --sidebar: #f3f2f0;
   --sidebar-foreground: #4b5563;
   --sidebar-primary: #111418;
   --sidebar-primary-foreground: #ffffff;
@@ -234,6 +235,56 @@ body {
   --sidebar-accent-foreground: #111418;
   --sidebar-border: #e3e6ea;
   --sidebar-ring: #1e4fd8;
+}
+
+.dark {
+  --background: #10151d;
+  --foreground: #eef2f7;
+  --sunken: #151c27;
+  --fg-secondary: #b7c2d0;
+  --fg-disabled: #788596;
+  --border-subtle: #25303d;
+  --border-strong: #596879;
+
+  --card: #19212c;
+  --card-foreground: #eef2f7;
+  --popover: #202a37;
+  --popover-foreground: #eef2f7;
+  --primary: #8aabff;
+  --primary-foreground: #0d1a35;
+  --secondary: #263241;
+  --secondary-foreground: #eef2f7;
+  --muted: #263241;
+  --muted-foreground: #a5b2c1;
+  --accent: #2b394b;
+  --accent-foreground: #eef2f7;
+  --destructive: #ff9292;
+  --border: #344150;
+  --input: #435164;
+  --ring: #8aabff;
+
+  --success: #7ee4a2;
+  --success-bg: #143425;
+  --success-border: #2c6b45;
+  --warning: #f8c27c;
+  --warning-bg: #3b2b18;
+  --warning-border: #75552b;
+  --danger: #ff9a9a;
+  --danger-bg: #3c2028;
+  --danger-border: #753744;
+  --info: #9bc0ff;
+  --info-bg: #1a3050;
+  --info-border: #35577f;
+  --color-lead-nuevo-bg: #203458;
+
+  --sidebar: #151d28;
+  --sidebar-foreground: #bdc8d6;
+  --sidebar-primary: #8aabff;
+  --sidebar-primary-foreground: #0d1a35;
+  --sidebar-accent: #2b394b;
+  --sidebar-accent-foreground: #eef2f7;
+  --sidebar-border: #344150;
+  --sidebar-ring: #8aabff;
 }
 
 @layer base {
@@ -244,7 +295,6 @@ body {
     @apply bg-background text-foreground;
   }
 }
-
 
 /* Scrollbars finas en todo el producto (Firefox + WebKit). */
 * {
@@ -266,32 +316,41 @@ body {
   background: var(--muted-foreground);
 }
 
-/* Leaflet: el mapa vive en su propio contexto de apilamiento (sus panes
-   usan z-index 400-1000) para no tapar dropdowns ni diálogos. */
-.leaflet-container {
+/* mapcn / MapLibre: los controles y popups quedan dentro del mapa. */
+.maplibregl-map {
   isolation: isolate;
   z-index: 0;
   font-family: inherit;
 }
 
-/* Popups alineados al sistema: foto a sangre arriba, texto con padding. */
-.leaflet-popup-content-wrapper {
-  border-radius: 10px;
-  border: 1px solid var(--border);
-  box-shadow: 0 4px 12px rgb(0 0 0 / 0.08);
+.maplibregl-popup-content {
+  background: transparent;
+  box-shadow: none;
   padding: 0;
-  overflow: hidden;
 }
-.leaflet-popup-content {
-  margin: 0;
-  width: 240px !important;
-  font-family: inherit;
-  line-height: 1.4;
+
+.maplibregl-popup-tip {
+  display: none;
 }
-.leaflet-container .leaflet-popup-content a {
+
+.maplibregl-ctrl-attrib {
+  background: var(--background) !important;
+  color: var(--muted-foreground);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.08);
+}
+
+.maplibregl-ctrl-attrib a {
+  color: var(--muted-foreground);
+}
+
+.maplibregl-ctrl-attrib a:hover {
   color: var(--foreground);
 }
-.leaflet-popup-tip {
-  box-shadow: none;
-  border: 1px solid var(--border);
+
+@media print {
+  [data-slot="sidebar"], [data-slot="sidebar-gap"], header.sticky {
+    display: none !important;
+  }
 }

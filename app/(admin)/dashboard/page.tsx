@@ -2,16 +2,19 @@ import { createClientServer } from "@/lib/supabase";
 import { redirect } from "next/navigation";
 import { dayStartISO, dayEndISO, ymdInAppTz, addDays, weekdayInAppTz } from "@/lib/dates";
 import { DashboardStats } from "@/features/dashboard/DashboardStats";
-import { AttentionToday, DASHBOARD_CARD_H } from "@/features/dashboard/AttentionToday";
-import { PropertyTable } from "@/features/dashboard/property/PropertyTable";
-import { UpcomingEvents, type UpcomingEvent } from "@/features/dashboard/UpcomingEvents";
+import { DashboardAside } from "@/features/dashboard/DashboardAgenda";
+import type { UpcomingEvent } from "@/features/dashboard/UpcomingEvents";
+import { LeadConversion } from "@/features/dashboard/LeadConversion";
 import { ActivityChart, type WeekPoint } from "@/features/dashboard/charts/ActivityChart";
-import { PortfolioChart } from "@/features/dashboard/charts/PortfolioChart";
+import {
+  DashboardPropertyPerformance,
+  type DashboardPropertyRow,
+} from "@/features/dashboard/property/DashboardPropertyPerformance";
 import { Button } from "@/shared/components/ui/button";
 import Link from "next/link";
 import { Plus } from "lucide-react";
 import { Page, PageHeader } from "@/shared/components/PageShell";
-import { format } from "date-fns";
+import { addMonths, format } from "date-fns";
 import { es } from "date-fns/locale";
 import type { PropertyWithDetails } from "@/app/types/entities";
 
@@ -23,9 +26,8 @@ function weekStart(ymd: string) {
   return addDays(ymd, wd === 0 ? -6 : 1 - wd);
 }
 
-// E1.3: dashboard OPERATIVO -- lo indispensable del día a día más dos
-// lecturas rápidas del negocio (actividad semanal y cartera). Lo analítico
-// fino (funnel, ingresos) sigue en /dashboard/reportes.
+// Dashboard operativo: rendimiento y cartera en el cuerpo; recordatorios,
+// calendario y próximos eventos en el lateral.
 async function getDashboardData() {
   const supabase = await createClientServer();
 
@@ -43,6 +45,11 @@ async function getDashboardData() {
   const isAdmin = agent?.role === "admin";
   const now = new Date();
   const today = ymdInAppTz(now);
+  const monthStart = `${today.slice(0, 7)}-01`;
+  const monthAfterAgenda = format(
+    addMonths(new Date(`${monthStart}T12:00:00`), 3),
+    "yyyy-MM-dd",
+  );
   const thisWeekStart = weekStart(today);
   const rangeStart = addDays(thisWeekStart, -7 * (WEEKS - 1));
 
@@ -61,11 +68,11 @@ async function getDashboardData() {
     .or("status.is.null,status.eq.NUEVO")
     .order("created_at", { ascending: true });
 
-  // Consultas de las últimas 12 semanas (para el gráfico de actividad).
-  let leadsHistoryQuery = supabase
+  // Todos los leads visibles alimentan KPIs, conversión y rendimiento por
+  // propiedad. created_at también permite construir la serie semanal.
+  let leadsQuery = supabase
     .from("leads")
-    .select("created_at")
-    .gte("created_at", dayStartISO(rangeStart));
+    .select("id, property_id, status, created_at");
 
   // Visitas de hoy y visitas de las últimas 12 semanas. La policy de
   // events ya limita a los eventos propios del agente.
@@ -84,36 +91,37 @@ async function getDashboardData() {
     .gte("date", dayStartISO(rangeStart))
     .lte("date", dayEndISO(addDays(thisWeekStart, 6)));
 
-  // Próximos 7 días (todos los tipos de evento).
-  const upcomingQuery = supabase
+  // Eventos del mes actual y de los próximos dos meses: el calendario usa
+  // el rango completo y el listado inferior muestra solo los futuros.
+  const agendaQuery = supabase
     .from("events")
     .select("id, date, time, title, type, lead_id, property_id")
-    .gte("date", dayStartISO(today))
-    .lte("date", dayEndISO(addDays(today, 6)))
+    .gte("date", dayStartISO(monthStart))
+    .lt("date", dayStartISO(monthAfterAgenda))
     .order("date", { ascending: true })
     .order("time", { ascending: true })
-    .limit(20);
+    .limit(200);
 
   if (!isAdmin) {
     propQuery = propQuery.eq("agent_id", user.id);
     untouchedQuery = untouchedQuery.eq("agent_id", user.id);
-    leadsHistoryQuery = leadsHistoryQuery.eq("agent_id", user.id);
+    leadsQuery = leadsQuery.eq("agent_id", user.id);
   }
 
   const [
     { data: properties },
     { data: untouched },
     { data: visitsToday },
-    { data: leadsHistory },
+    { data: leads },
     { data: visitsHistory },
-    { data: upcoming },
+    { data: agendaEvents },
   ] = await Promise.all([
     propQuery,
     untouchedQuery,
     visitsTodayQuery,
-    leadsHistoryQuery,
+    leadsQuery,
     visitsHistoryQuery,
-    upcomingQuery,
+    agendaQuery,
   ]);
 
   const props = (properties || []) as PropertyWithDetails[];
@@ -121,13 +129,26 @@ async function getDashboardData() {
     .filter((l) => !l.lead_notes || l.lead_notes.length === 0)
     .map(({ id, name, created_at }) => ({ id, name, created_at }));
 
+  const leadRows = leads ?? [];
+  const leadIds = leadRows.map((lead) => lead.id);
+  const { data: closedThisMonthHistory } = leadIds.length
+    ? await supabase
+        .from("status_history")
+        .select("entity_id")
+        .eq("entity_type", "lead")
+        .eq("status", "CERRADO")
+        .gte("changed_at", dayStartISO(monthStart))
+        .in("entity_id", leadIds)
+    : { data: [] as { entity_id: string }[] };
+
   // Serie semanal: 12 buckets fijos (semanas sin datos quedan en 0).
   const weeks: WeekPoint[] = Array.from({ length: WEEKS }, (_, i) => {
     const week = addDays(rangeStart, 7 * i);
     return { week, label: format(new Date(`${week}T12:00:00`), "d MMM", { locale: es }), leads: 0, visits: 0 };
   });
   const idx = new Map(weeks.map((w, i) => [w.week, i]));
-  for (const l of leadsHistory ?? []) {
+  for (const l of leadRows) {
+    if (l.created_at < dayStartISO(rangeStart)) continue;
     const i = idx.get(weekStart(ymdInAppTz(new Date(l.created_at))));
     if (i !== undefined) weeks[i].leads++;
   }
@@ -136,24 +157,61 @@ async function getDashboardData() {
     if (i !== undefined) weeks[i].visits++;
   }
 
-  const statusCounts: Record<string, number> = {};
-  for (const p of props) statusCounts[p.status] = (statusCounts[p.status] ?? 0) + 1;
+  const openLeads = leadRows.filter(
+    (lead) => lead.status !== "CERRADO" && lead.status !== "DESCARTADO",
+  );
+  const closedLeads = leadRows.filter((lead) => lead.status === "CERRADO");
+  const discardedLeads = leadRows.filter((lead) => lead.status === "DESCARTADO");
+  const activeLeadsByProperty = new Map<string, number>();
+  for (const lead of openLeads) {
+    if (!lead.property_id) continue;
+    activeLeadsByProperty.set(
+      lead.property_id,
+      (activeLeadsByProperty.get(lead.property_id) ?? 0) + 1,
+    );
+  }
+
+  const propertyPerformance: DashboardPropertyRow[] = props
+    .filter(
+      (property) =>
+        property.status === "EN_VENTA" || property.status === "EN_ALQUILER",
+    )
+    .map((property) => ({
+      id: property.id,
+      title: property.title,
+      location: [property.street_address, property.city].filter(Boolean).join(" · "),
+      type: property.property_types?.name ?? "Sin tipo",
+      activeLeads: activeLeadsByProperty.get(property.id) ?? 0,
+      views: property.views_count ?? 0,
+      status: property.status,
+      imageUrl: property.property_images?.[0]?.image_url ?? null,
+    }))
+    .sort(
+      (a, b) =>
+        b.activeLeads - a.activeLeads || b.views - a.views || a.title.localeCompare(b.title),
+    )
+    .slice(0, 5);
 
   return {
     agent,
     currentUserId: user.id,
     currentUserRole: agent?.role || "agente",
-    properties: props,
     weeks,
-    statusCounts,
-    upcoming: (upcoming ?? []) as UpcomingEvent[],
+    propertyPerformance,
+    agendaEvents: (agendaEvents ?? []) as UpcomingEvent[],
     attention: { untouchedLeads, visitsToday: visitsToday ?? [] },
+    conversion: {
+      closed: closedLeads.length,
+      discarded: discardedLeads.length,
+      open: openLeads.length,
+    },
     stats: {
-      totalProperties: props.length,
       activeProperties: props.filter((p) => p.status === "EN_VENTA" || p.status === "EN_ALQUILER").length,
-      totalViews: props.reduce((acc, p) => acc + (p.views_count || 0), 0),
-      newLeadsCount: untouchedLeads.length,
+      openLeads: openLeads.length,
       visitsThisWeek: weeks[WEEKS - 1].visits,
+      closedThisMonth: new Set(
+        (closedThisMonthHistory ?? []).map((item) => item.entity_id),
+      ).size,
     },
   };
 }
@@ -186,7 +244,15 @@ export default async function DashboardPage() {
   const data = await getDashboardData();
   if (!data) redirect("/login");
 
-  const { agent, properties, stats, attention, upcoming, weeks, statusCounts, currentUserId, currentUserRole } = data;
+  const {
+    agent,
+    stats,
+    attention,
+    agendaEvents,
+    weeks,
+    conversion,
+    propertyPerformance,
+  } = data;
 
   return (
     <Page>
@@ -203,47 +269,53 @@ export default async function DashboardPage() {
         }
       />
 
-      {/* KPIs: una fila baja */}
-      <DashboardStats stats={stats} />
+      <div className="grid min-w-0 grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_320px] xl:items-start">
+        <main className="flex min-w-0 flex-col gap-5">
+          <DashboardStats stats={stats} />
 
-      {/* Operativo: qué hacer hoy y esta semana */}
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <AttentionToday data={attention} />
-        <Section title="Próximos 7 días" className={DASHBOARD_CARD_H} action={<Link href="/dashboard/agenda" className={sectionLink}>Agenda</Link>}>
-          <UpcomingEvents events={upcoming} />
-        </Section>
-      </div>
-
-      {/* Analítico: dos lecturas rápidas del negocio */}
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
-        <Section title="Consultas y visitas por semana" action={<Link href="/dashboard/reportes" className={sectionLink}>Reportes</Link>}>
-          <div className="p-4">
-            <ActivityChart data={weeks} />
+          <div className="grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(260px,1fr)]">
+            <Section
+              title="Consultas y visitas por semana"
+              action={
+                <Link href="/dashboard/reportes" className={sectionLink}>
+                  Reportes
+                </Link>
+              }
+            >
+              <div className="p-4">
+                <ActivityChart data={weeks} />
+              </div>
+            </Section>
+            <Section
+              title="Conversión de leads"
+              action={
+                <Link href="/dashboard/reportes" className={sectionLink}>
+                  Ver funnel
+                </Link>
+              }
+            >
+              <LeadConversion {...conversion} />
+            </Section>
           </div>
-        </Section>
-        <Section title="Cartera por estado" action={<span className="text-xs text-muted-foreground">{stats.totalProperties} propiedades</span>}>
-          <div className="p-4">
-            <PortfolioChart counts={statusCounts} />
-          </div>
-        </Section>
-      </div>
 
-      {/* Propiedades */}
-      <section className="flex min-w-0 flex-col gap-3">
-        <div className="flex items-baseline justify-between">
-          <h2 className="text-lg font-semibold tracking-tight">Propiedades</h2>
-          <Link href="/dashboard/propiedades" className="text-sm text-fg-secondary underline-offset-4 hover:underline">
-            Ver todas
-          </Link>
-        </div>
-        <PropertyTable
-          compact
-          pageSize={12}
-          initialProperties={properties}
-          currentUserId={currentUserId}
-          currentUserRole={currentUserRole}
+          <Section
+            title="Rendimiento de propiedades"
+            action={
+              <Link href="/dashboard/propiedades" className={sectionLink}>
+                Ver todas
+              </Link>
+            }
+          >
+            <DashboardPropertyPerformance properties={propertyPerformance} />
+          </Section>
+        </main>
+
+        <DashboardAside
+          key={agendaEvents.map((event) => event.id).join(",")}
+          initialEvents={agendaEvents}
+          attention={attention}
         />
-      </section>
+      </div>
     </Page>
   );
 }

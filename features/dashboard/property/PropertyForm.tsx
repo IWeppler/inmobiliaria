@@ -80,20 +80,31 @@ export const propertySchema = z.object({
   latitude: z.coerce.number().nullable(),
   longitude: z.coerce.number().nullable(),
   agent_id: z.string().optional().nullable(),
+  captured_by: z.string().optional().nullable(),
   property_type_id: z.coerce.number().min(1, { message: "Elegí un tipo." }),
-  price: z.coerce.number().min(0, { message: "El precio no puede ser negativo." }),
+  price: z.coerce
+    .number()
+    .min(0, { message: "El precio no puede ser negativo." }),
   expensas: z.coerce.number().min(0).optional().nullable(),
   bedrooms: z.coerce.number().int().min(0),
   bathrooms: z.coerce.number().int().min(0),
   rooms: z.coerce.number().int().min(0),
-  total_area: z.coerce.number().min(1, { message: "Indicá la superficie total." }),
+  total_area: z.coerce
+    .number()
+    .min(1, { message: "Indicá la superficie total." }),
   covered_area: z.coerce.number().min(0),
   cocheras: z.string().optional().nullable(),
   antiguedad: z.string().optional().nullable(),
   currency: z.string(),
   operation_type: z.string(),
   amenities: z.array(z.number()).optional(),
-  status: z.enum(["EN_VENTA", "EN_ALQUILER", "RESERVADO", "VENDIDO", "ALQUILADO"]),
+  status: z.enum([
+    "EN_VENTA",
+    "EN_ALQUILER",
+    "RESERVADO",
+    "VENDIDO",
+    "ALQUILADO",
+  ]),
 });
 
 export type PropertyFormValues = z.output<typeof propertySchema>;
@@ -134,16 +145,19 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <section id={id} className="scroll-mt-20 rounded-lg border border-border bg-card">
-      <div className="border-b border-border px-5 py-3">
+    <section id={id} className="scroll-mt-20">
+      <div className="mb-2">
         <h2 className="text-base font-semibold tracking-tight">{title}</h2>
-        {description && <p className="text-xs text-muted-foreground">{description}</p>}
+        {description && (
+          <p className="text-xs text-muted-foreground">{description}</p>
+        )}
       </div>
-      <div className="flex flex-col gap-4 px-5 py-4">{children}</div>
+      <div className="flex flex-col gap-4 rounded-lg border border-border bg-card px-5 py-4">
+        {children}
+      </div>
     </section>
   );
 }
-
 // Input numérico con unidad a la derecha (m², ARS…).
 function UnitInput({
   unit,
@@ -152,7 +166,12 @@ function UnitInput({
 }: React.ComponentProps<typeof Input> & { unit: string }) {
   return (
     <div className="relative">
-      <Input type="number" inputMode="decimal" className={cn("pr-12", className)} {...props} />
+      <Input
+        type="number"
+        inputMode="decimal"
+        className={cn("pr-12", className)}
+        {...props}
+      />
       <span className="pointer-events-none absolute inset-y-0 right-2.5 flex items-center text-xs text-muted-foreground">
         {unit}
       </span>
@@ -163,26 +182,36 @@ function UnitInput({
 const chipClass = (on: boolean) =>
   cn(
     "inline-flex h-7 items-center gap-1 rounded-md border px-2.5 text-xs transition-colors",
-    on ? "border-primary bg-primary/5 text-foreground" : "border-border text-fg-secondary hover:bg-muted/50",
+    on
+      ? "border-primary bg-primary/5 text-foreground"
+      : "border-border text-fg-secondary hover:bg-muted/50",
   );
 
 const thumbButtonClass =
   "absolute right-1.5 top-1.5 flex size-6 items-center justify-center rounded-sm bg-card/95 text-muted-foreground opacity-0 transition-opacity hover:text-danger group-hover:opacity-100 focus-visible:opacity-100";
 
-export function PropertyForm({ initialData, propertyTypes: initialTypes }: PropertyFormProps) {
+export function PropertyForm({
+  initialData,
+  propertyTypes: initialTypes,
+}: PropertyFormProps) {
   const router = useRouter();
   const supabase = createClientBrowser();
   const isEditMode = !!initialData;
 
-  const [propertyTypes, setPropertyTypes] = useState<PropertyType[]>(initialTypes);
+  const [propertyTypes, setPropertyTypes] =
+    useState<PropertyType[]>(initialTypes);
   const [agents, setAgents] = useState<Agent[]>([]);
   const [allAmenities, setAllAmenities] = useState<Amenity[]>([]);
   const [files, setFiles] = useState<File[]>([]);
-  const [existingImages, setExistingImages] = useState(initialData?.property_images || []);
+  const [existingImages, setExistingImages] = useState(
+    initialData?.property_images || [],
+  );
   const [dragOver, setDragOver] = useState(false);
 
   const [geocodingLoading, setGeocodingLoading] = useState(false);
-  const [geocodeCandidates, setGeocodeCandidates] = useState<GeocodeCandidate[]>([]);
+  const [geocodeCandidates, setGeocodeCandidates] = useState<
+    GeocodeCandidate[]
+  >([]);
   const [mapZoom, setMapZoom] = useState(13);
   const [selectedPoint, setSelectedPoint] = useState<[number, number] | null>(
     initialData?.latitude && initialData?.longitude
@@ -196,7 +225,9 @@ export function PropertyForm({ initialData, propertyTypes: initialTypes }: Prope
   );
 
   const form = useForm<PropertyFormValues>({
-    resolver: zodResolver(propertySchema) as unknown as Resolver<PropertyFormValues>,
+    resolver: zodResolver(
+      propertySchema,
+    ) as unknown as Resolver<PropertyFormValues>,
     defaultValues: initialData
       ? {
           ...initialData,
@@ -204,6 +235,7 @@ export function PropertyForm({ initialData, propertyTypes: initialTypes }: Prope
           description: initialData.description || "",
           street_address: initialData.street_address || "",
           agent_id: initialData.agent_id || null,
+          captured_by: initialData.captured_by || null,
           rooms: initialData.rooms ?? 0,
           expensas: initialData.expensas ?? null,
           cocheras: initialData.cocheras ?? "",
@@ -220,6 +252,7 @@ export function PropertyForm({ initialData, propertyTypes: initialTypes }: Prope
           latitude: null,
           longitude: null,
           agent_id: null,
+          captured_by: null,
           property_type_id: 0,
           price: 0,
           expensas: null,
@@ -238,8 +271,14 @@ export function PropertyForm({ initialData, propertyTypes: initialTypes }: Prope
   });
 
   // Previews de archivos nuevos (object URLs liberadas al cambiar).
-  const previews = useMemo(() => files.map((f) => URL.createObjectURL(f)), [files]);
-  useEffect(() => () => previews.forEach((u) => URL.revokeObjectURL(u)), [previews]);
+  const previews = useMemo(
+    () => files.map((f) => URL.createObjectURL(f)),
+    [files],
+  );
+  useEffect(
+    () => () => previews.forEach((u) => URL.revokeObjectURL(u)),
+    [previews],
+  );
 
   // Aviso al salir con cambios sin guardar.
   const dirty = form.formState.isDirty || files.length > 0;
@@ -255,11 +294,12 @@ export function PropertyForm({ initialData, propertyTypes: initialTypes }: Prope
   // Catálogos
   useEffect(() => {
     const load = async () => {
-      const [{ data: types }, { data: agentsData }, { data: amenities }] = await Promise.all([
-        supabase.from("property_types").select("id, name").order("name"),
-        supabase.from("agents").select("id, full_name").order("full_name"),
-        supabase.from("amenities").select("id, name").order("name"),
-      ]);
+      const [{ data: types }, { data: agentsData }, { data: amenities }] =
+        await Promise.all([
+          supabase.from("property_types").select("id, name").order("name"),
+          supabase.from("agents").select("id, full_name").order("full_name"),
+          supabase.from("amenities").select("id, name").order("name"),
+        ]);
       if (types) setPropertyTypes(types);
       if (agentsData) setAgents(agentsData);
       if (amenities) setAllAmenities(amenities);
@@ -279,30 +319,44 @@ export function PropertyForm({ initialData, propertyTypes: initialTypes }: Prope
   // --- Geocoding (E2.3) ---
   const applyCandidate = (c: GeocodeCandidate) => {
     setMapCenter([c.lat, c.lon]);
-    setMapZoom(c.precision === "street" ? 16 : c.precision === "locality" ? 13 : 9);
+    setMapZoom(
+      c.precision === "street" ? 16 : c.precision === "locality" ? 13 : 9,
+    );
     setGeocodeCandidates([]);
     if (c.precision === "street") {
       handleLocationSelect(c.lat, c.lon);
       toast.success("Ubicación marcada. Arrastrá el marcador si hace falta.");
     } else {
-      toast.info("Mapa centrado en la zona. Hacé click para marcar el punto exacto.");
+      toast.info(
+        "Mapa centrado en la zona. Hacé click para marcar el punto exacto.",
+      );
     }
   };
 
   const handleGeocode = async () => {
     const { street_address, city, province } = form.getValues();
     if (!city || !province) {
-      toast.error("Ingresá al menos ciudad y provincia para buscar en el mapa.");
+      toast.error(
+        "Ingresá al menos ciudad y provincia para buscar en el mapa.",
+      );
       return;
     }
     setGeocodingLoading(true);
     try {
-      const params = new URLSearchParams({ street: street_address ?? "", city, province });
+      const params = new URLSearchParams({
+        street: street_address ?? "",
+        city,
+        province,
+      });
       const response = await fetch(`/api/geocode?${params.toString()}`);
       if (!response.ok) throw new Error(await response.text());
-      const { candidates } = (await response.json()) as { candidates: GeocodeCandidate[] };
+      const { candidates } = (await response.json()) as {
+        candidates: GeocodeCandidate[];
+      };
       if (candidates.length === 0) {
-        toast.error("No se encontró la zona. Probá con menos detalle o marcá a mano.");
+        toast.error(
+          "No se encontró la zona. Probá con menos detalle o marcá a mano.",
+        );
       } else if (candidates.length === 1) {
         applyCandidate(candidates[0]);
       } else {
@@ -319,11 +373,14 @@ export function PropertyForm({ initialData, propertyTypes: initialTypes }: Prope
   const fileInputRef = useRef<HTMLInputElement>(null);
   const addFiles = (list: FileList | File[] | null) => {
     if (!list) return;
-    const incoming = Array.from(list).filter((f) => f.type.startsWith("image/"));
+    const incoming = Array.from(list).filter((f) =>
+      f.type.startsWith("image/"),
+    );
     if (incoming.length === 0) return;
     setFiles((prev) => [...prev, ...incoming]);
   };
-  const removeFile = (i: number) => setFiles((prev) => prev.filter((_, idx) => idx !== i));
+  const removeFile = (i: number) =>
+    setFiles((prev) => prev.filter((_, idx) => idx !== i));
 
   const handleDeleteImage = async (image: ExistingImage) => {
     const toastId = toast.loading("Eliminando foto…");
@@ -337,7 +394,9 @@ export function PropertyForm({ initialData, propertyTypes: initialTypes }: Prope
   // --- Submit ---
   const onInvalid = (errors: Record<string, unknown>) => {
     const keys = Object.keys(errors);
-    const names = keys.map((k) => FIELD_LABELS[k as keyof PropertyFormValues] ?? k).slice(0, 4);
+    const names = keys
+      .map((k) => FIELD_LABELS[k as keyof PropertyFormValues] ?? k)
+      .slice(0, 4);
     toast.error(`Revisá: ${names.join(", ")}${keys.length > 4 ? "…" : ""}`);
   };
 
@@ -351,11 +410,15 @@ export function PropertyForm({ initialData, propertyTypes: initialTypes }: Prope
     }
     if (!data.latitude || !data.longitude) {
       toast.error("Marcá la ubicación en el mapa.");
-      document.getElementById("ubicacion")?.scrollIntoView({ behavior: "smooth", block: "start" });
+      document
+        .getElementById("ubicacion")
+        ?.scrollIntoView({ behavior: "smooth", block: "start" });
       return;
     }
 
-    const toastId = toast.loading(isEditMode ? "Guardando cambios…" : "Creando propiedad…");
+    const toastId = toast.loading(
+      isEditMode ? "Guardando cambios…" : "Creando propiedad…",
+    );
     const { amenities, ...propertyData } = data;
     const payload = {
       ...propertyData,
@@ -368,40 +431,68 @@ export function PropertyForm({ initialData, propertyTypes: initialTypes }: Prope
     const newImagePaths: string[] = [];
     for (const file of files) {
       const filePath = `${user.id}/${uuidv4()}-${file.name}`;
-      const { data: up, error } = await supabase.storage.from("properties").upload(filePath, file);
+      const { data: up, error } = await supabase.storage
+        .from("properties")
+        .upload(filePath, file);
       if (error) {
-        toast.error(`No se pudo subir ${file.name}: ${error.message}`, { id: toastId });
+        toast.error(`No se pudo subir ${file.name}: ${error.message}`, {
+          id: toastId,
+        });
         continue;
       }
-      newImagePaths.push(supabase.storage.from("properties").getPublicUrl(up.path).data.publicUrl);
+      newImagePaths.push(
+        supabase.storage.from("properties").getPublicUrl(up.path).data
+          .publicUrl,
+      );
     }
 
     let propertyId = initialData?.id;
     if (isEditMode && initialData) {
-      const { error } = await supabase.from("properties").update(payload).eq("id", initialData.id);
+      let { error } = await supabase
+        .from("properties")
+        .update(payload)
+        .eq("id", initialData.id);
+      if (error?.code === "PGRST204" || error?.code === "42703") {
+        const { captured_by: _capturedBy, ...legacyPayload } = payload;
+        void _capturedBy;
+        ({ error } = await supabase.from("properties").update(legacyPayload).eq("id", initialData.id));
+        if (!error) toast.warning("La captación se guardará cuando se aplique la migración de Supabase.");
+      }
       if (error) {
         toast.error(error.message, { id: toastId });
         return;
       }
     } else {
-      const { data: created, error } = await supabase
+      let { data: created, error } = await supabase
         .from("properties")
-        .insert({ ...payload, agent_id: payload.agent_id || user.id })
+        .insert({ ...payload, agent_id: payload.agent_id || user.id, captured_by: payload.captured_by || user.id })
         .select("id")
         .single();
-      if (error) {
-        toast.error(error.message, { id: toastId });
+      if (error?.code === "PGRST204" || error?.code === "42703") {
+        const { captured_by: _capturedBy, ...legacyPayload } = payload;
+        void _capturedBy;
+        ({ data: created, error } = await supabase.from("properties").insert({ ...legacyPayload, agent_id: payload.agent_id || user.id }).select("id").single());
+        if (!error) toast.warning("La captación se guardará cuando se aplique la migración de Supabase.");
+      }
+      if (error || !created) {
+        toast.error(error?.message ?? "No se pudo crear la propiedad.", { id: toastId });
         return;
       }
       propertyId = created.id;
     }
 
     if (propertyId) {
-      await supabase.from("property_amenities").delete().eq("property_id", propertyId);
+      await supabase
+        .from("property_amenities")
+        .delete()
+        .eq("property_id", propertyId);
       if (amenities && amenities.length > 0) {
-        await supabase
-          .from("property_amenities")
-          .insert(amenities.map((id) => ({ property_id: propertyId!, amenity_id: id })));
+        await supabase.from("property_amenities").insert(
+          amenities.map((id) => ({
+            property_id: propertyId!,
+            amenity_id: id,
+          })),
+        );
       }
       if (newImagePaths.length > 0) {
         await supabase.from("property_images").insert(
@@ -414,7 +505,9 @@ export function PropertyForm({ initialData, propertyTypes: initialTypes }: Prope
       }
     }
 
-    toast.success(isEditMode ? "Cambios guardados." : "Propiedad creada.", { id: toastId });
+    toast.success(isEditMode ? "Cambios guardados." : "Propiedad creada.", {
+      id: toastId,
+    });
     form.reset(data);
     setFiles([]);
     router.push(`/dashboard/propiedades/${propertyId}`);
@@ -426,19 +519,31 @@ export function PropertyForm({ initialData, propertyTypes: initialTypes }: Prope
   const cover = existingImages[0]?.image_url ?? previews[0] ?? null;
   const photoCount = existingImages.length + files.length;
   const meta = propertyStatusMeta(w.status);
-  const typeName = propertyTypes.find((t) => t.id === Number(w.property_type_id))?.name;
+  const typeName = propertyTypes.find(
+    (t) => t.id === Number(w.property_type_id),
+  )?.name;
   const checklist = [
     { label: "Título", ok: (w.title ?? "").length >= 5 },
     { label: "Tipo y operación", ok: Number(w.property_type_id) > 0 },
-    { label: "Precio", ok: Number(w.price) > 0, hint: Number(w.price) > 0 ? undefined : "0 = a consultar" },
+    {
+      label: "Precio",
+      ok: Number(w.price) > 0,
+      hint: Number(w.price) > 0 ? undefined : "0 = a consultar",
+    },
     { label: "Ubicación en el mapa", ok: !!w.latitude && !!w.longitude },
     { label: "Superficie", ok: Number(w.total_area) > 0 },
-    { label: "Fotos", ok: photoCount > 0, hint: photoCount > 0 && photoCount < 3 ? "mejor con 3 o más" : undefined },
+    {
+      label: "Fotos",
+      ok: photoCount > 0,
+      hint: photoCount > 0 && photoCount < 3 ? "mejor con 3 o más" : undefined,
+    },
     { label: "Descripción", ok: (w.description ?? "").trim().length > 40 },
   ];
   const done = checklist.filter((c) => c.ok).length;
   const submitting = form.formState.isSubmitting;
-  const cancelHref = initialData ? `/dashboard/propiedades/${initialData.id}` : "/dashboard/propiedades";
+  const cancelHref = initialData
+    ? `/dashboard/propiedades/${initialData.id}`
+    : "/dashboard/propiedades";
 
   const actions = (
     <>
@@ -454,12 +559,20 @@ export function PropertyForm({ initialData, propertyTypes: initialTypes }: Prope
 
   return (
     <Form {...form}>
-      <form id="property-form" onSubmit={form.handleSubmit(onSubmit, onInvalid)} className="contents">
+      <form
+        id="property-form"
+        onSubmit={form.handleSubmit(onSubmit, onInvalid)}
+        className="contents"
+      >
         <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
           {/* ===================== COLUMNA PRINCIPAL ===================== */}
-          <div className="flex min-w-0 flex-col gap-4">
+          <div className="flex min-w-0 flex-col gap-8">
             {/* 1. Lo básico */}
-            <Section id="basico" title="Lo básico" description="Cómo se va a llamar y qué es.">
+            <Section
+              id="basico"
+              title="Lo básico"
+              description="Cómo se va a llamar y qué tipo de inmueble es."
+            >
               <FormField
                 control={form.control}
                 name="title"
@@ -467,7 +580,10 @@ export function PropertyForm({ initialData, propertyTypes: initialTypes }: Prope
                   <FormItem>
                     <FormLabel>Título de la publicación</FormLabel>
                     <FormControl>
-                      <Input placeholder="Ej.: Casa 3 dormitorios con pileta en Fisherton" {...field} />
+                      <Input
+                        placeholder="Ej.: Casa 3 dormitorios con pileta en Fisherton"
+                        {...field}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -480,7 +596,10 @@ export function PropertyForm({ initialData, propertyTypes: initialTypes }: Prope
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Tipo</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value ? String(field.value) : undefined}>
+                      <Select
+                        onValueChange={field.onChange}
+                        value={field.value ? String(field.value) : undefined}
+                      >
                         <FormControl>
                           <SelectTrigger className="w-full">
                             <SelectValue placeholder="Elegí un tipo" />
@@ -488,7 +607,9 @@ export function PropertyForm({ initialData, propertyTypes: initialTypes }: Prope
                         </FormControl>
                         <SelectContent>
                           {propertyTypes.map((t) => (
-                            <SelectItem key={t.id} value={String(t.id)}>{t.name}</SelectItem>
+                            <SelectItem key={t.id} value={String(t.id)}>
+                              {t.name}
+                            </SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
@@ -502,9 +623,14 @@ export function PropertyForm({ initialData, propertyTypes: initialTypes }: Prope
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Operación</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value}>
+                      <Select
+                        onValueChange={field.onChange}
+                        value={field.value}
+                      >
                         <FormControl>
-                          <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+                          <SelectTrigger className="w-full">
+                            <SelectValue />
+                          </SelectTrigger>
                         </FormControl>
                         <SelectContent>
                           <SelectItem value="venta">Venta</SelectItem>
@@ -520,15 +646,23 @@ export function PropertyForm({ initialData, propertyTypes: initialTypes }: Prope
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Estado</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value}>
+                      <Select
+                        onValueChange={field.onChange}
+                        value={field.value}
+                      >
                         <FormControl>
-                          <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+                          <SelectTrigger className="w-full">
+                            <SelectValue />
+                          </SelectTrigger>
                         </FormControl>
                         <SelectContent>
                           {PROPERTY_STATUSES.map((s) => (
                             <SelectItem key={s.value} value={s.value}>
                               <span className="flex items-center gap-2">
-                                <s.icon className="size-3.5" style={{ color: s.color }} />
+                                <s.icon
+                                  className="size-3.5"
+                                  style={{ color: s.color }}
+                                />
                                 {s.label}
                               </span>
                             </SelectItem>
@@ -544,17 +678,37 @@ export function PropertyForm({ initialData, propertyTypes: initialTypes }: Prope
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Responsable</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value ?? undefined}>
+                      <Select
+                        onValueChange={field.onChange}
+                        value={field.value ?? undefined}
+                      >
                         <FormControl>
                           <SelectTrigger className="w-full">
-                            <SelectValue placeholder={isEditMode ? "Sin asignar" : "Vos"} />
+                            <SelectValue
+                              placeholder={isEditMode ? "Sin asignar" : "Vos"}
+                            />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
                           {agents.map((a) => (
-                            <SelectItem key={a.id} value={a.id}>{a.full_name ?? a.id}</SelectItem>
+                            <SelectItem key={a.id} value={a.id}>
+                              {a.full_name ?? a.id}
+                            </SelectItem>
                           ))}
                         </SelectContent>
+                      </Select>
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="captured_by"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Captador</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value ?? undefined}>
+                        <FormControl><SelectTrigger className="w-full"><SelectValue placeholder={isEditMode ? "Sin registrar" : "Vos"} /></SelectTrigger></FormControl>
+                        <SelectContent>{agents.map((agent) => <SelectItem key={agent.id} value={agent.id}>{agent.full_name ?? agent.id}</SelectItem>)}</SelectContent>
                       </Select>
                     </FormItem>
                   )}
@@ -571,10 +725,18 @@ export function PropertyForm({ initialData, propertyTypes: initialTypes }: Prope
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>
-                        Precio <span className="font-normal text-muted-foreground">(0 = a consultar)</span>
+                        Precio{" "}
+                        <span className="font-normal text-muted-foreground">
+                          (0 = a consultar)
+                        </span>
                       </FormLabel>
                       <FormControl>
-                        <Input type="number" inputMode="decimal" min={0} {...field} />
+                        <Input
+                          type="number"
+                          inputMode="decimal"
+                          min={0}
+                          {...field}
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -586,9 +748,14 @@ export function PropertyForm({ initialData, propertyTypes: initialTypes }: Prope
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Moneda</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value}>
+                      <Select
+                        onValueChange={field.onChange}
+                        value={field.value}
+                      >
                         <FormControl>
-                          <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+                          <SelectTrigger className="w-full">
+                            <SelectValue />
+                          </SelectTrigger>
                         </FormControl>
                         <SelectContent>
                           <SelectItem value="USD">USD</SelectItem>
@@ -604,7 +771,10 @@ export function PropertyForm({ initialData, propertyTypes: initialTypes }: Prope
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>
-                        Expensas <span className="font-normal text-muted-foreground">(opcional)</span>
+                        Expensas{" "}
+                        <span className="font-normal text-muted-foreground">
+                          (opcional)
+                        </span>
                       </FormLabel>
                       <FormControl>
                         <UnitInput
@@ -614,7 +784,11 @@ export function PropertyForm({ initialData, propertyTypes: initialTypes }: Prope
                           onBlur={field.onBlur}
                           ref={field.ref}
                           value={field.value ?? ""}
-                          onChange={(e) => field.onChange(e.target.value === "" ? null : e.target.value)}
+                          onChange={(e) =>
+                            field.onChange(
+                              e.target.value === "" ? null : e.target.value,
+                            )
+                          }
                         />
                       </FormControl>
                     </FormItem>
@@ -641,7 +815,12 @@ export function PropertyForm({ initialData, propertyTypes: initialTypes }: Prope
                       <FormItem>
                         <FormLabel>{label}</FormLabel>
                         <FormControl>
-                          <Input type="number" inputMode="numeric" min={0} {...field} />
+                          <Input
+                            type="number"
+                            inputMode="numeric"
+                            min={0}
+                            {...field}
+                          />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -654,7 +833,9 @@ export function PropertyForm({ initialData, propertyTypes: initialTypes }: Prope
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Sup. total</FormLabel>
-                      <FormControl><UnitInput unit="m²" min={0} {...field} /></FormControl>
+                      <FormControl>
+                        <UnitInput unit="m²" min={0} {...field} />
+                      </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -665,7 +846,9 @@ export function PropertyForm({ initialData, propertyTypes: initialTypes }: Prope
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Sup. cubierta</FormLabel>
-                      <FormControl><UnitInput unit="m²" min={0} {...field} /></FormControl>
+                      <FormControl>
+                        <UnitInput unit="m²" min={0} {...field} />
+                      </FormControl>
                     </FormItem>
                   )}
                 />
@@ -676,7 +859,11 @@ export function PropertyForm({ initialData, propertyTypes: initialTypes }: Prope
                     <FormItem>
                       <FormLabel>Cocheras</FormLabel>
                       <FormControl>
-                        <Input placeholder="Ej.: 1 cubierta" {...field} value={field.value ?? ""} />
+                        <Input
+                          placeholder="Ej.: 1 cubierta"
+                          {...field}
+                          value={field.value ?? ""}
+                        />
                       </FormControl>
                     </FormItem>
                   )}
@@ -689,7 +876,11 @@ export function PropertyForm({ initialData, propertyTypes: initialTypes }: Prope
                   <FormItem className="sm:max-w-xs">
                     <FormLabel>Antigüedad</FormLabel>
                     <FormControl>
-                      <Input placeholder="Ej.: A estrenar · 10 años" {...field} value={field.value ?? ""} />
+                      <Input
+                        placeholder="Ej.: A estrenar · 10 años"
+                        {...field}
+                        value={field.value ?? ""}
+                      />
                     </FormControl>
                   </FormItem>
                 )}
@@ -704,7 +895,9 @@ export function PropertyForm({ initialData, propertyTypes: initialTypes }: Prope
                       <FormLabel>
                         Amenities{" "}
                         {field.value && field.value.length > 0 && (
-                          <span className="font-normal text-muted-foreground">· {field.value.length}</span>
+                          <span className="font-normal text-muted-foreground">
+                            · {field.value.length}
+                          </span>
                         )}
                       </FormLabel>
                       <div className="flex flex-wrap gap-1.5">
@@ -718,7 +911,9 @@ export function PropertyForm({ initialData, propertyTypes: initialTypes }: Prope
                               onClick={() =>
                                 field.onChange(
                                   on
-                                    ? (field.value ?? []).filter((id) => id !== a.id)
+                                    ? (field.value ?? []).filter(
+                                        (id) => id !== a.id,
+                                      )
                                     : [...(field.value ?? []), a.id],
                                 )
                               }
@@ -737,7 +932,11 @@ export function PropertyForm({ initialData, propertyTypes: initialTypes }: Prope
             </Section>
 
             {/* 4. Descripción */}
-            <Section id="descripcion" title="Descripción" description="Lo que ve el interesado en la ficha pública y en los portales.">
+            <Section
+              id="descripcion"
+              title="Descripción"
+              description="Lo que ve el interesado en la ficha pública y en los portales."
+            >
               <FormField
                 control={form.control}
                 name="description"
@@ -772,7 +971,9 @@ export function PropertyForm({ initialData, propertyTypes: initialTypes }: Prope
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Provincia</FormLabel>
-                      <FormControl><Input {...field} /></FormControl>
+                      <FormControl>
+                        <Input {...field} />
+                      </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -783,7 +984,9 @@ export function PropertyForm({ initialData, propertyTypes: initialTypes }: Prope
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Ciudad / localidad</FormLabel>
-                      <FormControl><Input placeholder="Ej.: Rosario" {...field} /></FormControl>
+                      <FormControl>
+                        <Input placeholder="Ej.: Rosario" {...field} />
+                      </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -794,7 +997,12 @@ export function PropertyForm({ initialData, propertyTypes: initialTypes }: Prope
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Dirección o referencia</FormLabel>
-                      <FormControl><Input placeholder="Ej.: Belgrano 830 · Ruta 95 Km 10" {...field} /></FormControl>
+                      <FormControl>
+                        <Input
+                          placeholder="Ej.: Belgrano 830 · Ruta 95 Km 10"
+                          {...field}
+                        />
+                      </FormControl>
                     </FormItem>
                   )}
                 />
@@ -804,15 +1012,26 @@ export function PropertyForm({ initialData, propertyTypes: initialTypes }: Prope
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Barrio / paraje</FormLabel>
-                      <FormControl><Input placeholder="Ej.: Fisherton" {...field} /></FormControl>
+                      <FormControl>
+                        <Input placeholder="Ej.: Fisherton" {...field} />
+                      </FormControl>
                     </FormItem>
                   )}
                 />
               </div>
 
               <div className="flex flex-wrap items-center gap-3">
-                <Button type="button" variant="outline" onClick={handleGeocode} disabled={geocodingLoading}>
-                  {geocodingLoading ? <Loader2 className="animate-spin" /> : <Search />}
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleGeocode}
+                  disabled={geocodingLoading}
+                >
+                  {geocodingLoading ? (
+                    <Loader2 className="animate-spin" />
+                  ) : (
+                    <Search />
+                  )}
                   Buscar en el mapa
                 </Button>
                 <span className="text-xs text-muted-foreground">
@@ -838,7 +1057,11 @@ export function PropertyForm({ initialData, propertyTypes: initialTypes }: Prope
                         <MapPin className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
                         <span className="flex-1">{c.label}</span>
                         <span className="shrink-0 text-xs text-muted-foreground">
-                          {c.precision === "street" ? "calle" : c.precision === "locality" ? "localidad" : "zona"}
+                          {c.precision === "street"
+                            ? "calle"
+                            : c.precision === "locality"
+                              ? "localidad"
+                              : "zona"}
                         </span>
                       </button>
                     </li>
@@ -879,12 +1102,18 @@ export function PropertyForm({ initialData, propertyTypes: initialTypes }: Prope
                 }}
                 className={cn(
                   "flex h-28 w-full flex-col items-center justify-center gap-1 rounded-lg border border-dashed text-sm transition-colors",
-                  dragOver ? "border-primary bg-primary/5" : "border-border-strong bg-sunken hover:bg-muted",
+                  dragOver
+                    ? "border-primary bg-primary/5"
+                    : "border-border-strong bg-sunken hover:bg-muted",
                 )}
               >
                 <ImagePlus className="size-5 text-muted-foreground" />
-                <span className="text-fg-secondary">Soltá las fotos acá o hacé click</span>
-                <span className="text-xs text-muted-foreground">JPG o PNG · varias a la vez</span>
+                <span className="text-fg-secondary">
+                  Soltá las fotos acá o hacé click
+                </span>
+                <span className="text-xs text-muted-foreground">
+                  JPG o PNG · varias a la vez
+                </span>
               </button>
               <input
                 ref={fileInputRef}
@@ -901,22 +1130,44 @@ export function PropertyForm({ initialData, propertyTypes: initialTypes }: Prope
               {(existingImages.length > 0 || files.length > 0) && (
                 <ul className="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-6">
                   {existingImages.map((img, i) => (
-                    <li key={img.id} className="group relative aspect-square overflow-hidden rounded-md bg-muted">
-                      <Image src={img.image_url} alt="" fill sizes="160px" className="object-cover" unoptimized />
+                    <li
+                      key={img.id}
+                      className="group relative aspect-square overflow-hidden rounded-md bg-muted"
+                    >
+                      <Image
+                        src={img.image_url}
+                        alt=""
+                        fill
+                        sizes="160px"
+                        className="object-cover"
+                        unoptimized
+                      />
                       {i === 0 && (
                         <span className="absolute left-1.5 top-1.5 rounded-sm bg-card/95 px-1.5 text-[11px] font-medium text-foreground">
                           Portada
                         </span>
                       )}
-                      <button type="button" aria-label="Eliminar foto" onClick={() => handleDeleteImage(img)} className={thumbButtonClass}>
+                      <button
+                        type="button"
+                        aria-label="Eliminar foto"
+                        onClick={() => handleDeleteImage(img)}
+                        className={thumbButtonClass}
+                      >
                         <Trash2 className="size-3.5" />
                       </button>
                     </li>
                   ))}
                   {files.map((f, i) => (
-                    <li key={`${f.name}-${i}`} className="group relative aspect-square overflow-hidden rounded-md bg-muted">
+                    <li
+                      key={`${f.name}-${i}`}
+                      className="group relative aspect-square overflow-hidden rounded-md bg-muted"
+                    >
                       {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={previews[i]} alt="" className="h-full w-full object-cover" />
+                      <img
+                        src={previews[i]}
+                        alt=""
+                        className="h-full w-full object-cover"
+                      />
                       {existingImages.length === 0 && i === 0 && (
                         <span className="absolute left-1.5 top-1.5 rounded-sm bg-card/95 px-1.5 text-[11px] font-medium text-foreground">
                           Portada
@@ -925,7 +1176,12 @@ export function PropertyForm({ initialData, propertyTypes: initialTypes }: Prope
                       <span className="absolute bottom-1.5 left-1.5 rounded-sm bg-primary px-1.5 text-[11px] font-medium text-primary-foreground">
                         Nueva
                       </span>
-                      <button type="button" aria-label="Quitar" onClick={() => removeFile(i)} className={thumbButtonClass}>
+                      <button
+                        type="button"
+                        aria-label="Quitar"
+                        onClick={() => removeFile(i)}
+                        className={thumbButtonClass}
+                      >
                         <X className="size-3.5" />
                       </button>
                     </li>
@@ -941,17 +1197,30 @@ export function PropertyForm({ initialData, propertyTypes: initialTypes }: Prope
               <div className="relative aspect-[16/10] bg-muted">
                 {cover ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={cover} alt="" className="h-full w-full object-cover" />
+                  <img
+                    src={cover}
+                    alt=""
+                    className="h-full w-full object-cover"
+                  />
                 ) : (
-                  <div className="flex h-full items-center justify-center text-xs text-muted-foreground">Sin portada</div>
+                  <div className="flex h-full items-center justify-center text-xs text-muted-foreground">
+                    Sin portada
+                  </div>
                 )}
               </div>
               <div className="flex flex-col gap-1.5 p-4">
                 <div className="flex items-start justify-between gap-2">
                   <p className="line-clamp-2 text-sm font-medium text-foreground">
-                    {w.title?.trim() || <span className="text-muted-foreground">Sin título</span>}
+                    {w.title?.trim() || (
+                      <span className="text-muted-foreground">Sin título</span>
+                    )}
                   </p>
-                  <StatusBadge tone={meta.tone} color={meta.color} icon={meta.icon} className="shrink-0">
+                  <StatusBadge
+                    tone={meta.tone}
+                    color={meta.color}
+                    icon={meta.icon}
+                    className="shrink-0"
+                  >
                     {meta.label}
                   </StatusBadge>
                 </div>
@@ -959,8 +1228,14 @@ export function PropertyForm({ initialData, propertyTypes: initialTypes }: Prope
                   {formatPrice(Number(w.price), w.currency) ?? "A consultar"}
                 </p>
                 <p className="truncate text-xs text-muted-foreground">
-                  {[typeName, w.operation_type === "alquiler" ? "Alquiler" : "Venta"].filter(Boolean).join(" · ")}
-                  {(w.street_address || w.city) && ` · ${[w.street_address, w.city].filter(Boolean).join(", ")}`}
+                  {[
+                    typeName,
+                    w.operation_type === "alquiler" ? "Alquiler" : "Venta",
+                  ]
+                    .filter(Boolean)
+                    .join(" · ")}
+                  {(w.street_address || w.city) &&
+                    ` · ${[w.street_address, w.city].filter(Boolean).join(", ")}`}
                 </p>
               </div>
             </div>
@@ -968,7 +1243,9 @@ export function PropertyForm({ initialData, propertyTypes: initialTypes }: Prope
             <div className="rounded-lg border border-border bg-card p-4">
               <div className="mb-2 flex items-baseline justify-between">
                 <h3 className="text-sm font-semibold">Completitud</h3>
-                <span className="text-xs text-muted-foreground">{done} de {checklist.length}</span>
+                <span className="text-xs text-muted-foreground">
+                  {done} de {checklist.length}
+                </span>
               </div>
               <div className="mb-3 h-1 overflow-hidden rounded-full bg-muted">
                 <div
@@ -984,14 +1261,24 @@ export function PropertyForm({ initialData, propertyTypes: initialTypes }: Prope
                     ) : (
                       <Circle className="size-4 shrink-0 text-border-strong" />
                     )}
-                    <span className={c.ok ? "text-fg-secondary" : "text-foreground"}>{c.label}</span>
-                    {c.hint && <span className="text-xs text-muted-foreground">· {c.hint}</span>}
+                    <span
+                      className={c.ok ? "text-fg-secondary" : "text-foreground"}
+                    >
+                      {c.label}
+                    </span>
+                    {c.hint && (
+                      <span className="text-xs text-muted-foreground">
+                        · {c.hint}
+                      </span>
+                    )}
                   </li>
                 ))}
               </ul>
             </div>
 
-            <div className="hidden items-center justify-end gap-2 lg:flex">{actions}</div>
+            <div className="hidden items-center justify-end gap-2 lg:flex">
+              {actions}
+            </div>
           </aside>
         </div>
 

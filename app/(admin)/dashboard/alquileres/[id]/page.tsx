@@ -21,7 +21,8 @@ export default async function ContratoPage({
     .select(
       `id, status, start_date, end_date, rent_amount, currency, adjustment_index, adjustment_months,
        adjustment_pct, base_rent_amount, base_period, next_adjustment_date, commission_pct,
-       late_fee_pct_daily, payment_due_day, notes,
+       last_adjustment_date, late_fee_pct_daily, late_fee_fixed, payment_due_day,
+       guarantee_type, guarantee_detail, deposit_amount, renewed_from_id, notes,
        property:properties(id, title),
        owner:rental_contacts!rental_contracts_owner_id_fkey(id, full_name, phone, email),
        tenant:rental_contacts!rental_contracts_tenant_id_fkey(id, full_name, phone, email)`
@@ -32,20 +33,23 @@ export default async function ContratoPage({
 
   const c = raw as unknown as Omit<
     ContractDetailData,
-    "payments" | "settlements" | "adjustmentPreview" | "today"
+    "charges" | "settlements" | "adjustments" | "adjustmentPreview" | "today"
   > & { base_rent_amount: number };
 
-  const [{ data: payments }, { data: settlements }, { data: indexValues }] = await Promise.all([
+  const [{ data: charges }, { data: settlements }, { data: adjustments }, { data: indexValues }] = await Promise.all([
     supabase
-      .from("rental_payments")
-      .select("id, period, due_date, amount, currency, paid_at, paid_amount, method")
+      .from("rental_charges")
+      .select("id, period, due_date, kind, description, amount, currency, entries:rental_payment_entries(id, amount, paid_at, method, account, receipt_number)")
       .eq("contract_id", id)
-      .order("period"),
+      .order("due_date", { ascending: false }),
     supabase
       .from("rental_settlements")
       .select("id, period, net_amount, currency, issued_at")
       .eq("contract_id", id)
       .order("period", { ascending: false }),
+    supabase.from("rental_adjustments")
+      .select("id, effective_date, previous_amount, new_amount, index_code")
+      .eq("contract_id", id).order("effective_date", { ascending: false }),
     c.next_adjustment_date && (c.adjustment_index === "ICL" || c.adjustment_index === "IPC")
       ? supabase
           .from("index_values")
@@ -63,8 +67,9 @@ export default async function ContratoPage({
     <ContractDetail
       c={{
         ...c,
-        payments: (payments ?? []) as ContractDetailData["payments"],
+        charges: (charges ?? []) as ContractDetailData["charges"],
         settlements: (settlements ?? []) as ContractDetailData["settlements"],
+        adjustments: (adjustments ?? []) as ContractDetailData["adjustments"],
         adjustmentPreview,
         today: ymdInAppTz(),
       }}

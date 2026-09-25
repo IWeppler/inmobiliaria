@@ -12,7 +12,7 @@ import {
 import { isLocated, type Located } from "@/features/dashboard/property/PropertiesMap";
 import { cn } from "@/lib/utils";
 
-// Leaflet solo en cliente.
+// MapLibre solo en cliente.
 const PropertiesMap = dynamic(
   () => import("@/features/dashboard/property/PropertiesMap"),
   {
@@ -68,7 +68,7 @@ export function PropertiesMapView({ properties }: { properties: PropertyWithDeta
                   onMouseLeave={() => setActiveId(null)}
                   onFocus={() => onMap && setActiveId(p.id)}
                   onBlur={() => setActiveId(null)}
-                  onClick={() => onMap && setFocus(p)}
+                  onClick={() => onMap && setFocus({ ...p })}
                   disabled={!onMap}
                   title={onMap ? "Ver en el mapa" : "Sin coordenadas"}
                   className={cn(

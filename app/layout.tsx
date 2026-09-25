@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "@/shared/components/ui/sonner";
-import "leaflet/dist/leaflet.css";
+import { ThemeProvider } from "next-themes";
 
 // Tipografía del producto (panel + login). El sitio público restaura la
 // suya con el scope `.site-public` (ver globals.css).
@@ -27,11 +27,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html
-      lang="es"
-      className={`light ${inter.variable}`}
-      style={{ colorScheme: "light" }}
-    >
+    <html lang="es" className={inter.variable} suppressHydrationWarning>
       <head>
         <link
           href="https://api.fontshare.com/v2/css?f[]=clash-grotesk@500,600,700&f[]=general-sans@400,500,600,700&display=swap"
@@ -43,8 +39,10 @@ export default function RootLayout({
         />
       </head>
       <body>
-        {children}
-        <Toaster position="bottom-right" />
+        <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false} disableTransitionOnChange>
+          {children}
+          <Toaster position="bottom-right" />
+        </ThemeProvider>
       </body>
     </html>
   );

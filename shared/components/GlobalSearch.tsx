@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { Building2, FileText, Inbox, Search } from "lucide-react";
 import { createClientBrowser } from "@/lib/supabase-browser";
 import { Dialog, DialogContent, DialogTitle } from "@/shared/components/ui/dialog";
-import { Button } from "@/shared/components/ui/button";
+import { SidebarMenuButton } from "@/shared/components/ui/sidebar";
 import { StatusBadge } from "@/shared/components/StatusBadge";
 import { propertyStatusMeta, formatPrice } from "@/features/dashboard/property/propertyStatus";
 import { statusMeta } from "@/features/dashboard/leads/leadStatus";
@@ -188,18 +188,19 @@ export function GlobalSearch() {
 
   return (
     <>
-      <Button
-        variant="outline"
+      <SidebarMenuButton
+        type="button"
         onClick={() => setOpen(true)}
-        className="h-8 w-56 justify-start gap-2 px-2.5 text-muted-foreground font-normal max-md:w-8 max-md:justify-center max-md:px-0"
+        tooltip="Buscar"
+        className="text-muted-foreground"
         aria-label="Buscar"
       >
-        <Search className="size-4" />
-        <span className="max-md:hidden">Buscar…</span>
-        <kbd className="ml-auto rounded-sm border border-border bg-muted px-1 text-[11px] font-medium text-muted-foreground max-md:hidden">
+        <Search />
+        <span>Buscar</span>
+        <kbd className="ml-auto rounded-sm border border-border bg-muted px-1 text-[11px] font-medium text-muted-foreground group-data-[collapsible=icon]:hidden">
           {isMac ? "⌘" : "Ctrl"} K
         </kbd>
-      </Button>
+      </SidebarMenuButton>
 
       <Dialog open={open} onOpenChange={setOpenAndReset}>
         <DialogContent

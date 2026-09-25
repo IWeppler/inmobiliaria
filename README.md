@@ -83,3 +83,12 @@ pnpm run dev
 
 
 Desarrollado para potenciar el mercado inmobiliario. 🏡🔑
+
+## Alquileres: puesta en marcha
+
+1. Aplicar las migraciones de `supabase/migrations/` en orden, incluida `20260925120000_rental_operations.sql`, antes de usar las pantallas nuevas. La migración conserva cuotas y cobros existentes y crea la cuenta corriente, los ajustes auditables y los recibos numerados.
+2. Configurar `SUPABASE_SERVICE_ROLE_KEY` y `CRON_SECRET` en el entorno de despliegue. `vercel.json` programa `/api/cron/rentals` diariamente; la ruta exige `Authorization: Bearer <CRON_SECRET>`. Al abrir `/dashboard/alquileres` también se aplican los ajustes vencidos que ya tengan índices cargados.
+3. Cargar los valores de ICL e IPC en `/dashboard/ajustes` para cada mes necesario. El MVP usa el valor del primer día de cada mes; verificar el monto previsto antes de avisar al inquilino, especialmente si el contrato requiere el ICL de un día específico.
+4. Para importar contratos vigentes, descargar la plantilla y el catálogo en `/dashboard/alquileres/importar`. Informar el canon vigente y `last_adjustment_date` del último ajuste aplicado. `first_unpaid_period` abre la cuenta corriente desde ese mes; si se omite, comienza en el mes actual. La importación es atómica y admite hasta 500 filas por archivo.
+
+Los avisos previos y reclamos de mora del MVP abren WhatsApp con el mensaje preparado para que el operador lo revise y envíe. Las liquidaciones consolidadas por propietario se imprimen o guardan como PDF desde `/dashboard/alquileres/propietarios`.

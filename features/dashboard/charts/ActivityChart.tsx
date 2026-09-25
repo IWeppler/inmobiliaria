@@ -12,10 +12,10 @@ export type WeekPoint = {
   visits: number;
 };
 
-// Series categóricas validadas contra superficie blanca (ΔE CVD 22).
+// Series categóricas: paleta de gráficos de globals.css (--chart-*).
 const SERIES = [
-  { key: "leads", label: "Consultas", color: "#1e4fd8" },
-  { key: "visits", label: "Visitas", color: "#0d9488" },
+  { key: "leads", label: "Consultas", color: "var(--chart-1)" },
+  { key: "visits", label: "Visitas", color: "var(--chart-3)" },
 ] as const;
 
 function niceMax(n: number) {

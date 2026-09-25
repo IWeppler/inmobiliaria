@@ -6,7 +6,6 @@ import { createClientServer } from "@/lib/supabase";
 import { ymdInAppTz } from "@/lib/dates";
 import {
   addMonths,
-  computeAdjustment,
   computeSettlement,
   contractPeriods,
   dueDateFor,
@@ -75,12 +74,17 @@ const contractSchema = z
     end_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
     rent_amount: z.coerce.number().positive(),
     currency: z.enum(["ARS", "USD"]),
-    adjustment_index: z.enum(["ICL", "IPC", "FIJO", "NINGUNO"]),
-    adjustment_months: z.coerce.number().int().min(1).max(36),
+    adjustment_index: z.enum(["ICL", "IPC", "FIJO", "MANUAL", "NINGUNO"]),
+    adjustment_months: z.coerce.number().int().refine((value) => [3, 4, 6, 12].includes(value)),
     adjustment_pct: z.coerce.number().min(0).max(500).optional(),
+    guarantee_type: z.enum(["NINGUNA", "GARANTE", "CAUCION"]),
+    guarantee_detail: z.string().max(200).optional(),
+    deposit_amount: z.coerce.number().min(0),
     commission_pct: z.coerce.number().min(0).max(100),
     late_fee_pct_daily: z.coerce.number().min(0).max(10),
+    late_fee_fixed: z.coerce.number().min(0),
     payment_due_day: z.coerce.number().int().min(1).max(28),
+    renewed_from_id: z.string().uuid().optional(),
     notes: z.string().max(2000).optional().or(z.literal("")),
   })
   .refine((v) => v.end_date > v.start_date, { message: "Fin debe ser posterior al inicio" });
@@ -98,9 +102,22 @@ export async function createContractAction(
   if (!user) return { success: false, message: "No autenticado" };
   const v = parsed.data;
 
+  const { data: activeContracts } = await supabase.from("rental_contracts")
+    .select("id").eq("property_id", v.property_id).eq("status", "ACTIVO");
+  if (activeContracts?.length && (!v.renewed_from_id || activeContracts.some((c) => c.id !== v.renewed_from_id))) {
+    return { success: false, message: "La propiedad ya tiene un contrato activo." };
+  }
+  if (v.renewed_from_id) {
+    const { data: previous } = await supabase.from("rental_contracts")
+      .select("property_id").eq("id", v.renewed_from_id).single();
+    if (!previous || previous.property_id !== v.property_id) {
+      return { success: false, message: "El contrato a renovar no corresponde a esta propiedad." };
+    }
+  }
+
   const basePeriod = periodOf(v.start_date);
-  const nextAdjustment =
-    v.adjustment_index === "NINGUNO" ? null : addMonths(v.start_date, v.adjustment_months);
+  const firstAdjustment = addMonths(v.start_date, v.adjustment_months);
+  const nextAdjustment = v.adjustment_index === "NINGUNO" || firstAdjustment > v.end_date ? null : firstAdjustment;
 
   const { data: contract, error } = await supabase
     .from("rental_contracts")
@@ -116,12 +133,17 @@ export async function createContractAction(
       adjustment_index: v.adjustment_index,
       adjustment_months: v.adjustment_months,
       adjustment_pct: v.adjustment_index === "FIJO" ? v.adjustment_pct ?? 0 : null,
+      guarantee_type: v.guarantee_type,
+      guarantee_detail: v.guarantee_detail || null,
+      deposit_amount: v.deposit_amount,
       base_rent_amount: v.rent_amount,
       base_period: basePeriod,
       next_adjustment_date: nextAdjustment,
       commission_pct: v.commission_pct,
       late_fee_pct_daily: v.late_fee_pct_daily,
+      late_fee_fixed: v.late_fee_fixed,
       payment_due_day: v.payment_due_day,
+      renewed_from_id: v.renewed_from_id ?? null,
       notes: v.notes || null,
     })
     .select("id")
@@ -137,9 +159,25 @@ export async function createContractAction(
     amount: v.rent_amount,
     currency: v.currency,
   }));
-  const { error: payError } = await supabase.from("rental_payments").insert(rows);
-  if (payError) {
-    return { success: false, message: `Contrato creado pero sin cuotas: ${payError.message}` };
+  const { data: payments, error: payError } = await supabase.from("rental_payments")
+    .insert(rows).select("id, period, due_date, amount, currency");
+  if (payError || !payments) {
+    await supabase.from("rental_contracts").delete().eq("id", contract.id);
+    return { success: false, message: payError?.message ?? "No se pudieron generar las cuotas." };
+  }
+  const { error: chargeError } = await supabase.from("rental_charges").insert(payments.map((payment) => ({
+    contract_id: contract.id,
+    rent_payment_id: payment.id,
+    period: payment.period,
+    due_date: payment.due_date,
+    kind: "ALQUILER",
+    description: `Alquiler ${payment.period.slice(5, 7)}/${payment.period.slice(0, 4)}`,
+    amount: payment.amount,
+    currency: payment.currency,
+  })));
+  if (chargeError) {
+    await supabase.from("rental_contracts").delete().eq("id", contract.id);
+    return { success: false, message: chargeError.message };
   }
 
   // La propiedad pasa a ALQUILADO (queda en status_history por trigger).
@@ -166,10 +204,11 @@ export async function setContractStatusAction(
 
   // Al cerrar el contrato la propiedad vuelve a estar disponible.
   if (status !== "ACTIVO") {
-    await supabase
-      .from("properties")
-      .update({ status: "EN_ALQUILER" })
-      .eq("id", contract.property_id);
+    const { count } = await supabase.from("rental_contracts").select("id", { count: "exact", head: true })
+      .eq("property_id", contract.property_id).eq("status", "ACTIVO");
+    if (!count) {
+      await supabase.from("properties").update({ status: "EN_ALQUILER" }).eq("id", contract.property_id);
+    }
   }
   revalidatePath("/dashboard/alquileres");
   revalidatePath(`/dashboard/alquileres/${contractId}`);
@@ -177,52 +216,85 @@ export async function setContractStatusAction(
 }
 
 // === E4.3 — Pagos ===
-const paymentSchema = z.object({
-  payment_id: z.string().uuid(),
-  paid_at: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-  paid_amount: z.coerce.number().min(0),
-  method: z.string().max(40).optional().or(z.literal("")),
-  notes: z.string().max(500).optional().or(z.literal("")),
+const chargeSchema = z.object({
+  contract_id: z.string().uuid(),
+  period: z.string().regex(/^\d{4}-\d{2}-01$/),
+  due_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  kind: z.enum(["EXPENSAS", "SERVICIOS", "PUNITORIOS", "REPARACIONES"]),
+  description: z.string().trim().min(3).max(160),
+  amount: z.coerce.number().positive(),
 });
 
-export async function registerPaymentAction(
-  input: z.input<typeof paymentSchema>
-): Promise<ActionResult> {
-  const parsed = paymentSchema.safeParse(input);
-  if (!parsed.success) return { success: false, message: "Datos de pago inválidos." };
+export async function addRentalChargeAction(input: z.input<typeof chargeSchema>): Promise<ActionResult> {
+  const parsed = chargeSchema.safeParse(input);
+  if (!parsed.success) return { success: false, message: "Datos del cargo inválidos." };
   const { supabase, user } = await currentUser();
   if (!user) return { success: false, message: "No autenticado" };
-  const v = parsed.data;
-
-  const { data, error } = await supabase
-    .from("rental_payments")
-    .update({
-      paid_at: v.paid_at,
-      paid_amount: v.paid_amount,
-      method: v.method || null,
-      notes: v.notes || null,
-    })
-    .eq("id", v.payment_id)
-    .select("contract_id")
-    .single();
-  if (error || !data) return { success: false, message: error?.message ?? "Error" };
-  revalidatePath(`/dashboard/alquileres/${data.contract_id}`);
-  revalidatePath("/dashboard/alquileres");
-  return { success: true, message: "Pago registrado." };
+  const { data: contract } = await supabase.from("rental_contracts")
+    .select("currency").eq("id", parsed.data.contract_id).single();
+  if (!contract) return { success: false, message: "Contrato no encontrado." };
+  const { count: settled } = await supabase.from("rental_settlements")
+    .select("id", { count: "exact", head: true })
+    .eq("contract_id", parsed.data.contract_id).eq("period", parsed.data.period);
+  if (settled) return { success: false, message: "El período ya está liquidado." };
+  const { error } = await supabase.from("rental_charges")
+    .insert({ ...parsed.data, currency: contract.currency });
+  if (error) return { success: false, message: error.message };
+  revalidatePath(`/dashboard/alquileres/${parsed.data.contract_id}`);
+  return { success: true, message: "Cargo agregado." };
 }
 
-export async function undoPaymentAction(paymentId: string): Promise<ActionResult> {
+const collectionSchema = z.object({
+  charge_id: z.string().uuid(),
+  paid_at: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  amount: z.coerce.number().positive(),
+  method: z.enum(["TRANSFERENCIA", "EFECTIVO", "OTRO"]),
+  account: z.string().trim().min(1).max(100),
+  notes: z.string().max(500).optional(),
+});
+
+export async function recordRentalPaymentAction(
+  input: z.input<typeof collectionSchema>,
+): Promise<ActionResult<{ id: string; receipt_number: number }>> {
+  const parsed = collectionSchema.safeParse(input);
+  if (!parsed.success) return { success: false, message: "Datos del cobro inválidos." };
   const { supabase, user } = await currentUser();
   if (!user) return { success: false, message: "No autenticado" };
-  const { data, error } = await supabase
-    .from("rental_payments")
-    .update({ paid_at: null, paid_amount: null, method: null })
-    .eq("id", paymentId)
-    .select("contract_id")
-    .single();
-  if (error || !data) return { success: false, message: error?.message ?? "Error" };
-  revalidatePath(`/dashboard/alquileres/${data.contract_id}`);
-  return { success: true, message: "Pago revertido." };
+  const { data: charge } = await supabase.from("rental_charges")
+    .select("contract_id, period").eq("id", parsed.data.charge_id).single();
+  if (!charge) return { success: false, message: "Cargo no encontrado." };
+  const { count: settled } = await supabase.from("rental_settlements")
+    .select("id", { count: "exact", head: true })
+    .eq("contract_id", charge.contract_id).eq("period", charge.period);
+  if (settled) return { success: false, message: "El período ya está liquidado." };
+  const { data, error } = await supabase.from("rental_payment_entries")
+    .insert({ ...parsed.data, notes: parsed.data.notes || null })
+    .select("id, receipt_number").single();
+  if (error || !data) return { success: false, message: error?.message ?? "No se pudo registrar el cobro." };
+  revalidatePath(`/dashboard/alquileres/${charge.contract_id}`);
+  revalidatePath("/dashboard/alquileres");
+  return { success: true, message: `Cobro registrado. Recibo N.º ${data.receipt_number}.`, data };
+}
+
+export async function deleteRentalPaymentAction(entryId: string): Promise<ActionResult> {
+  if (!z.string().uuid().safeParse(entryId).success) return { success: false, message: "Cobro inválido." };
+  const { supabase, user } = await currentUser();
+  if (!user) return { success: false, message: "No autenticado" };
+  const { data: entry } = await supabase.from("rental_payment_entries")
+    .select("charge_id").eq("id", entryId).single();
+  if (!entry) return { success: false, message: "Cobro no encontrado." };
+  const { data: charge } = await supabase.from("rental_charges")
+    .select("contract_id, period").eq("id", entry.charge_id).single();
+  if (!charge) return { success: false, message: "Cargo no encontrado." };
+  const contractId = charge.contract_id;
+  const { count } = await supabase.from("rental_settlements").select("id", { count: "exact", head: true })
+    .eq("contract_id", contractId).eq("period", charge.period);
+  if (count) return { success: false, message: "El período ya fue liquidado. No se puede revertir este cobro." };
+  const { error } = await supabase.from("rental_payment_entries").delete().eq("id", entryId);
+  if (error) return { success: false, message: error.message };
+  revalidatePath(`/dashboard/alquileres/${contractId}`);
+  revalidatePath("/dashboard/alquileres");
+  return { success: true, message: "Cobro revertido." };
 }
 
 // === E4.2 — Ajuste ===
@@ -230,47 +302,19 @@ export async function undoPaymentAction(paymentId: string): Promise<ActionResult
 // canon, mueve la base y la próxima fecha, y actualiza las cuotas no
 // pagadas desde ese período en adelante.
 export async function applyAdjustmentAction(
-  contractId: string
+  contractId: string,
+  manualAmount?: number,
 ): Promise<ActionResult<{ newAmount: number; factor: number }>> {
   const { supabase, user } = await currentUser();
   if (!user) return { success: false, message: "No autenticado" };
-
-  const { data: c } = await supabase
-    .from("rental_contracts")
-    .select("*")
-    .eq("id", contractId)
-    .single();
-  if (!c) return { success: false, message: "Contrato no encontrado." };
-  if (!c.next_adjustment_date) return { success: false, message: "El contrato no tiene ajuste pendiente." };
-
-  const targetPeriod = periodOf(c.next_adjustment_date);
-  const { data: idx } = await supabase
-    .from("index_values")
-    .select("index_code, period, value")
-    .eq("index_code", c.adjustment_index)
-    .in("period", [c.base_period, targetPeriod]);
-
-  const result = computeAdjustment(c, targetPeriod, idx ?? []);
-  if ("error" in result) return { success: false, message: result.error };
-
-  const nextDate = addMonths(c.next_adjustment_date, c.adjustment_months);
-  const { error } = await supabase
-    .from("rental_contracts")
-    .update({
-      rent_amount: result.amount,
-      base_rent_amount: result.amount,
-      base_period: targetPeriod,
-      next_adjustment_date: nextDate <= c.end_date ? nextDate : null,
-    })
-    .eq("id", contractId);
-  if (error) return { success: false, message: error.message };
-
-  await supabase
-    .from("rental_payments")
-    .update({ amount: result.amount })
-    .eq("contract_id", contractId)
-    .is("paid_at", null)
-    .gte("period", targetPeriod);
+  const { data, error } = await supabase.rpc("rental_apply_adjustment", {
+    p_contract_id: contractId,
+    p_manual_amount: manualAmount ?? null,
+  });
+  if (error || !data || typeof data !== "object" || Array.isArray(data)) {
+    return { success: false, message: error?.message ?? "No se pudo aplicar el ajuste." };
+  }
+  const result = data as { amount: number; factor: number };
 
   revalidatePath(`/dashboard/alquileres/${contractId}`);
   revalidatePath("/dashboard/alquileres");
@@ -307,20 +351,22 @@ export async function createSettlementAction(
     .single();
   if (!c) return { success: false, message: "Contrato no encontrado." };
 
-  // Se liquida lo efectivamente cobrado en el período.
-  const { data: p } = await supabase
-    .from("rental_payments")
-    .select("paid_amount, paid_at, amount")
-    .eq("contract_id", v.contract_id)
-    .eq("period", v.period)
-    .single();
-  if (!p?.paid_at) {
-    return { success: false, message: "El período todavía no está cobrado." };
+  const { data: charges } = await supabase.from("rental_charges")
+    .select("amount, kind, rental_payment_entries(amount)")
+    .eq("contract_id", v.contract_id).eq("period", v.period);
+  if (!charges?.length) return { success: false, message: "El período no tiene cargos." };
+  const totals = charges.map((charge) => ({
+    kind: charge.kind,
+    amount: charge.amount,
+    paid: round2(charge.rental_payment_entries.reduce((sum, entry) => sum + entry.amount, 0)),
+  }));
+  if (totals.some((charge) => charge.paid + 0.005 < charge.amount)) {
+    return { success: false, message: "Cobrá todos los cargos del período antes de liquidar." };
   }
-
-  const rent = round2(p.paid_amount ?? p.amount);
+  const rent = round2(totals.filter((charge) => charge.kind === "ALQUILER").reduce((sum, charge) => sum + charge.paid, 0));
+  const otherCollected = round2(totals.filter((charge) => charge.kind !== "ALQUILER").reduce((sum, charge) => sum + charge.paid, 0));
   const expenses: SettlementExpense[] = v.expenses;
-  const calc = computeSettlement(rent, c.commission_pct, expenses);
+  const calc = computeSettlement(rent + otherCollected, c.commission_pct, expenses, rent);
 
   const { data, error } = await supabase
     .from("rental_settlements")
@@ -328,6 +374,7 @@ export async function createSettlementAction(
       contract_id: v.contract_id,
       period: v.period,
       rent_amount: rent,
+      other_collected_amount: otherCollected,
       commission_amount: calc.commission,
       expenses,
       expenses_amount: calc.expensesAmount,
@@ -380,4 +427,17 @@ export async function deleteIndexValueAction(id: string): Promise<ActionResult> 
   if (error) return { success: false, message: error.message };
   revalidatePath("/dashboard/ajustes");
   return { success: true, message: "Índice eliminado." };
+}
+
+const importSchema = z.array(z.record(z.string(), z.string())).min(1).max(500);
+
+export async function importRentalContractsAction(input: unknown): Promise<ActionResult<{ count: number }>> {
+  const parsed = importSchema.safeParse(input);
+  if (!parsed.success) return { success: false, message: "El CSV debe contener entre 1 y 500 filas válidas." };
+  const { supabase, user } = await currentUser();
+  if (!user) return { success: false, message: "No autenticado" };
+  const { data, error } = await supabase.rpc("rental_import_contracts", { p_rows: parsed.data });
+  if (error) return { success: false, message: error.message };
+  revalidatePath("/dashboard/alquileres");
+  return { success: true, message: `${data} contratos importados.`, data: { count: data } };
 }

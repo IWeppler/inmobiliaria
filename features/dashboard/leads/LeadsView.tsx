@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Plus, KanbanSquare, List, Search, X } from "lucide-react";
+import { Plus, KanbanSquare, List, Search, X, ArrowLeft, Archive } from "lucide-react";
 import type { LeadWithDetails } from "@/app/types";
 import { Button } from "@/shared/components/ui/button";
 import { PageHeader } from "@/shared/components/PageShell";
@@ -22,7 +22,7 @@ import {
 import { LeadForm } from "@/features/dashboard/leads/LeadForm";
 import { LeadBoard } from "@/features/dashboard/leads/LeadBoard";
 import { LeadTable } from "@/features/dashboard/leads/LeadTable";
-import { LEAD_STATUSES, normalizeStatus } from "@/features/dashboard/leads/leadStatus";
+import { LEAD_STATUSES, normalizeStatus, type LeadStatus } from "@/features/dashboard/leads/leadStatus";
 import { Input } from "@/shared/components/ui/input";
 import {
   Select,
@@ -51,7 +51,14 @@ type LeadsViewProps = {
 // ambas.
 export function LeadsView({ leads, userRole, initialStatus }: LeadsViewProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [activeView, setActiveView] = useState("board");
+  const [leadUpdates, setLeadUpdates] = useState<Record<string, { status: LeadStatus; changedAt: string }>>({});
   const isAdmin = userRole === "admin";
+  const currentLeads = useMemo(() => leads.map((lead) => {
+    const update = leadUpdates[lead.id];
+    return update ? { ...lead, status: update.status, status_since: update.changedAt, last_activity_at: update.changedAt } : lead;
+  }), [leads, leadUpdates]);
+  const discardedCount = currentLeads.filter((lead) => normalizeStatus(lead.status) === "DESCARTADO").length;
 
   // Filtros compartidos por ambas vistas. Las opciones de responsable y
   // fuente salen de los datos (no hay catálogo aparte).
@@ -65,17 +72,17 @@ export function LeadsView({ leads, userRole, initialStatus }: LeadsViewProps) {
 
   const agents = useMemo(() => {
     const m = new Map<string, string>();
-    for (const l of leads) if (l.agent_id && l.agents?.full_name) m.set(l.agent_id, l.agents.full_name);
+    for (const l of currentLeads) if (l.agent_id && l.agents?.full_name) m.set(l.agent_id, l.agents.full_name);
     return [...m.entries()].sort((a, b) => a[1].localeCompare(b[1]));
-  }, [leads]);
+  }, [currentLeads]);
   const sources = useMemo(
-    () => [...new Set(leads.map((l) => l.source).filter((s): s is string => !!s))].sort(),
-    [leads],
+    () => [...new Set(currentLeads.map((l) => l.source).filter((s): s is string => !!s))].sort(),
+    [currentLeads],
   );
 
   const filtered = useMemo(() => {
     const text = q.trim().toLowerCase();
-    return leads.filter((l) => {
+    return currentLeads.filter((l) => {
       if (
         text &&
         !(
@@ -94,9 +101,14 @@ export function LeadsView({ leads, userRole, initialStatus }: LeadsViewProps) {
       if (source !== ALL && l.source !== source) return false;
       return true;
     });
-  }, [leads, q, status, operation, agent, source]);
+  }, [currentLeads, q, status, operation, agent, source]);
 
   const hasFilters = q.trim() !== "" || status !== ALL || operation !== ALL || agent !== ALL || source !== ALL;
+  const visibleCount = activeView === "board" && status !== "DESCARTADO"
+    ? filtered.filter((lead) => normalizeStatus(lead.status) !== "DESCARTADO").length
+    : filtered.length;
+  const isArchive = status === "DESCARTADO";
+
   const clear = () => {
     setQ("");
     setStatus(ALL);
@@ -109,11 +121,11 @@ export function LeadsView({ leads, userRole, initialStatus }: LeadsViewProps) {
   const filterKey = [q, status, operation, agent, source].join("|");
 
   return (
-    <Tabs defaultValue="board" className="gap-4 w-full min-w-0">
+    <Tabs value={activeView} onValueChange={setActiveView} className="gap-4 w-full min-w-0">
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
         <PageHeader
           title="Leads"
-          description={`${leads.length} en seguimiento`}
+          description={`${visibleCount} ${visibleCount === 1 ? "lead" : "leads"}${hasFilters ? ` de ${currentLeads.length}` : ""}`}
           actions={
             <>
               <TabsList>
@@ -218,14 +230,20 @@ export function LeadsView({ leads, userRole, initialStatus }: LeadsViewProps) {
           </Button>
         )}
 
-        <span className="ml-auto text-xs text-muted-foreground">
-          {filtered.length} {filtered.length === 1 ? "lead" : "leads"}
-          {hasFilters && ` de ${leads.length}`}
-        </span>
+        <Button variant="outline" size="sm" className="ml-auto" onClick={() => { setStatus(isArchive ? ALL : "DESCARTADO"); setActiveView("board"); }}>
+          {isArchive ? <ArrowLeft className="size-4" /> : <Archive className="size-4" />}
+          {isArchive ? "Volver al tablero" : `Descartados (${discardedCount})`}
+        </Button>
       </div>
 
       <TabsContent value="board" className="min-w-0">
-        <LeadBoard key={filterKey} initialLeads={filtered} isAdmin={isAdmin} />
+        <LeadBoard
+          key={filterKey}
+          initialLeads={filtered}
+          isAdmin={isAdmin}
+          statusFilter={status}
+          onLeadMoved={(leadId, nextStatus, changedAt) => setLeadUpdates((updates) => ({ ...updates, [leadId]: { status: nextStatus, changedAt } }))}
+        />
       </TabsContent>
       <TabsContent value="list" className="min-w-0 overflow-x-auto">
         <LeadTable key={filterKey} initialLeads={filtered} userRole={userRole} />

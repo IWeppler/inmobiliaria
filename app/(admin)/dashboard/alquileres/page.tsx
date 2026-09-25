@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Plus, AlertTriangle, CalendarClock, TrendingUp, FileText } from "lucide-react";
+import { Plus, AlertTriangle, CalendarClock, TrendingUp, FileText, Upload, MessageCircle } from "lucide-react";
 import { createClientServer } from "@/lib/supabase";
 import { ymdInAppTz } from "@/lib/dates";
 import { Button } from "@/shared/components/ui/button";
@@ -33,9 +33,12 @@ type ContractRow = {
   currency: string;
   next_adjustment_date: string | null;
   adjustment_index: string;
+  renewed_from_id: string | null;
+  late_fee_pct_daily: number;
+  late_fee_fixed: number;
   properties: { title: string } | null;
   owner: { full_name: string } | null;
-  tenant: { full_name: string } | null;
+  tenant: { full_name: string; phone: string | null } | null;
 };
 
 // Tier 4 — /dashboard/alquileres: contratos + alertas (vencimientos,
@@ -46,40 +49,46 @@ export default async function AlquileresPage() {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
+  await supabase.rpc("rental_apply_due_adjustments");
 
   const today = ymdInAppTz();
 
-  const [{ data: contractsRaw }, { data: overdueRaw }] = await Promise.all([
+  const [{ data: contractsRaw }, { data: overdueRaw }, { data: isAdmin }] = await Promise.all([
     supabase
       .from("rental_contracts")
       .select(
-        "id, status, start_date, end_date, rent_amount, currency, next_adjustment_date, adjustment_index, properties(title), owner:rental_contacts!rental_contracts_owner_id_fkey(full_name), tenant:rental_contacts!rental_contracts_tenant_id_fkey(full_name)"
+        "id, status, start_date, end_date, rent_amount, currency, next_adjustment_date, adjustment_index, renewed_from_id, late_fee_pct_daily, late_fee_fixed, properties(title), owner:rental_contacts!rental_contracts_owner_id_fkey(full_name), tenant:rental_contacts!rental_contracts_tenant_id_fkey(full_name, phone)"
       )
       .order("status")
       .order("end_date"),
     supabase
-      .from("rental_payments")
-      .select("id, contract_id, period, due_date, amount, currency")
-      .is("paid_at", null)
+      .from("rental_charges")
+      .select("id, contract_id, period, due_date, amount, currency, rental_payment_entries(amount)")
       .lt("due_date", today)
       .order("due_date"),
+    supabase.rpc("is_admin"),
   ]);
 
   const contracts = (contractsRaw ?? []) as unknown as ContractRow[];
-  const overdue = (overdueRaw ?? []) as {
+  const overdue = ((overdueRaw ?? []) as {
     id: string;
     contract_id: string;
     period: string;
     due_date: string;
     amount: number;
     currency: string;
-  }[];
+    rental_payment_entries: { amount: number }[];
+  }[]).map((charge) => ({ ...charge, balance: charge.amount - charge.rental_payment_entries.reduce((sum, entry) => sum + entry.amount, 0) }))
+    .filter((charge) => charge.balance > 0.005);
   const byId = new Map(contracts.map((c) => [c.id, c]));
 
   const active = contracts.filter((c) => c.status === "ACTIVO");
-  const expiring = active.filter(
-    (c) => daysBetween(today, c.end_date) <= EXPIRY_ALERT_DAYS
-  );
+  const renewedIds = new Set(contracts.map((contract) => contract.renewed_from_id).filter(Boolean));
+  const expiring = active.filter((c) => !renewedIds.has(c.id) && daysBetween(today, c.end_date) <= EXPIRY_ALERT_DAYS);
+  const expiryCounts = [90, 60, 30].map((days, index) => expiring.filter((contract) => {
+    const remaining = daysBetween(today, contract.end_date);
+    return remaining <= days && (index === 2 || remaining > [90, 60, 30][index + 1]);
+  }).length);
   const adjusting = active.filter(
     (c) =>
       c.next_adjustment_date &&
@@ -99,8 +108,8 @@ export default async function AlquileresPage() {
     },
     {
       icon: CalendarClock,
-      label: `Vencen en ≤ ${EXPIRY_ALERT_DAYS} días`,
-      value: expiring.length,
+      label: "Vencen en 90 / 60 / 30 días",
+      value: `${expiryCounts[0]} / ${expiryCounts[1]} / ${expiryCounts[2]}`,
       tone: "text-warning",
     },
     {
@@ -123,12 +132,16 @@ export default async function AlquileresPage() {
         title="Alquileres"
         description="Contratos, cobranzas y liquidaciones."
         actions={
+          <div className="flex flex-wrap gap-2">
+          <Button asChild variant="outline"><Link href="/dashboard/alquileres/propietarios"><FileText /> Por propietario</Link></Button>
+          {isAdmin && <Button asChild variant="outline"><Link href="/dashboard/alquileres/importar"><Upload /> Importar CSV</Link></Button>}
           <Button asChild>
             <Link href="/dashboard/alquileres/nuevo">
               <Plus />
               Nuevo contrato
             </Link>
           </Button>
+          </div>
         }
       />
 
@@ -140,7 +153,7 @@ export default async function AlquileresPage() {
           >
             <span className="text-xs font-medium text-muted-foreground">{a.label}</span>
             {/* El color solo aparece cuando hay algo que atender */}
-            <span className={`text-2xl font-semibold tracking-tight ${a.value > 0 ? a.tone : "text-foreground"}`}>
+            <span className={`text-2xl font-semibold tracking-tight ${Number(a.value) > 0 || (typeof a.value === "string" && expiring.length > 0) ? a.tone : "text-foreground"}`}>
               {a.value}
             </span>
           </div>
@@ -166,7 +179,8 @@ export default async function AlquileresPage() {
                       · {c?.tenant?.full_name} · cuota vencida el {formatDate(p.due_date)}
                     </span>
                   </span>
-                  <span className="tabular-nums shrink-0">{money(p.amount, p.currency)}</span>
+                  <span className="tabular-nums shrink-0">{money(p.balance, p.currency)} · {daysBetween(p.due_date, today)} días</span>
+                  {c?.tenant?.phone && <a href={`https://wa.me/${c.tenant.phone.replace(/\D/g, "")}?text=${encodeURIComponent(`Hola ${c.tenant.full_name}, registramos un saldo pendiente de ${money(p.balance, p.currency)} por ${c.properties?.title ?? "tu alquiler"}. Por favor, contactanos para coordinar el pago.`)}`} target="_blank" rel="noopener noreferrer" aria-label={`Reclamar a ${c.tenant.full_name} por WhatsApp`} className="text-success"><MessageCircle className="size-4" /></a>}
                 </li>
               );
             })}
@@ -191,7 +205,7 @@ export default async function AlquileresPage() {
                     {c.properties?.title ?? "Contrato"}
                   </Link>
                   <span className="text-muted-foreground truncate">
-                    · vence el {formatDate(c.end_date)} ({daysBetween(today, c.end_date)} días)
+                    · vence el {formatDate(c.end_date)} ({daysBetween(today, c.end_date)} días) · <Link href={`/dashboard/alquileres/nuevo?renovar=${c.id}`} className="underline">Renovar</Link>
                   </span>
                 </span>
               </li>

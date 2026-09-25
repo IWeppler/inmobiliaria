@@ -315,6 +315,7 @@ export type Database = {
       properties: {
         Row: {
           agent_id: string | null
+          captured_by: string | null
           antiguedad: string | null
           bathrooms: number | null
           bedrooms: number | null
@@ -343,6 +344,7 @@ export type Database = {
         }
         Insert: {
           agent_id?: string | null
+          captured_by?: string | null
           antiguedad?: string | null
           bathrooms?: number | null
           bedrooms?: number | null
@@ -371,6 +373,7 @@ export type Database = {
         }
         Update: {
           agent_id?: string | null
+          captured_by?: string | null
           antiguedad?: string | null
           bathrooms?: number | null
           bedrooms?: number | null
@@ -527,6 +530,21 @@ export type Database = {
         }
         Relationships: []
       }
+      rental_adjustments: {
+        Row: { id: string; contract_id: string; effective_date: string; previous_amount: number; new_amount: number; factor: number | null; index_code: string; applied_at: string }
+        Insert: { id?: string; contract_id: string; effective_date: string; previous_amount: number; new_amount: number; factor?: number | null; index_code: string; applied_at?: string }
+        Update: { id?: string; contract_id?: string; effective_date?: string; previous_amount?: number; new_amount?: number; factor?: number | null; index_code?: string; applied_at?: string }
+        Relationships: [{ foreignKeyName: "rental_adjustments_contract_id_fkey"; columns: ["contract_id"]; isOneToOne: false; referencedRelation: "rental_contracts"; referencedColumns: ["id"] }]
+      }
+      rental_charges: {
+        Row: { id: string; contract_id: string; rent_payment_id: string | null; period: string; due_date: string; kind: string; description: string; amount: number; currency: string; created_at: string }
+        Insert: { id?: string; contract_id: string; rent_payment_id?: string | null; period: string; due_date: string; kind: string; description: string; amount: number; currency: string; created_at?: string }
+        Update: { id?: string; contract_id?: string; rent_payment_id?: string | null; period?: string; due_date?: string; kind?: string; description?: string; amount?: number; currency?: string; created_at?: string }
+        Relationships: [
+          { foreignKeyName: "rental_charges_contract_id_fkey"; columns: ["contract_id"]; isOneToOne: false; referencedRelation: "rental_contracts"; referencedColumns: ["id"] },
+          { foreignKeyName: "rental_charges_rent_payment_id_fkey"; columns: ["rent_payment_id"]; isOneToOne: true; referencedRelation: "rental_payments"; referencedColumns: ["id"] },
+        ]
+      }
       rental_contracts: {
         Row: {
           adjustment_index: string
@@ -539,7 +557,12 @@ export type Database = {
           created_at: string
           currency: string
           end_date: string
+          deposit_amount: number
+          guarantee_detail: string | null
+          guarantee_type: string
           id: string
+          last_adjustment_date: string | null
+          late_fee_fixed: number
           late_fee_pct_daily: number
           next_adjustment_date: string | null
           notes: string | null
@@ -547,6 +570,7 @@ export type Database = {
           payment_due_day: number
           property_id: string
           rent_amount: number
+          renewed_from_id: string | null
           start_date: string
           status: string
           tenant_id: string
@@ -562,7 +586,12 @@ export type Database = {
           created_at?: string
           currency?: string
           end_date: string
+          deposit_amount?: number
+          guarantee_detail?: string | null
+          guarantee_type?: string
           id?: string
+          last_adjustment_date?: string | null
+          late_fee_fixed?: number
           late_fee_pct_daily?: number
           next_adjustment_date?: string | null
           notes?: string | null
@@ -570,6 +599,7 @@ export type Database = {
           payment_due_day?: number
           property_id: string
           rent_amount: number
+          renewed_from_id?: string | null
           start_date: string
           status?: string
           tenant_id: string
@@ -585,7 +615,12 @@ export type Database = {
           created_at?: string
           currency?: string
           end_date?: string
+          deposit_amount?: number
+          guarantee_detail?: string | null
+          guarantee_type?: string
           id?: string
+          last_adjustment_date?: string | null
+          late_fee_fixed?: number
           late_fee_pct_daily?: number
           next_adjustment_date?: string | null
           notes?: string | null
@@ -593,6 +628,7 @@ export type Database = {
           payment_due_day?: number
           property_id?: string
           rent_amount?: number
+          renewed_from_id?: string | null
           start_date?: string
           status?: string
           tenant_id?: string
@@ -620,6 +656,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "rental_contracts_renewed_from_id_fkey"
+            columns: ["renewed_from_id"]
+            isOneToOne: false
+            referencedRelation: "rental_contracts"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "rental_contracts_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
@@ -627,6 +670,12 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      rental_payment_entries: {
+        Row: { id: string; charge_id: string; paid_at: string; amount: number; method: string; account: string | null; notes: string | null; receipt_number: number; created_at: string }
+        Insert: { id?: string; charge_id: string; paid_at: string; amount: number; method: string; account?: string | null; notes?: string | null; created_at?: string }
+        Update: { id?: string; charge_id?: string; paid_at?: string; amount?: number; method?: string; account?: string | null; notes?: string | null; created_at?: string }
+        Relationships: [{ foreignKeyName: "rental_payment_entries_charge_id_fkey"; columns: ["charge_id"]; isOneToOne: false; referencedRelation: "rental_charges"; referencedColumns: ["id"] }]
       }
       rental_payments: {
         Row: {
@@ -690,6 +739,7 @@ export type Database = {
           issued_at: string
           net_amount: number
           notes: string | null
+          other_collected_amount: number
           period: string
           rent_amount: number
         }
@@ -704,6 +754,7 @@ export type Database = {
           issued_at?: string
           net_amount: number
           notes?: string | null
+          other_collected_amount?: number
           period: string
           rent_amount: number
         }
@@ -718,6 +769,7 @@ export type Database = {
           issued_at?: string
           net_amount?: number
           notes?: string | null
+          other_collected_amount?: number
           period?: string
           rent_amount?: number
         }
@@ -765,6 +817,9 @@ export type Database = {
     Functions: {
       increment_views: { Args: { property_id: string }; Returns: undefined }
       is_admin: { Args: never; Returns: boolean }
+      rental_apply_adjustment: { Args: { p_contract_id: string; p_manual_amount?: number | null }; Returns: Json }
+      rental_apply_due_adjustments: { Args: never; Returns: number }
+      rental_import_contracts: { Args: { p_rows: Json }; Returns: number }
       next_agent_for_lead: {
         Args: { p_city?: string | null; p_property_type?: string | null }
         Returns: string

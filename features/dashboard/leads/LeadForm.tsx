@@ -44,7 +44,7 @@ const leadSchema = z.object({
     .optional()
     .or(z.literal("")),
   phone: z.string().optional().or(z.literal("")),
-  source: z.enum(["TELEFONO", "EMAIL", "WEB", "REFERIDO"] as const, {
+  source: z.enum(["ZONAPROP", "ARGENPROP", "MERCADOLIBRE", "INSTAGRAM", "FACEBOOK", "WEB", "WHATSAPP", "REFERIDO", "CARTEL_OFICINA", "TELEFONO", "EMAIL"] as const, {
     message: "Selecciona una fuente",
   }),
   notes: z.string().optional().or(z.literal("")),
@@ -219,10 +219,17 @@ export function LeadForm({ onSuccess }: LeadFormProps) {
                     </SelectTrigger>
                   </FormControl>
                   <SelectContent>
+                    <SelectItem value="ZONAPROP">Zonaprop</SelectItem>
+                    <SelectItem value="ARGENPROP">Argenprop</SelectItem>
+                    <SelectItem value="MERCADOLIBRE">MercadoLibre</SelectItem>
+                    <SelectItem value="INSTAGRAM">Instagram</SelectItem>
+                    <SelectItem value="FACEBOOK">Facebook</SelectItem>
+                    <SelectItem value="WHATSAPP">WhatsApp directo</SelectItem>
+                    <SelectItem value="CARTEL_OFICINA">Cartel/Oficina</SelectItem>
+                    <SelectItem value="REFERIDO">Referido</SelectItem>
+                    <SelectItem value="WEB">Sitio web</SelectItem>
                     <SelectItem value="TELEFONO">Teléfono</SelectItem>
                     <SelectItem value="EMAIL">Email</SelectItem>
-                    <SelectItem value="WEB">Sitio Web</SelectItem>
-                    <SelectItem value="REFERIDO">Referido</SelectItem>
                   </SelectContent>
                 </Select>
                 <FormMessage />
@@ -269,7 +276,7 @@ export function LeadForm({ onSuccess }: LeadFormProps) {
               <FormControl>
                 <Textarea
                   placeholder="Ej: El cliente llamó consultando por la casa..."
-                  className="resize-none bg-white"
+                  className="resize-none bg-background"
                   {...field}
                 />
               </FormControl>

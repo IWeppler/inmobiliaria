@@ -2,12 +2,13 @@
 // actions, páginas y PDF. Fechas como "YYYY-MM-DD"; períodos como el
 // primer día del mes "YYYY-MM-01".
 
-export type AdjustmentIndex = "ICL" | "IPC" | "FIJO" | "NINGUNO";
+export type AdjustmentIndex = "ICL" | "IPC" | "FIJO" | "MANUAL" | "NINGUNO";
 
 export const ADJUSTMENT_LABELS: Record<AdjustmentIndex, string> = {
   ICL: "ICL (BCRA)",
   IPC: "IPC (INDEC)",
   FIJO: "Porcentaje fijo",
+  MANUAL: "Manual",
   NINGUNO: "Sin ajuste",
 };
 
@@ -120,15 +121,17 @@ export const PAYMENT_STATUS_LABELS: Record<PaymentStatus, string> = {
 // Punitorio simple: % diario sobre el canon por cada día de atraso
 // (desde el vencimiento hasta hoy o hasta la fecha de pago).
 export function lateFee(
-  p: { amount: number; due_date: string; paid_at: string | null },
+  p: { amount: number; due_date: string; paid_at: string | null; paid_amount?: number | null },
   lateFeePctDaily: number,
-  today: string
+  today: string,
+  lateFeeFixed = 0,
 ) {
-  if (lateFeePctDaily <= 0) return 0;
-  const until = p.paid_at ?? today;
+  const balance = Math.max(0, p.amount - (p.paid_amount ?? 0));
+  const until = balance > 0 ? today : p.paid_at ?? today;
   const days = daysBetween(p.due_date, until);
   if (days <= 0) return 0;
-  return Math.round(p.amount * (lateFeePctDaily / 100) * days * 100) / 100;
+  const basis = balance > 0 ? balance : p.amount;
+  return round2(basis * (lateFeePctDaily / 100) * days + lateFeeFixed);
 }
 
 // === E4.2 — Ajuste por índice ===
@@ -147,6 +150,7 @@ export function computeAdjustment(
 ): { amount: number; factor: number } | { error: string } {
   const idx = contract.adjustment_index as AdjustmentIndex;
   if (idx === "NINGUNO") return { error: "El contrato no tiene ajuste." };
+  if (idx === "MANUAL") return { error: "Ingresá el nuevo canon al aplicar el ajuste manual." };
   if (idx === "FIJO") {
     const pct = contract.adjustment_pct ?? 0;
     const factor = 1 + pct / 100;
@@ -172,19 +176,20 @@ export function round2(n: number) {
 export type SettlementExpense = { description: string; amount: number };
 
 export function computeSettlement(
-  rentAmount: number,
+  collectedAmount: number,
   commissionPct: number,
-  expenses: SettlementExpense[]
+  expenses: SettlementExpense[],
+  commissionBase = collectedAmount,
 ) {
-  const commission = round2(rentAmount * (commissionPct / 100));
+  const commission = round2(commissionBase * (commissionPct / 100));
   const expensesAmount = round2(expenses.reduce((a, e) => a + (e.amount || 0), 0));
   return {
     commission,
     expensesAmount,
-    net: round2(rentAmount - commission - expensesAmount),
+    net: round2(collectedAmount - commission - expensesAmount),
   };
 }
 
 // === E4.1 — Alertas ===
-export const EXPIRY_ALERT_DAYS = 60;
+export const EXPIRY_ALERT_DAYS = 90;
 export const ADJUSTMENT_ALERT_DAYS = 30;

@@ -22,7 +22,7 @@ type ClientPropertyMapProps = {
 };
 
 export function ClientPropertyMap({ lat, lng, title }: ClientPropertyMapProps) {
-  if (!lat || !lng) {
+  if (typeof lat !== "number" || typeof lng !== "number") {
     return (
       <div className="w-full h-full bg-zinc-200 flex flex-col items-center justify-center text-zinc-500 p-6 text-center">
         <MapPin size={32} className="mb-2 opacity-50" />

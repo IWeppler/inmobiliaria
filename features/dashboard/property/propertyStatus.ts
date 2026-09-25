@@ -11,8 +11,8 @@ export type PropertyStatus =
   | "ALQUILADO";
 
 // Cada estado tiene color propio (ícono, borde del badge, donut): son 5
-// categorías que se leen juntas, no 5 niveles de un mismo semáforo. Paleta
-// validada para CVD (ΔE ≥ 12.6) y contraste sobre blanco.
+// categorías que se leen juntas, no 5 niveles de un mismo semáforo. Se usa
+// la paleta categórica de gráficos de globals.css (--chart-1..5).
 export const PROPERTY_STATUSES: {
   value: PropertyStatus;
   label: string;
@@ -20,11 +20,11 @@ export const PROPERTY_STATUSES: {
   tone: StatusTone;
   color: string;
 }[] = [
-  { value: "EN_VENTA", label: "En venta", icon: Tag, tone: "success", color: "#16a34a" },
-  { value: "EN_ALQUILER", label: "En alquiler", icon: KeyRound, tone: "info", color: "#2563eb" },
-  { value: "RESERVADO", label: "Reservado", icon: Clock, tone: "warning", color: "#f59e0b" },
-  { value: "VENDIDO", label: "Vendido", icon: CheckCircle2, tone: "neutral", color: "#8b5cf6" },
-  { value: "ALQUILADO", label: "Alquilado", icon: Home, tone: "neutral", color: "#0891b2" },
+  { value: "EN_VENTA", label: "En venta", icon: Tag, tone: "success", color: "var(--chart-3)" },
+  { value: "EN_ALQUILER", label: "En alquiler", icon: KeyRound, tone: "info", color: "var(--chart-1)" },
+  { value: "RESERVADO", label: "Reservado", icon: Clock, tone: "warning", color: "var(--chart-4)" },
+  { value: "VENDIDO", label: "Vendido", icon: CheckCircle2, tone: "neutral", color: "var(--chart-2)" },
+  { value: "ALQUILADO", label: "Alquilado", icon: Home, tone: "neutral", color: "var(--chart-5)" },
 ];
 
 const byValue = Object.fromEntries(PROPERTY_STATUSES.map((s) => [s.value, s]));

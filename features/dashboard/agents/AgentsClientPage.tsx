@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import Image from "next/image";
 import { toast } from "sonner";
 import {
@@ -39,6 +40,7 @@ import {
 } from "@/shared/components/ui/select";
 import { Label } from "@/shared/components/ui/label";
 import { StatusBadge } from "@/shared/components/StatusBadge";
+import type { AgentMetric } from "./getAgentMetrics";
 import {
   Table,
   TableBody,
@@ -61,11 +63,24 @@ type Agent = {
 export function AgentsClientPage({
   initialAgents,
   currentUserId,
+  metrics,
+  asOf,
 }: {
   initialAgents: Agent[];
   currentUserId: string;
+  metrics: AgentMetric[];
+  asOf: string;
 }) {
   const [agents, setAgents] = useState(initialAgents);
+  const [inactiveDays, setInactiveDays] = useState(7);
+  const [selectedAgentId, setSelectedAgentId] = useState<string | null>(initialAgents[0]?.id ?? null);
+  const selectedMetric = metrics.find((metric) => metric.id === selectedAgentId);
+  const selectedAgent = agents.find((agent) => agent.id === selectedAgentId);
+  const inactiveLeads = selectedMetric?.openLeads.filter((lead) => new Date(asOf).getTime() - new Date(lead.lastActivityAt).getTime() > inactiveDays * 86400000) ?? [];
+  const percent = (numerator: number, denominator: number) => denominator ? `${Math.round(numerator / denominator * 100)}%` : "—";
+  const conversion = (numerator: number, denominator: number) => selectedMetric && selectedMetric.assigned >= 10 ? percent(numerator, denominator) : "Muestra insuficiente";
+  const duration = (minutes: number | null) => minutes === null ? "Sin datos" : minutes >= 60 ? `${(minutes / 60).toFixed(1)} h` : `${Math.round(minutes)} min`;
+  const money = (value: number, currency: "ARS" | "USD") => new Intl.NumberFormat("es-AR", { style: "currency", currency, maximumFractionDigits: 0 }).format(value);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [editingAgent, setEditingAgent] = useState<Agent | null>(null);
@@ -301,6 +316,49 @@ export function AgentsClientPage({
             </form>
           </DialogContent>
       </Dialog>
+
+      <section className="mb-6 space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div><h2 className="text-lg font-semibold">Rendimiento por agente</h2><p className="text-sm text-muted-foreground">Seleccioná un integrante para ver actividad y conversiones.</p></div>
+          <Select value={selectedAgentId ?? undefined} onValueChange={setSelectedAgentId}>
+            <SelectTrigger className="w-56"><SelectValue placeholder="Elegí un agente" /></SelectTrigger>
+            <SelectContent>{agents.map((agent) => <SelectItem key={agent.id} value={agent.id}>{agent.full_name || agent.email || "Sin nombre"}</SelectItem>)}</SelectContent>
+          </Select>
+        </div>
+        {selectedMetric && <>
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            {[
+              ["Leads asignados", String(selectedMetric.assigned)],
+              ["Primera respuesta media", duration(selectedMetric.meanResponseMinutes)],
+              ["Visitas pasadas", String(selectedMetric.pastVisits)],
+              ["En negociación", String(selectedMetric.negotiating)],
+              ["Cierres", String(selectedMetric.closed)],
+              ["Propiedades captadas", String(selectedMetric.captured)],
+              ["Comisiones alquiler · ARS", money(selectedMetric.commissions.ARS, "ARS")],
+              ["Comisiones alquiler · USD", money(selectedMetric.commissions.USD, "USD")],
+            ].map(([label, value]) => <div key={label} className="rounded-lg border bg-card p-4"><p className="text-sm text-muted-foreground">{label}</p><p className="mt-2 text-2xl font-semibold">{value}</p></div>)}
+          </div>
+          <div className="grid gap-4 xl:grid-cols-2">
+            <div className="rounded-lg border bg-card p-5">
+              <h3 className="font-semibold">Conversión · {selectedAgent?.full_name || "Agente"}</h3>
+              <p className="mt-1 text-xs text-muted-foreground">Porcentaje visible desde 10 leads asignados. Cada etapa usa como base la etapa anterior.</p>
+              <div className="mt-4 space-y-3 text-sm">
+                {[
+                  ["Cierres / leads asignados", selectedMetric.closed, selectedMetric.assigned],
+                  ["Lead → visita programada", selectedMetric.visitedStage, selectedMetric.assigned],
+                  ["Visita programada → negociación", selectedMetric.negotiating, selectedMetric.visitedStage],
+                  ["Negociación → cierre", selectedMetric.closed, selectedMetric.negotiating],
+                ].map(([label, numerator, denominator]) => <div key={String(label)} className="flex items-center justify-between gap-3 border-b pb-2 last:border-0"><span>{label}</span><span className="text-right font-medium">{conversion(Number(numerator), Number(denominator))}<span className="ml-2 text-xs font-normal text-muted-foreground">({numerator}/{denominator})</span></span></div>)}
+              </div>
+            </div>
+            <div className="rounded-lg border bg-card p-5">
+              <div className="flex flex-wrap items-center justify-between gap-3"><h3 className="font-semibold">Leads sin actividad <span className="text-destructive">{inactiveLeads.length > 0 ? `· ${inactiveLeads.length}` : ""}</span></h3><Select value={String(inactiveDays)} onValueChange={(value) => setInactiveDays(Number(value))}><SelectTrigger className="w-36"><SelectValue /></SelectTrigger><SelectContent>{[3, 7, 14, 30].map((days) => <SelectItem key={days} value={String(days)}>{days} días</SelectItem>)}</SelectContent></Select></div>
+              <div className="mt-4 max-h-56 space-y-2 overflow-auto text-sm">{inactiveLeads.length ? inactiveLeads.map((lead) => <Link key={lead.id} href={`/dashboard/leads/${lead.id}`} className="flex justify-between rounded-md border px-3 py-2 hover:bg-muted"><span>{lead.name}</span><span className="text-muted-foreground">{Math.floor((new Date(asOf).getTime() - new Date(lead.lastActivityAt).getTime()) / 86400000)} días</span></Link>) : <p className="text-muted-foreground">No hay leads abiertos sin actividad en este plazo.</p>}</div>
+            </div>
+          </div>
+          <p className="text-xs text-muted-foreground">Primera respuesta: tiempo hasta CONTACTADO ({selectedMetric.responseSample} leads medidos). Visitas pasadas: eventos agendados con fecha anterior a hoy, sin confirmación de asistencia. Negociación indica etapa del Kanban, no oferta registrada. Comisiones: liquidaciones de alquiler del agente; las ventas todavía no registran comisión. Propiedades captadas cuenta solo las que tienen captador registrado.</p>
+        </>}
+      </section>
 
       <div className="overflow-hidden rounded-lg border border-border bg-card">
         <Table>

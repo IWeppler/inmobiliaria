@@ -4,11 +4,10 @@ import Link from "next/link";
 // Sin íconos ni hints; el detalle vive en cada sección.
 type StatsProps = {
   stats: {
-    totalProperties: number;
-    totalViews: number;
     activeProperties: number;
-    newLeadsCount: number;
+    openLeads: number;
     visitsThisWeek: number;
+    closedThisMonth: number;
   };
 };
 
@@ -16,10 +15,10 @@ const nf = new Intl.NumberFormat("es-AR");
 
 export function DashboardStats({ stats }: StatsProps) {
   const items = [
+    { label: "Leads activos", value: stats.openLeads, href: "/dashboard/leads" },
     { label: "Propiedades activas", value: stats.activeProperties, href: "/dashboard/propiedades" },
-    { label: "Leads sin contactar", value: stats.newLeadsCount, href: "/dashboard/leads" },
-    { label: "Visitas esta semana", value: stats.visitsThisWeek, href: "/dashboard/agenda" },
-    { label: "Vistas del sitio", value: stats.totalViews, href: "/dashboard/reportes" },
+    { label: "Visitas esta semana", value: stats.visitsThisWeek, href: "/dashboard/reportes" },
+    { label: "Cierres este mes", value: stats.closedThisMonth, href: "/dashboard/reportes" },
   ];
 
   return (
