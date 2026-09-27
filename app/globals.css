@@ -7,7 +7,7 @@
 /* ============================================================
    TERRANOVA — DESIGN SYSTEM DEL PANEL
    Un solo sistema, definido en :root. Sin scopes por ruta.
-   Reglas: color solo con significado; neutros fríos; una familia
+   Reglas: color solo con significado; neutros mate; una familia
    tipográfica (Inter) en el producto; radios 4/6/10; sombras casi
    inexistentes salvo en capas flotantes.
    ============================================================ */
@@ -141,34 +141,34 @@ body {
   --shadow-lg: 0 12px 32px rgb(0 0 0 / 0.12);
   --shadow-xl: 0 12px 32px rgb(0 0 0 / 0.12);
 
-  /* Neutros fríos-suaves */
-  --background: #fefeff;
-  --foreground: #111418;
-  --sunken: #f1f3f5;
-  --fg-secondary: #4b5563;
-  --fg-disabled: #9ca3af;
-  --border-subtle: #eef0f2;
-  --border-strong: #c9cfd6;
+  /* Base gris cálida mate; cards y sidebar comparten superficie. */
+  --background: #efeee9;
+  --foreground: #20211f;
+  --sunken: #ebeae5;
+  --fg-secondary: #575b57;
+  --fg-disabled: #999d98;
+  --border-subtle: #e5e3de;
+  --border-strong: #bcbeb9;
 
-  --card: #ffffff;
-  --card-foreground: #111418;
-  --popover: #ffffff;
-  --popover-foreground: #111418;
+  --card: #f8f7f3;
+  --card-foreground: #20211f;
+  --popover: #fbfaf7;
+  --popover-foreground: #20211f;
 
-  /* Acento: única decisión de marca dentro del producto */
-  --primary: #1e4fd8;
+  /* Acento: única decisión de marca dentro del producto (ciruela) */
+  --primary: #6b3f63;
   --primary-foreground: #ffffff;
 
-  --secondary: #f1f3f5;
-  --secondary-foreground: #111418;
-  --muted: #f1f3f5;
-  --muted-foreground: #6b7280;
-  --accent: #f1f3f5;
-  --accent-foreground: #111418;
+  --secondary: #ebeae5;
+  --secondary-foreground: #20211f;
+  --muted: #ebeae5;
+  --muted-foreground: #676b66;
+  --accent: #ebeae5;
+  --accent-foreground: #20211f;
   --destructive: #b91c1c;
-  --border: #e3e6ea;
-  --input: #e3e6ea;
-  --ring: #1e4fd8;
+  --border: #deddd7;
+  --input: #d4d4ce;
+  --ring: #6b3f63;
 
   /* Tonos semánticos: fg (texto, contraste AA) / bg / border. Los *-vivid
      son para íconos y puntos de estado: más saturados, escaneables. */
@@ -176,7 +176,7 @@ body {
   --warning-vivid: #f59e0b;
   --danger-vivid: #ef4444;
   --info-vivid: #3b82f6;
-  --accent-vivid: #2563eb;
+  --accent-vivid: #a3478f;
   --neutral-vivid: #9ca3af;
 
   --success: #15803d;
@@ -207,7 +207,7 @@ body {
   --color-alquilado: var(--muted-foreground);
   --color-alquilado-bg: var(--sunken);
   --color-lead-nuevo: var(--primary);
-  --color-lead-nuevo-bg: #e8eefc;
+  --color-lead-nuevo-bg: #f4e9f1;
   --color-lead-contactado: var(--muted-foreground);
   --color-lead-contactado-bg: var(--sunken);
   --color-lead-visita: var(--info);
@@ -220,71 +220,80 @@ body {
   --color-lead-descartado-bg: var(--sunken);
 
   /* Paleta categórica de gráficos (única excepción "no funcional") */
-  --chart-1: #b9eb70;
-  --chart-2: #f3951c;
-  --chart-3: #355c9b;
-  --chart-4: #9781fe;
-  --chart-5: #07d0b9;
+  --chart-1: #ff5329;
+  --chart-2: #d9e5d7;
+  --chart-3: #968aaa;
+  --chart-4: #8e8000;
+  --chart-5: #1597d0;
+  --chart-6: #f06efe;
 
-  /* Sidebar: superficie hundida; ítem activo = blanco + borde */
-  --sidebar: #f3f2f0;
-  --sidebar-foreground: #4b5563;
-  --sidebar-primary: #111418;
+  /* Sidebar comparte superficie con las cards; activo usa un tono hundido. */
+  --sidebar: var(--card);
+  --sidebar-foreground: #575b57;
+  --sidebar-primary: #20211f;
   --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #ffffff;
-  --sidebar-accent-foreground: #111418;
-  --sidebar-border: #e3e6ea;
-  --sidebar-ring: #1e4fd8;
+  --sidebar-accent: #ebeae5;
+  --sidebar-accent-foreground: #20211f;
+  --sidebar-border: #deddd7;
+  --sidebar-ring: #6b3f63;
 }
 
 .dark {
-  --background: #10151d;
-  --foreground: #eef2f7;
-  --sunken: #151c27;
-  --fg-secondary: #b7c2d0;
-  --fg-disabled: #788596;
-  --border-subtle: #25303d;
-  --border-strong: #596879;
+  --background: #1c1d1c;
+  --foreground: #e9e9e5;
+  --sunken: #191a19;
+  --fg-secondary: #bbbfba;
+  --fg-disabled: #828781;
+  --border-subtle: #30322f;
+  --border-strong: #686d66;
 
-  --card: #19212c;
-  --card-foreground: #eef2f7;
-  --popover: #202a37;
-  --popover-foreground: #eef2f7;
-  --primary: #8aabff;
-  --primary-foreground: #0d1a35;
-  --secondary: #263241;
-  --secondary-foreground: #eef2f7;
-  --muted: #263241;
-  --muted-foreground: #a5b2c1;
-  --accent: #2b394b;
-  --accent-foreground: #eef2f7;
-  --destructive: #ff9292;
-  --border: #344150;
-  --input: #435164;
-  --ring: #8aabff;
+  --card: #232523;
+  --card-foreground: #e9e9e5;
+  --popover: #2a2c29;
+  --popover-foreground: #e9e9e5;
+  --primary: #d9aecd;
+  --primary-foreground: #36182e;
+  --secondary: #2e312d;
+  --secondary-foreground: #e9e9e5;
+  --muted: #2e312d;
+  --muted-foreground: #a9aea8;
+  --accent: #343733;
+  --accent-foreground: #e9e9e5;
+  --destructive: #ed9993;
+  --border: #40433e;
+  --input: #50544e;
+  --ring: #d9aecd;
 
   --success: #7ee4a2;
-  --success-bg: #143425;
-  --success-border: #2c6b45;
+  --success-bg: #24372a;
+  --success-border: #42694b;
   --warning: #f8c27c;
-  --warning-bg: #3b2b18;
-  --warning-border: #75552b;
+  --warning-bg: #3b3024;
+  --warning-border: #776046;
   --danger: #ff9a9a;
-  --danger-bg: #3c2028;
-  --danger-border: #753744;
+  --danger-bg: #402b2b;
+  --danger-border: #795050;
   --info: #9bc0ff;
-  --info-bg: #1a3050;
-  --info-border: #35577f;
-  --color-lead-nuevo-bg: #203458;
+  --info-bg: #283546;
+  --info-border: #49617e;
+  --color-lead-nuevo-bg: #3d2b39;
 
-  --sidebar: #151d28;
-  --sidebar-foreground: #bdc8d6;
-  --sidebar-primary: #8aabff;
-  --sidebar-primary-foreground: #0d1a35;
-  --sidebar-accent: #2b394b;
-  --sidebar-accent-foreground: #eef2f7;
-  --sidebar-border: #344150;
-  --sidebar-ring: #8aabff;
+  /* Misma paleta, un paso más luminosa para la card oscura. */
+  --chart-1: #ff5329;
+  --chart-2: #d9e5d7;
+  --chart-3: #968aaa;
+  --chart-4: #8e8000;
+  --chart-5: #1597d0;
+  --chart-6: #f06efe;
+
+  --sidebar: var(--card);
+  --sidebar-foreground: #bbbfba;
+  --sidebar-primary: #d9aecd;
+  --sidebar-primary-foreground: #36182e;
+  --sidebar-accent: #343733;
+  --sidebar-accent-foreground: #e9e9e5;
+  --sidebar-border: #40433e;
+  --sidebar-ring: #d9aecd;
 }
 
 @layer base {
@@ -350,7 +359,9 @@ body {
 }
 
 @media print {
-  [data-slot="sidebar"], [data-slot="sidebar-gap"], header.sticky {
+  [data-slot="sidebar"],
+  [data-slot="sidebar-gap"],
+  header.sticky {
     display: none !important;
   }
 }

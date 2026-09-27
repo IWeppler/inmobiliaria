@@ -325,7 +325,7 @@ export function LeadBoard({
                 );
             }}
           >
-            <KanbanBoard className="flex w-max min-w-full flex-nowrap gap-3 justify-between">
+            <KanbanBoard className="flex w-full flex-nowrap gap-3">
               {BOARD_STATUSES.map((status) => {
                 const items = columns[status.value];
                 const Icon = status.icon;
@@ -333,7 +333,7 @@ export function LeadBoard({
                   <KanbanColumn
                     key={status.value}
                     value={status.value}
-                    className="min-h-[420px] min-w-60 max-w-[270px] shrink-0 rounded-xl border border-border bg-sunken p-2"
+                    className="min-h-[420px] min-w-[190px] max-w-[320px] flex-1 basis-0 rounded-xl border border-border bg-sunken p-2"
                   >
                     <div className="mb-2 flex items-center gap-2 px-2 py-2">
                       <span

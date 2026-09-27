@@ -12,6 +12,7 @@ import {
   BarChart3,
   KeyRound,
   CalendarDays,
+  Wallet,
 } from "lucide-react";
 
 import {
@@ -43,6 +44,7 @@ const mainNav = [
 ];
 
 const adminNav = [
+  { title: "Finanzas", url: "/dashboard/finanzas", icon: Wallet },
   { title: "Equipo", url: "/dashboard/agentes", icon: Users },
   { title: "Ajustes", url: "/dashboard/ajustes", icon: Settings },
 ];

@@ -5,7 +5,10 @@ import { DashboardStats } from "@/features/dashboard/DashboardStats";
 import { DashboardAside } from "@/features/dashboard/DashboardAgenda";
 import type { UpcomingEvent } from "@/features/dashboard/UpcomingEvents";
 import { LeadConversion } from "@/features/dashboard/LeadConversion";
-import { ActivityChart, type WeekPoint } from "@/features/dashboard/charts/ActivityChart";
+import { CollectionChart } from "@/features/dashboard/charts/CollectionChart";
+import { buildCollectionSeries, type ChargeRow } from "@/features/dashboard/charts/collection";
+import { CashFlowChart } from "@/features/finances/CashFlowChart";
+import { buildCashFlowSeries, toArs, type MovementRow } from "@/features/finances/logic";
 import {
   DashboardPropertyPerformance,
   type DashboardPropertyRow,
@@ -19,6 +22,7 @@ import { es } from "date-fns/locale";
 import type { PropertyWithDetails } from "@/app/types/entities";
 
 const WEEKS = 12;
+const MONTHS = 12;
 
 // Lunes de la semana (zona de la app) de una fecha YYYY-MM-DD.
 function weekStart(ymd: string) {
@@ -52,6 +56,10 @@ async function getDashboardData() {
   );
   const thisWeekStart = weekStart(today);
   const rangeStart = addDays(thisWeekStart, -7 * (WEEKS - 1));
+  // Últimos 12 meses de cobranza, incluido el actual.
+  const periods = Array.from({ length: MONTHS }, (_, i) =>
+    format(addMonths(new Date(`${monthStart}T12:00:00`), i - (MONTHS - 1)), "yyyy-MM-dd"),
+  );
 
   let propQuery = supabase
     .from("properties")
@@ -102,6 +110,34 @@ async function getDashboardData() {
     .order("time", { ascending: true })
     .limit(200);
 
+  // Cargos de alquiler de los últimos 12 meses con sus cobros. La policy
+  // de rental_charges ya limita a los contratos visibles del agente.
+  const chargesQuery = supabase
+    .from("rental_charges")
+    .select("period, due_date, amount, currency, rental_payment_entries(amount)")
+    .gte("period", periods[0])
+    .lte("period", monthStart);
+
+  const rateQuery = supabase
+    .from("exchange_rates")
+    .select("usd_to_ars")
+    .eq("id", 1)
+    .single();
+
+  // Flujo de caja del negocio: solo admin (RLS devuelve vacío al resto).
+  // Antes de leer, registra los gastos fijos del mes que ya vencieron.
+  const movementsQuery = isAdmin
+    ? supabase.rpc("generate_recurring_expenses").then(() =>
+        supabase
+          .from("cash_movements")
+          .select("occurred_on, category, nature, amount, currency")
+          .gte("occurred_on", periods[0]),
+      )
+    : Promise.resolve({ data: [] as MovementRow[] });
+  const recurringQuery = isAdmin
+    ? supabase.from("recurring_expenses").select("amount, currency").eq("active", true)
+    : Promise.resolve({ data: [] as { amount: number; currency: string }[] });
+
   if (!isAdmin) {
     propQuery = propQuery.eq("agent_id", user.id);
     untouchedQuery = untouchedQuery.eq("agent_id", user.id);
@@ -115,6 +151,10 @@ async function getDashboardData() {
     { data: leads },
     { data: visitsHistory },
     { data: agendaEvents },
+    { data: charges },
+    { data: rate },
+    { data: movements },
+    { data: recurring },
   ] = await Promise.all([
     propQuery,
     untouchedQuery,
@@ -122,6 +162,10 @@ async function getDashboardData() {
     leadsQuery,
     visitsHistoryQuery,
     agendaQuery,
+    chargesQuery,
+    rateQuery,
+    movementsQuery,
+    recurringQuery,
   ]);
 
   const props = (properties || []) as PropertyWithDetails[];
@@ -141,21 +185,19 @@ async function getDashboardData() {
         .in("entity_id", leadIds)
     : { data: [] as { entity_id: string }[] };
 
-  // Serie semanal: 12 buckets fijos (semanas sin datos quedan en 0).
-  const weeks: WeekPoint[] = Array.from({ length: WEEKS }, (_, i) => {
-    const week = addDays(rangeStart, 7 * i);
-    return { week, label: format(new Date(`${week}T12:00:00`), "d MMM", { locale: es }), leads: 0, visits: 0 };
-  });
-  const idx = new Map(weeks.map((w, i) => [w.week, i]));
-  for (const l of leadRows) {
-    if (l.created_at < dayStartISO(rangeStart)) continue;
-    const i = idx.get(weekStart(ymdInAppTz(new Date(l.created_at))));
-    if (i !== undefined) weeks[i].leads++;
-  }
-  for (const v of visitsHistory ?? []) {
-    const i = idx.get(weekStart(v.date.slice(0, 10)));
-    if (i !== undefined) weeks[i].visits++;
-  }
+  const usdToArs = Number(rate?.usd_to_ars ?? 0);
+  const collection = buildCollectionSeries((charges ?? []) as ChargeRow[], periods, today, usdToArs);
+  const cashFlow = isAdmin
+    ? {
+        series: buildCashFlowSeries(movements ?? [], periods, usdToArs),
+        fixedMonthly: (recurring ?? []).reduce((sum, r) => sum + toArs(r.amount, r.currency, usdToArs), 0),
+      }
+    : null;
+
+  // Visitas de la semana en curso para el KPI.
+  const visitsThisWeek = (visitsHistory ?? []).filter(
+    (v) => weekStart(v.date.slice(0, 10)) === thisWeekStart,
+  ).length;
 
   const openLeads = leadRows.filter(
     (lead) => lead.status !== "CERRADO" && lead.status !== "DESCARTADO",
@@ -196,7 +238,8 @@ async function getDashboardData() {
     agent,
     currentUserId: user.id,
     currentUserRole: agent?.role || "agente",
-    weeks,
+    collection,
+    cashFlow,
     propertyPerformance,
     agendaEvents: (agendaEvents ?? []) as UpcomingEvent[],
     attention: { untouchedLeads, visitsToday: visitsToday ?? [] },
@@ -208,7 +251,7 @@ async function getDashboardData() {
     stats: {
       activeProperties: props.filter((p) => p.status === "EN_VENTA" || p.status === "EN_ALQUILER").length,
       openLeads: openLeads.length,
-      visitsThisWeek: weeks[WEEKS - 1].visits,
+      visitsThisWeek,
       closedThisMonth: new Set(
         (closedThisMonthHistory ?? []).map((item) => item.entity_id),
       ).size,
@@ -249,7 +292,8 @@ export default async function DashboardPage() {
     stats,
     attention,
     agendaEvents,
-    weeks,
+    collection,
+    cashFlow,
     conversion,
     propertyPerformance,
   } = data;
@@ -274,18 +318,49 @@ export default async function DashboardPage() {
           <DashboardStats stats={stats} />
 
           <div className="grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(260px,1fr)]">
+            {cashFlow ? (
+              <Section
+                title="Flujo de caja"
+                action={
+                  <Link href="/dashboard/finanzas" className={sectionLink}>
+                    Finanzas
+                  </Link>
+                }
+              >
+                <div className="p-4">
+                  {cashFlow.series.some((point) => point.income > 0 || point.expense > 0) ? (
+                    <CashFlowChart data={cashFlow.series} fixedMonthly={cashFlow.fixedMonthly} showSummary={false} />
+                  ) : (
+                    <p className="py-12 text-center text-sm text-muted-foreground">
+                      Todavía no hay movimientos.{" "}
+                      <Link href="/dashboard/finanzas" className="underline underline-offset-4">
+                        Cargá ingresos y egresos
+                      </Link>
+                      .
+                    </p>
+                  )}
+                </div>
+              </Section>
+            ) : (
             <Section
-              title="Consultas y visitas por semana"
+              title="Cobranza de alquileres"
               action={
-                <Link href="/dashboard/reportes" className={sectionLink}>
-                  Reportes
+                <Link href="/dashboard/alquileres" className={sectionLink}>
+                  Alquileres
                 </Link>
               }
             >
               <div className="p-4">
-                <ActivityChart data={weeks} />
+                {collection.some((point) => point.expected > 0) ? (
+                  <CollectionChart data={collection} />
+                ) : (
+                  <p className="py-12 text-center text-sm text-muted-foreground">
+                    Todavía no hay cuotas de alquiler en los últimos 12 meses.
+                  </p>
+                )}
               </div>
             </Section>
+            )}
             <Section
               title="Conversión de leads"
               action={

@@ -68,6 +68,7 @@ import {
   type PropertyStatus,
 } from "@/features/dashboard/property/propertyStatus";
 import { cn } from "@/lib/utils";
+import { CloseSaleDialog } from "@/features/finances/CloseSaleDialog";
 import { PropertiesMapView } from "@/features/dashboard/property/PropertiesMapView";
 
 type PropertyTableProps = {
@@ -157,6 +158,9 @@ export function PropertyTable({
 
   const [properties, setProperties] = useState(initialProperties);
   const [isDeleting, setIsDeleting] = useState(false);
+  // Pasar a VENDIDO abre el cierre de venta (registra la comisión) en
+  // lugar de cambiar el estado directo.
+  const [saleProperty, setSaleProperty] = useState<PropertyWithDetails | null>(null);
   const [propertyToDelete, setPropertyToDelete] =
     useState<PropertyWithDetails | null>(null);
 
@@ -531,7 +535,9 @@ export function PropertyTable({
                       <Select
                         value={property.status ?? undefined}
                         onValueChange={(val) =>
-                          handleStatusChange(property.id, val as PropertyStatus)
+                          val === "VENDIDO" && property.status !== "VENDIDO"
+                            ? setSaleProperty(property)
+                            : handleStatusChange(property.id, val as PropertyStatus)
                         }
                       >
                         <SelectTrigger
@@ -695,6 +701,25 @@ export function PropertyTable({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {saleProperty && (
+        <CloseSaleDialog
+          open
+          onOpenChange={(open) => !open && setSaleProperty(null)}
+          property={{
+            id: saleProperty.id,
+            title: saleProperty.title,
+            price: saleProperty.price ?? null,
+            currency: saleProperty.currency ?? null,
+            agent_id: saleProperty.agent_id ?? null,
+          }}
+          onClosed={() =>
+            setProperties((prev) =>
+              prev.map((p) => (p.id === saleProperty.id ? { ...p, status: "VENDIDO" } : p)),
+            )
+          }
+        />
+      )}
     </div>
   );
 }

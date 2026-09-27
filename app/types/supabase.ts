@@ -62,6 +62,19 @@ export type Database = {
         }
         Relationships: []
       }
+      cash_movements: {
+        Row: { id: string; occurred_on: string; direction: string; category: string; nature: string | null; description: string; amount: number; currency: string; property_id: string | null; contract_id: string | null; settlement_id: string | null; sale_id: string | null; recurring_expense_id: string | null; recurring_period: string | null; agent_id: string | null; created_by: string | null; created_at: string }
+        Insert: { id?: string; occurred_on: string; direction: string; category: string; nature?: string | null; description: string; amount: number; currency: string; property_id?: string | null; contract_id?: string | null; settlement_id?: string | null; sale_id?: string | null; recurring_expense_id?: string | null; recurring_period?: string | null; agent_id?: string | null; created_by?: string | null; created_at?: string }
+        Update: { id?: string; occurred_on?: string; direction?: string; category?: string; nature?: string | null; description?: string; amount?: number; currency?: string; property_id?: string | null; contract_id?: string | null; settlement_id?: string | null; sale_id?: string | null; recurring_expense_id?: string | null; recurring_period?: string | null; agent_id?: string | null; created_by?: string | null; created_at?: string }
+        Relationships: [
+          { foreignKeyName: "cash_movements_property_id_fkey"; columns: ["property_id"]; isOneToOne: false; referencedRelation: "properties"; referencedColumns: ["id"] },
+          { foreignKeyName: "cash_movements_contract_id_fkey"; columns: ["contract_id"]; isOneToOne: false; referencedRelation: "rental_contracts"; referencedColumns: ["id"] },
+          { foreignKeyName: "cash_movements_settlement_id_fkey"; columns: ["settlement_id"]; isOneToOne: true; referencedRelation: "rental_settlements"; referencedColumns: ["id"] },
+          { foreignKeyName: "cash_movements_sale_id_fkey"; columns: ["sale_id"]; isOneToOne: false; referencedRelation: "property_sales"; referencedColumns: ["id"] },
+          { foreignKeyName: "cash_movements_recurring_expense_id_fkey"; columns: ["recurring_expense_id"]; isOneToOne: false; referencedRelation: "recurring_expenses"; referencedColumns: ["id"] },
+          { foreignKeyName: "cash_movements_agent_id_fkey"; columns: ["agent_id"]; isOneToOne: false; referencedRelation: "agents"; referencedColumns: ["id"] },
+        ]
+      }
       events: {
         Row: {
           agent_id: string | null
@@ -494,6 +507,21 @@ export type Database = {
         }
         Relationships: []
       }
+      property_sales: {
+        Row: { id: string; property_id: string; sold_on: string; sale_price: number; currency: string; commission_pct: number; commission_amount: number; agent_id: string | null; agent_commission_pct: number; agent_commission_amount: number; notes: string | null; created_by: string | null; created_at: string }
+        Insert: { id?: string; property_id: string; sold_on: string; sale_price: number; currency: string; commission_pct: number; commission_amount: number; agent_id?: string | null; agent_commission_pct?: number; agent_commission_amount?: number; notes?: string | null; created_by?: string | null; created_at?: string }
+        Update: { id?: string; property_id?: string; sold_on?: string; sale_price?: number; currency?: string; commission_pct?: number; commission_amount?: number; agent_id?: string | null; agent_commission_pct?: number; agent_commission_amount?: number; notes?: string | null; created_by?: string | null; created_at?: string }
+        Relationships: [
+          { foreignKeyName: "property_sales_property_id_fkey"; columns: ["property_id"]; isOneToOne: false; referencedRelation: "properties"; referencedColumns: ["id"] },
+          { foreignKeyName: "property_sales_agent_id_fkey"; columns: ["agent_id"]; isOneToOne: false; referencedRelation: "agents"; referencedColumns: ["id"] },
+        ]
+      }
+      recurring_expenses: {
+        Row: { id: string; description: string; category: string; amount: number; currency: string; day_of_month: number; start_period: string; active: boolean; created_by: string | null; created_at: string }
+        Insert: { id?: string; description: string; category: string; amount: number; currency: string; day_of_month?: number; start_period: string; active?: boolean; created_by?: string | null; created_at?: string }
+        Update: { id?: string; description?: string; category?: string; amount?: number; currency?: string; day_of_month?: number; start_period?: string; active?: boolean; created_by?: string | null; created_at?: string }
+        Relationships: []
+      }
       rental_contacts: {
         Row: {
           address: string | null
@@ -815,6 +843,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      generate_recurring_expenses: { Args: never; Returns: number }
       increment_views: { Args: { property_id: string }; Returns: undefined }
       is_admin: { Args: never; Returns: boolean }
       rental_apply_adjustment: { Args: { p_contract_id: string; p_manual_amount?: number | null }; Returns: Json }

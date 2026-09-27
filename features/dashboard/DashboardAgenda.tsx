@@ -1,9 +1,10 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { createContext, useContext, useMemo, useState } from "react";
 import type { Dispatch, SetStateAction } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import type { DayButton } from "react-day-picker";
 import { addMonths, format } from "date-fns";
 import { es } from "date-fns/locale";
 import {
@@ -17,13 +18,13 @@ import {
 import { toast } from "sonner";
 import { createClientBrowser } from "@/lib/supabase-browser";
 import { dayStartISO, ymdInAppTz } from "@/lib/dates";
-import { eventTypeLabel } from "@/features/dashboard/eventTypes";
+import { eventTypeLabel, eventTypeStyle } from "@/features/dashboard/eventTypes";
 import { daysBetween } from "@/features/dashboard/leads/leadStatus";
 import { NewEventDialog } from "@/features/dashboard/NewEventDialog";
 import type { AttentionData } from "@/features/dashboard/AttentionToday";
 import type { UpcomingEvent } from "@/features/dashboard/UpcomingEvents";
 import { Button } from "@/shared/components/ui/button";
-import { Calendar } from "@/shared/components/ui/calendar";
+import { Calendar, CalendarDayButton } from "@/shared/components/ui/calendar";
 import {
   Sheet,
   SheetContent,
@@ -33,6 +34,44 @@ import {
 } from "@/shared/components/ui/sheet";
 
 const PREVIEW_ITEMS = 5;
+const CalendarEventsContext = createContext<ReadonlyMap<string, UpcomingEvent[]>>(new Map());
+
+function AgendaDayButton(props: React.ComponentProps<typeof DayButton>) {
+  const eventsByDay = useContext(CalendarEventsContext);
+  const dayEvents = eventsByDay.get(format(props.day.date, "yyyy-MM-dd")) ?? [];
+  const eventTypes = dayEvents.map((event) => eventTypeLabel(event.type) ?? "Evento").join(", ");
+  const label = dayEvents.length
+    ? `${props["aria-label"] ?? format(props.day.date, "d 'de' MMMM", { locale: es })}: ${dayEvents.length} ${dayEvents.length === 1 ? "evento" : "eventos"} (${eventTypes})`
+    : props["aria-label"];
+
+  return (
+    <CalendarDayButton
+      {...props}
+      aria-label={label}
+      className={`${props.className ?? ""} ${dayEvents.length >= 4 ? "pb-3" : ""}`}
+    >
+      {props.children}
+      {dayEvents.length > 0 && (
+        <div className="pointer-events-none absolute inset-x-0 bottom-0.5 flex items-center justify-center" aria-hidden="true">
+          {dayEvents.length >= 4 ? (
+            <span className="inline-flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-foreground px-0.5 text-[8px] font-semibold leading-none text-background">
+              +{dayEvents.length}
+            </span>
+          ) : (
+            <span className="flex -space-x-0.5">
+              {dayEvents.map((event) => (
+                <span
+                  key={event.id}
+                  className={`size-1.5 rounded-full ring-1 ring-card ${eventTypeStyle(event.type).dot}`}
+                />
+              ))}
+            </span>
+          )}
+        </div>
+      )}
+    </CalendarDayButton>
+  );
+}
 
 function eventYmd(event: UpcomingEvent) {
   return ymdInAppTz(new Date(event.date));
@@ -283,13 +322,14 @@ function DashboardAgenda({
     ? events.filter((event) => eventYmd(event) === selectedYmd)
     : futureEvents.slice(0, PREVIEW_ITEMS);
   const hiddenCount = Math.max(0, futureEvents.length - PREVIEW_ITEMS);
-  const eventDays = useMemo(
-    () =>
-      [...new Set(events.map(eventYmd))].map(
-        (day) => new Date(`${day}T12:00:00`),
-      ),
-    [events],
-  );
+  const eventsByDay = useMemo(() => {
+    const groups = new Map<string, UpcomingEvent[]>();
+    for (const event of events) {
+      const day = eventYmd(event);
+      groups.set(day, [...(groups.get(day) ?? []), event]);
+    }
+    return groups;
+  }, [events]);
 
   const changeMonth = async (month: Date) => {
     onMonthChange(month);
@@ -365,24 +405,22 @@ function DashboardAgenda({
             <ChevronRight />
           </Button>
         </div>
-        <Calendar
-          mode="single"
-          selected={selectedDay}
-          onSelect={onSelectDay}
-          locale={es}
-          weekStartsOn={1}
-          month={visibleMonth}
-          onMonthChange={changeMonth}
-          hideNavigation
-          showOutsideDays={false}
-          modifiers={{ hasEvent: eventDays }}
-          modifiersClassNames={{
-            hasEvent:
-              "[&_button]:after:absolute [&_button]:after:bottom-0.5 [&_button]:after:left-1/2 [&_button]:after:size-1 [&_button]:after:-translate-x-1/2 [&_button]:after:rounded-full [&_button]:after:bg-primary [&_button]:after:content-[''] [&_button[data-selected-single=true]]:after:bg-primary-foreground",
-          }}
-          className="mx-auto w-fit max-w-full bg-transparent p-1 [--cell-size:--spacing(8)]"
-          classNames={{ month_caption: "sr-only" }}
-        />
+        <CalendarEventsContext.Provider value={eventsByDay}>
+          <Calendar
+            mode="single"
+            selected={selectedDay}
+            onSelect={onSelectDay}
+            locale={es}
+            weekStartsOn={1}
+            month={visibleMonth}
+            onMonthChange={changeMonth}
+            hideNavigation
+            showOutsideDays={false}
+            components={{ DayButton: AgendaDayButton }}
+            className="mx-auto w-fit max-w-full bg-transparent p-1 [--cell-size:--spacing(8)]"
+            classNames={{ month_caption: "sr-only" }}
+          />
+        </CalendarEventsContext.Provider>
       </div>
 
       <section className="min-h-0">
