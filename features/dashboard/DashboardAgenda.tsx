@@ -32,6 +32,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/shared/components/ui/sheet";
+import { deleteEventAction } from "@/features/dashboard/google-calendar/actions";
 
 const PREVIEW_ITEMS = 5;
 const CalendarEventsContext = createContext<ReadonlyMap<string, UpcomingEvent[]>>(new Map());
@@ -365,10 +366,10 @@ function DashboardAgenda({
   const handleDelete = async (id: string) => {
     const previous = events;
     setEvents(events.filter((event) => event.id !== id));
-    const { error } = await supabase.from("events").delete().eq("id", id);
+    const { error } = await deleteEventAction(id);
     if (error) {
       setEvents(previous);
-      toast.error(`No se pudo eliminar: ${error.message}`);
+      toast.error(`No se pudo eliminar: ${error}`);
       return;
     }
     router.refresh();

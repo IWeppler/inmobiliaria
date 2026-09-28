@@ -5,7 +5,7 @@ type AgentRow = Database["public"]["Tables"]["agents"]["Row"];
 
 // --- Tipos ---
 export type Amenity = { amenities: { name: string } | null };
-export type PropertyImage = { image_url: string | null };
+export type PropertyImage = { image_url: string | null; order: number | null };
 
 export type PropertyFullDetails = Pick<
   PropertyRow,
@@ -38,4 +38,4 @@ export type PropertyFullDetails = Pick<
     AgentRow,
     "id" | "full_name" | "avatar_url" | "phone" | "email"
   > | null;
-};
+};

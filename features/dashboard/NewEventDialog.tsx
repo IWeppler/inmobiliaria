@@ -27,6 +27,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/shared/components/ui/select";
+import { syncEventAction } from "@/features/dashboard/google-calendar/actions";
 
 const DEFAULT_TIME = "10:00";
 
@@ -70,7 +71,10 @@ export function NewEventDialog({ initialDate, onCreated }: { initialDate?: strin
     }
 
     toast.success("Evento agendado.");
-    if (created) onCreated?.(created);
+    if (created) {
+      onCreated?.(created);
+      void syncEventAction(created.id);
+    }
     setSaving(false);
     setOpen(false);
     reset();

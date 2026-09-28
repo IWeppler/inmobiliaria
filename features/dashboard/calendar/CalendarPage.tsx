@@ -15,6 +15,7 @@ import type { UpcomingEvent } from "@/features/dashboard/UpcomingEvents";
 import { Button } from "@/shared/components/ui/button";
 import { PageHeader } from "@/shared/components/PageShell";
 import { cn } from "@/lib/utils";
+import { deleteEventAction } from "@/features/dashboard/google-calendar/actions";
 
 type View = "dia" | "semana" | "mes" | "agenda";
 const VIEWS: { key: View; label: string }[] = [
@@ -115,6 +116,15 @@ export function CalendarPage() {
     }
     return map;
   }, [events]);
+  // Próximos eventos agrupados por día: un solo label por fecha.
+  const upcomingByDay = useMemo(() => {
+    const map = new Map<string, UpcomingEvent[]>();
+    for (const event of sortEvents(upcoming)) {
+      const day = eventYmd(event);
+      map.set(day, [...(map.get(day) ?? []), event]);
+    }
+    return [...map.entries()];
+  }, [upcoming]);
   const days: string[] = [];
   for (let day = range.start; day < range.end; day = addDays(day, 1)) days.push(day);
   const periodLabel = view === "dia" ? format(localDate(selectedDay), "EEEE d 'de' MMMM yyyy", { locale: es })
@@ -131,8 +141,8 @@ export function CalendarPage() {
     if (eventYmd(event) >= today && eventYmd(event) < addDays(today, 31)) setUpcoming((current) => sortEvents([...current, event]));
   };
   const onDelete = async (id: string) => {
-    const { error } = await supabase.from("events").delete().eq("id", id);
-    if (error) { toast.error(`No se pudo eliminar el evento: ${error.message}`); return; }
+    const { error } = await deleteEventAction(id);
+    if (error) { toast.error(`No se pudo eliminar el evento: ${error}`); return; }
     setEvents((current) => current.filter((event) => event.id !== id));
     setUpcoming((current) => current.filter((event) => event.id !== id));
     toast.success("Evento eliminado.");
@@ -173,7 +183,7 @@ export function CalendarPage() {
         {view === "agenda" && <div className="divide-y">{[...byDay.entries()].length ? [...byDay.entries()].map(([day, dayEvents]) => <section key={day} className="grid gap-3 p-4 md:grid-cols-[160px_1fr]"><button type="button" onClick={() => selectDay(day)} className="text-left text-sm font-semibold capitalize hover:underline">{format(localDate(day), "EEEE d MMMM", { locale: es })}</button><div className="space-y-2">{dayEvents.map((event) => <EventCard key={event.id} event={event} onDelete={onDelete} />)}</div></section>) : <p className="p-10 text-center text-sm text-muted-foreground">No hay eventos en este mes.</p>}</div>}
       </div>
       {(view === "mes" || view === "semana") && <aside className="space-y-4">
-        <section className="rounded-lg border bg-card p-4"><h3 className="font-semibold">Próximos eventos</h3><p className="mt-1 text-xs text-muted-foreground">Siguientes 30 días</p><div className="mt-4 max-h-[480px] space-y-3 overflow-auto">{upcoming.length ? upcoming.map((event) => <div key={event.id}><p className="mb-1 text-xs capitalize text-muted-foreground">{format(localDate(eventYmd(event)), "EEE d MMM", { locale: es })}</p><EventCard event={event} compact onDelete={onDelete} /></div>) : <p className="text-sm text-muted-foreground">No hay próximos eventos.</p>}</div></section>
+        <section className="rounded-lg border bg-card p-4"><h3 className="font-semibold">Próximos eventos</h3><p className="mt-1 text-xs text-muted-foreground">Siguientes 30 días</p><div className="mt-4 max-h-[480px] space-y-3 overflow-auto">{upcomingByDay.length ? upcomingByDay.map(([day, dayEvents]) => <div key={day}><p className="mb-1 text-xs capitalize text-muted-foreground">{format(localDate(day), "EEE d MMM", { locale: es })}</p><div className="space-y-1.5">{dayEvents.map((event) => <EventCard key={event.id} event={event} compact onDelete={onDelete} />)}</div></div>) : <p className="text-sm text-muted-foreground">No hay próximos eventos.</p>}</div></section>
         <section className="rounded-lg border bg-card p-4"><h3 className="text-sm font-semibold">Tipos de evento</h3><div className="mt-3 grid grid-cols-2 gap-2 text-xs">{EVENT_TYPES.map((type) => <span key={type.value} className="flex items-center gap-2"><span className={cn("size-2.5 rounded-full", eventTypeStyle(type.value).dot)} />{type.label}</span>)}<span className="flex items-center gap-2"><span className={cn("size-2.5 rounded-full", eventTypeStyle(null).dot)} />Sin clasificar</span></div></section>
       </aside>}
     </div>

@@ -7,6 +7,7 @@ import { AppBreadcrumbs } from "@/shared/components/AppBreadcrumbs";
 import { NotificationsMenu } from "@/shared/components/NotificationsMenu";
 import { UserMenu } from "@/shared/components/UserMenu";
 import { ThemeToggle } from "@/shared/components/ThemeToggle";
+import { GoogleCalendarBanner } from "@/features/dashboard/google-calendar/GoogleCalendarBanner";
 
 // Shell del panel: sidebar + topbar de 48px con ruta y acciones + contenido.
 export default function Layout({ children }: { children: React.ReactNode }) {
@@ -27,6 +28,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             <UserMenu />
           </div>
         </header>
+        <GoogleCalendarBanner />
         <main className="min-w-0 flex-1">{children}</main>
       </div>
     </SidebarProvider>

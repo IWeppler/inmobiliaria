@@ -14,12 +14,18 @@ import {
   CheckCircle,
   ArrowRight,
   ArrowLeft,
+  DoorOpen,
+  Maximize2,
+  Navigation,
+  Receipt,
+  CalendarClock,
+  Tag,
 } from "lucide-react";
 
 import { ClientPropertyMap } from "@/features/properties/ClientPropertyMap";
 import { ImageGallery } from "@/features/properties/ImageGallery";
 import { DescriptionWithReadMore } from "@/features/properties/DescriptionReadMore";
-import { AgentCard } from "@/features/public/AgentCard";
+import { AgentCard, MobileContactBar } from "@/features/public/AgentCard";
 import { ViewCounter } from "@/features/public/ViewCounter";
 import { PropertyJsonLd } from "@/features/public/seo/PropertyJsonLd";
 import { PropertyFullDetails } from "@/features/properties/types/index";
@@ -38,9 +44,9 @@ async function getPropertyDetails(
       price, currency, bedrooms, bathrooms, total_area, covered_area, rooms,
       description, latitude, longitude, expensas, antiguedad, cocheras,
       property_types ( name ),
-      property_images ( image_url ),
+      property_images ( image_url, order ),
       property_amenities ( amenities ( name ) ),
-      agents ( id, full_name, avatar_url, phone, email )
+      agents!properties_agent_id_fkey ( id, full_name, avatar_url, phone, email )
     `,
     )
     .eq("id", slug)
@@ -48,7 +54,8 @@ async function getPropertyDetails(
 
   if (error) {
     console.error("Error fetching property details:", error);
-    return null;
+    if (error.code === "PGRST116") return null;
+    throw new Error("No se pudieron cargar los datos de la propiedad.");
   }
   return data as unknown as PropertyFullDetails;
 }
@@ -123,7 +130,9 @@ export async function generateMetadata({
     .filter(Boolean)
     .join(" · ");
   const operation =
-    property.operation_type?.toUpperCase() === "ALQUILER" ? "En alquiler" : "En venta";
+    property.operation_type?.toUpperCase() === "ALQUILER"
+      ? "En alquiler"
+      : "En venta";
 
   const shortDescription = [
     [operation, price, specs].filter(Boolean).join(" · "),
@@ -154,27 +163,51 @@ export async function generateMetadata({
 }
 
 // --- Helpers Visuales ---
-function AspectItem({
+function KeyFact({
+  icon: Icon,
+  label,
+  value,
+  unit,
+}: {
+  icon: React.ElementType;
+  label: string;
+  value: number | string | null;
+  unit?: string;
+}) {
+  if (value === null || value === undefined || value === "") return null;
+  return (
+    <div className="flex flex-col gap-3 bg-white p-4 md:p-5">
+      <Icon className="h-5 w-5 text-zinc-400" strokeWidth={1.75} />
+      <div>
+        <dd className="font-clash text-2xl font-semibold leading-none text-zinc-900 md:text-[28px]">
+          {typeof value === "number" ? value.toLocaleString("es-AR") : value}
+          {unit && (
+            <span className="ml-1 text-base font-medium text-zinc-500">
+              {unit}
+            </span>
+          )}
+        </dd>
+        <dt className="mt-1.5 text-sm text-zinc-500">{label}</dt>
+      </div>
+    </div>
+  );
+}
+
+function FactChip({
   icon: Icon,
   label,
   value,
 }: {
   icon: React.ElementType;
   label: string;
-  value: string | number | null;
+  value: string | null;
 }) {
   if (!value) return null;
   return (
-    <div className="flex items-center gap-4">
-      <div className="p-3 bg-white rounded-xl border shadow-sm">
-        <Icon className="w-5 h-5 text-black" />
-      </div>
-      <div>
-        <dt className="text-xs text-zinc-500 uppercase tracking-wide">
-          {label}
-        </dt>
-        <dd className="text-lg font-semibold text-zinc-900">{value}</dd>
-      </div>
+    <div className="inline-flex items-center gap-2 rounded-full border border-zinc-200 bg-white px-3.5 py-2 text-sm">
+      <Icon className="h-4 w-4 text-zinc-400" />
+      <span className="text-zinc-500">{label}</span>
+      <span className="font-semibold text-zinc-900">{value}</span>
     </div>
   );
 }
@@ -186,7 +219,7 @@ function TechSpecItem({
   label: string;
   value: string | number | null;
 }) {
-  if (!value) return null;
+  if (value === null || value === undefined || value === "") return null;
   return (
     <div className="flex justify-between py-3 border-b border-zinc-100 last:border-0">
       <dt className="text-zinc-600">{label}</dt>
@@ -228,12 +261,13 @@ export default async function PropertyPage({
 
   const locationString = [street_address, neighborhood, city, province]
     .filter(Boolean)
-    .join(" | ");
+    .join(", ");
   const statusLabels: { [key: string]: string } = {
     EN_VENTA: "En Venta",
     EN_ALQUILER: "En Alquiler",
     RESERVADO: "Reservado",
     VENDIDO: "Vendido",
+    ALQUILADO: "Alquilado",
   };
   const statusDisplay = statusLabels[status] || status;
 
@@ -247,91 +281,126 @@ export default async function PropertyPage({
 
   const amenities =
     property_amenities?.map((a) => a.amenities?.name).filter(Boolean) || [];
-  const images =
-    property_images?.map((img) => img.image_url).filter(Boolean) || [];
+  const images = [...(property_images || [])]
+    .sort(
+      (a, b) =>
+        (a.order ?? Number.MAX_SAFE_INTEGER) -
+        (b.order ?? Number.MAX_SAFE_INTEGER),
+    )
+    .map((img) => img.image_url)
+    .filter((url): url is string => Boolean(url));
+  const available = status === "EN_VENTA" || status === "EN_ALQUILER";
+  const isRent =
+    property.operation_type?.toUpperCase() === "ALQUILER" ||
+    status === "EN_ALQUILER" ||
+    status === "ALQUILADO";
+  const priceLabel = isRent ? "Alquiler mensual" : "Precio de venta";
+  const expensasDisplay =
+    property.expensas && property.expensas > 0
+      ? `ARS $${property.expensas.toLocaleString("es-AR")}`
+      : null;
+  const pricePerM2 =
+    !isRent &&
+    typeof price === "number" &&
+    price > 0 &&
+    property.total_area &&
+    property.total_area > 0
+      ? `${currency || "USD"} $${Math.round(price / property.total_area).toLocaleString("es-AR")}`
+      : null;
+  const keyFactCount = [
+    property.rooms,
+    property.bedrooms,
+    property.bathrooms,
+    property.total_area,
+    property.covered_area,
+    property.cocheras,
+  ].filter((v) => v !== null && v !== undefined && v !== "").length;
+  const hasCoords =
+    typeof property.latitude === "number" &&
+    typeof property.longitude === "number";
 
   return (
-    <main className="min-h-screen">
+    <main className="min-h-screen pb-24 lg:pb-0">
       <ViewCounter propertyId={property.id} />
       <PropertyJsonLd property={property} />
 
-      <div className="container mx-auto max-w-[1600px] p-4 md:p-8 py-8">
+      <div className="container mx-auto max-w-[1480px] px-4 py-8 md:px-8 md:py-12">
         {/* Header */}
-        <header className="mb-8 md:mb-12">
+        <header className="mb-7 md:mb-9">
           <Link
             href="/propiedades"
-            className="flex gap-1 items-center mb-4 hover:underline cursor-pointer"
+            className="mb-6 inline-flex items-center gap-2 text-sm text-zinc-600 hover:text-zinc-900"
           >
             <ArrowLeft className="h-4 w-4" />
-            <p>Volver a las propiedades</p>
+            Volver a las propiedades
           </Link>
-          <div className="flex flex-col md:flex-row justify-between md:items-end mb-3 gap-4">
-            <h1 className="font-clash text-3xl md:text-5xl font-semibold leading-tight max-w-4xl text-zinc-900">
-              {title}
-            </h1>
-            <div className="md:text-right shrink-0">
-              <div className="flex justify-end items-center gap-3 mb-2">
-                <ShareButton title={title} price={priceDisplay} location={locationString} />
-                <span className="text-xs font-semibold tracking-wider text-white bg-main px-3 py-1.5 rounded-full uppercase">
-                  {statusDisplay}
-                </span>
-              </div>
-              <p className="font-clash text-2xl md:text-3xl font-bold text-zinc-900">
+          <div className="flex flex-wrap items-center gap-3">
+            <span className="rounded-full border border-zinc-200 bg-zinc-100 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-zinc-700">
+              {statusDisplay}
+            </span>
+            {property.property_types?.name && (
+              <span className="text-sm text-zinc-500">
+                {property.property_types.name}
+              </span>
+            )}
+          </div>
+          <div className="mt-3 flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
+            <div className="max-w-4xl">
+              <h1 className="font-clash text-3xl font-semibold leading-tight text-zinc-900 md:text-5xl">
+                {title}
+              </h1>
+              {locationString && (
+                <p className="mt-3 flex items-start gap-2 text-sm text-zinc-600 md:text-base">
+                  <MapPin size={18} className="mt-0.5 shrink-0" />
+                  <span>{locationString}</span>
+                </p>
+              )}
+            </div>
+            <div className="flex shrink-0 items-center justify-between gap-4 md:block md:text-right">
+              <p className="font-clash text-2xl font-semibold text-zinc-900 md:text-3xl">
                 {priceDisplay}
               </p>
+              <ShareButton
+                title={title}
+                price={priceDisplay}
+                location={locationString}
+              />
             </div>
-          </div>
-          <div className="flex items-center text-zinc-500">
-            <MapPin size={18} className="mr-2 shrink-0" />
-            <span className="text-base font-medium">{locationString}</span>
           </div>
         </header>
 
-        <ImageGallery images={images as string[]} />
+        <ImageGallery images={images} title={title} />
 
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 mt-16">
+        <div className="mt-12 grid grid-cols-1 gap-10 lg:grid-cols-12 lg:gap-12">
           {/* Columna Principal (8 columnas) */}
-          <div className="lg:col-span-8 space-y-16">
-            {/* Aspectos Básicos */}
-            <section>
-              <h2 className="font-clash text-2xl font-semibold mb-6 text-zinc-900">
-                Aspectos Básicos
+          <div className="space-y-14 lg:col-span-8">
+            {/* Datos clave */}
+            <section aria-labelledby="key-facts-title">
+              <h2
+                id="key-facts-title"
+                className="font-clash text-2xl font-semibold mb-5 text-zinc-900"
+              >
+                La propiedad de un vistazo
               </h2>
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                <AspectItem
-                  icon={BedDouble}
-                  label="Dormitorios"
-                  value={property.bedrooms}
-                />
-                <AspectItem
-                  icon={Bath}
-                  label="Baños"
-                  value={property.bathrooms}
-                />
-                <AspectItem
-                  icon={Building}
-                  label="Ambientes"
-                  value={property.rooms}
-                />
-                <AspectItem
-                  icon={Ruler}
-                  label="Sup. Total"
-                  value={
-                    property.total_area ? `${property.total_area} m²` : null
-                  }
-                />
-                <AspectItem
-                  icon={Ruler}
-                  label="Sup. Cubierta"
-                  value={
-                    property.covered_area ? `${property.covered_area} m²` : null
-                  }
-                />
-                <AspectItem
-                  icon={Car}
-                  label="Cocheras"
-                  value={property.cocheras}
-                />
+              {keyFactCount > 0 && (
+                <dl
+                  className={`grid grid-cols-2 gap-px overflow-hidden rounded-2xl border border-zinc-200 bg-zinc-200 sm:grid-cols-3 ${
+                    keyFactCount === 6 ? "xl:grid-cols-6" : ""
+                  }`}
+                >
+                  <KeyFact icon={DoorOpen} label="Ambientes" value={property.rooms} />
+                  <KeyFact icon={BedDouble} label="Dormitorios" value={property.bedrooms} />
+                  <KeyFact icon={Bath} label="Baños" value={property.bathrooms} />
+                  <KeyFact icon={Maximize2} label="Sup. total" value={property.total_area} unit="m²" />
+                  <KeyFact icon={Ruler} label="Sup. cubierta" value={property.covered_area} unit="m²" />
+                  <KeyFact icon={Car} label="Cocheras" value={property.cocheras} />
+                </dl>
+              )}
+              <div className="mt-4 flex flex-wrap gap-2">
+                <FactChip icon={Building} label="Tipo" value={property.property_types?.name ?? null} />
+                <FactChip icon={Tag} label="Precio / m²" value={pricePerM2} />
+                <FactChip icon={Receipt} label="Expensas" value={expensasDisplay} />
+                <FactChip icon={CalendarClock} label="Antigüedad" value={property.antiguedad} />
               </div>
             </section>
 
@@ -370,15 +439,15 @@ export default async function PropertyPage({
               <h2 className="font-clash text-2xl font-semibold mb-6 text-zinc-900">
                 Ficha Técnica
               </h2>
-              <div className="bg-zinc-50 p-6 rounded-2xl border border-zinc-100">
+              <div className="rounded-2xl border border-zinc-200 bg-zinc-50 p-6">
                 <div className="grid md:grid-cols-2 gap-x-12 gap-y-2">
                   <TechSpecItem label="Precio" value={priceDisplay} />
                   <TechSpecItem
                     label="Expensas"
                     value={
-                      property.expensas
-                        ? `ARS $${property.expensas}`
-                        : "No especifica"
+                      property.expensas === null
+                        ? "No informadas"
+                        : `ARS $${property.expensas.toLocaleString("es-AR")}`
                     }
                   />
                   <TechSpecItem
@@ -388,13 +457,15 @@ export default async function PropertyPage({
                   <TechSpecItem
                     label="Superficie Total"
                     value={
-                      property.total_area ? `${property.total_area} m²` : null
+                      property.total_area !== null
+                        ? `${property.total_area} m²`
+                        : null
                     }
                   />
                   <TechSpecItem
                     label="Superficie Cubierta"
                     value={
-                      property.covered_area
+                      property.covered_area !== null
                         ? `${property.covered_area} m²`
                         : null
                     }
@@ -410,10 +481,28 @@ export default async function PropertyPage({
 
             {/* Mapa */}
             <section>
-              <h2 className="font-clash text-2xl font-semibold mb-6 text-zinc-900">
-                Ubicación
-              </h2>
-              <div className="h-[450px] w-full rounded-2xl overflow-hidden border border-zinc-200 shadow-sm">
+              <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
+                <div>
+                  <h2 className="font-clash text-2xl font-semibold text-zinc-900">
+                    Ubicación
+                  </h2>
+                  {locationString && (
+                    <p className="mt-1 text-sm text-zinc-600">{locationString}</p>
+                  )}
+                </div>
+                {hasCoords && (
+                  <a
+                    href={`https://www.google.com/maps/dir/?api=1&destination=${property.latitude},${property.longitude}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-2 rounded-full border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-900 transition hover:bg-zinc-50"
+                  >
+                    <Navigation className="h-4 w-4" />
+                    Cómo llegar
+                  </a>
+                )}
+              </div>
+              <div className="h-[380px] w-full overflow-hidden rounded-2xl border border-zinc-200 md:h-[460px]">
                 <ClientPropertyMap
                   lat={property.latitude}
                   lng={property.longitude}
@@ -430,6 +519,11 @@ export default async function PropertyPage({
                 agent={property.agents}
                 propertyTitle={property.title}
                 propertyId={property.id}
+                available={available}
+                priceDisplay={priceDisplay}
+                priceLabel={priceLabel}
+                statusDisplay={statusDisplay}
+                expensasDisplay={expensasDisplay}
               />
             </div>
           </aside>
@@ -508,6 +602,15 @@ export default async function PropertyPage({
           </section>
         )}
       </div>
+
+      <MobileContactBar
+        agent={property.agents}
+        propertyTitle={property.title}
+        propertyId={property.id}
+        available={available}
+        priceDisplay={priceDisplay}
+        priceLabel={priceLabel}
+      />
     </main>
   );
 }

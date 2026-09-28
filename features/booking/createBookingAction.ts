@@ -1,5 +1,6 @@
 "use server";
 
+import { after } from "next/server";
 import { z } from "zod";
 import { supabaseAdmin, nextAgentForLead } from "@/lib/supabase-admin";
 import {
@@ -7,6 +8,7 @@ import {
   isSlotBookable,
 } from "@/features/booking/availability";
 import { dayStartISO } from "@/lib/dates";
+import { syncEventToGoogle } from "@/lib/google-calendar";
 import { BRAND, propertyUrl } from "@/lib/brand";
 import { normalizeArPhone, sendTemplate, whatsappEnabled } from "@/lib/whatsapp";
 
@@ -36,25 +38,69 @@ export type BookingState = {
     address: string;
     agentName: string;
     ics: string;
+    googleCalendarUrl: string;
+    outlookCalendarUrl: string;
   };
 };
 
 const OFFSET = process.env.NEXT_PUBLIC_APP_UTC_OFFSET ?? "-03:00";
 
-// Archivo .ics para que el visitante (o el agente) lo sume a su
-// calendario. Reemplaza, por ahora, la sync con Google Calendar.
-function buildIcs(opts: {
+const VISIT_DURATION_MS = 60 * 60 * 1000;
+
+function visitRange(date: string, time: string) {
+  const start = new Date(`${date}T${time}:00${OFFSET}`);
+  return { start, end: new Date(start.getTime() + VISIT_DURATION_MS) };
+}
+
+// 20260915T130000Z: formato UTC compacto de iCalendar y Google Calendar.
+const fmtUtc = (d: Date) =>
+  d.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}Z$/, "Z");
+
+type CalendarEventOpts = {
   date: string;
   time: string;
   title: string;
   address: string;
   url: string;
-  uid: string;
-}) {
-  const start = new Date(`${opts.date}T${opts.time}:00${OFFSET}`);
-  const end = new Date(start.getTime() + 60 * 60 * 1000);
-  const fmt = (d: Date) =>
-    d.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}Z$/, "Z");
+};
+
+const eventSummary = (title: string) => `Visita: ${title}`;
+const eventDescription = (url: string) =>
+  `Visita coordinada con ${BRAND.name}. Ficha: ${url}`;
+
+// Links "agregar al calendario": abren Google Calendar / Outlook con el
+// evento precargado y el visitante solo confirma. No requieren OAuth ni
+// guardan nada de nuestro lado.
+function buildGoogleCalendarUrl(opts: CalendarEventOpts) {
+  const { start, end } = visitRange(opts.date, opts.time);
+  const params = new URLSearchParams({
+    action: "TEMPLATE",
+    text: eventSummary(opts.title),
+    dates: `${fmtUtc(start)}/${fmtUtc(end)}`,
+    details: eventDescription(opts.url),
+    location: opts.address,
+  });
+  return `https://calendar.google.com/calendar/render?${params.toString()}`;
+}
+
+function buildOutlookCalendarUrl(opts: CalendarEventOpts) {
+  const { start, end } = visitRange(opts.date, opts.time);
+  const params = new URLSearchParams({
+    path: "/calendar/action/compose",
+    rru: "addevent",
+    subject: eventSummary(opts.title),
+    startdt: start.toISOString(),
+    enddt: end.toISOString(),
+    body: eventDescription(opts.url),
+    location: opts.address,
+  });
+  return `https://outlook.live.com/calendar/0/deeplink/compose?${params.toString()}`;
+}
+
+// Archivo .ics para Apple Calendar y el resto de los clientes.
+function buildIcs(opts: CalendarEventOpts & { uid: string }) {
+  const { start, end } = visitRange(opts.date, opts.time);
+  const fmt = fmtUtc;
   const esc = (s: string) =>
     s
       .replace(/\\/g, "\\\\")
@@ -70,9 +116,9 @@ function buildIcs(opts: {
     `DTSTAMP:${fmt(new Date())}`,
     `DTSTART:${fmt(start)}`,
     `DTEND:${fmt(end)}`,
-    `SUMMARY:${esc(`Visita: ${opts.title}`)}`,
+    `SUMMARY:${esc(eventSummary(opts.title))}`,
     `LOCATION:${esc(opts.address)}`,
-    `DESCRIPTION:${esc(`Visita coordinada con ${BRAND.name}. Ficha: ${opts.url}`)}`,
+    `DESCRIPTION:${esc(eventDescription(opts.url))}`,
     `URL:${opts.url}`,
     "END:VEVENT",
     "END:VCALENDAR",
@@ -177,6 +223,10 @@ export async function createBookingAction(
     };
   }
 
+  // Copia al Google Calendar del agente, si lo conectó. Después de
+  // responder: no demora ni rompe la reserva.
+  after(() => syncEventToGoogle(event.id));
+
   const { data: agent } = await supabaseAdmin
     .from("agents")
     .select("full_name")
@@ -203,6 +253,14 @@ export async function createBookingAction(
     .filter(Boolean)
     .join(", ");
 
+  const calendarEvent: CalendarEventOpts = {
+    date,
+    time,
+    title: property.title,
+    address,
+    url: propertyUrl(propertyId),
+  };
+
   return {
     success: true,
     message: "¡Visita agendada! Te vamos a confirmar por WhatsApp o teléfono.",
@@ -212,12 +270,10 @@ export async function createBookingAction(
       propertyTitle: property.title,
       address,
       agentName: agent?.full_name ?? BRAND.name,
+      googleCalendarUrl: buildGoogleCalendarUrl(calendarEvent),
+      outlookCalendarUrl: buildOutlookCalendarUrl(calendarEvent),
       ics: buildIcs({
-        date,
-        time,
-        title: property.title,
-        address,
-        url: propertyUrl(propertyId),
+        ...calendarEvent,
         uid: `${event.id}@${BRAND.siteUrl.replace(/^https?:\/\//, "")}`,
       }),
     },

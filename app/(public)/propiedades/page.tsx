@@ -4,6 +4,11 @@ import { PropertyCardData } from "@/app/types/entities";
 import { PropertyFilterList } from "@/features/properties/PropertyFilterList";
 import { Search } from "lucide-react";
 import { SortDropdown } from "@/features/properties/SortDropdown";
+import { ViewToggle } from "@/features/properties/ViewToggle";
+import { PublicMapView } from "@/features/properties/PublicMapView";
+import type { MapProperty } from "@/features/properties/PublicPropertiesMap";
+import { PropertyFilterBar } from "@/features/properties/PropertyFilterBar";
+import { PropertySearchInput } from "@/features/properties/PropertySearchInput";
 
 export const revalidate = 60;
 
@@ -18,6 +23,8 @@ type PageSearchParams = {
   bedrooms?: string;
   bathrooms?: string;
   sortBy?: string;
+  vista?: string;
+  q?: string;
 };
 
 export default async function PropiedadesPage({
@@ -35,8 +42,8 @@ export default async function PropiedadesPage({
   let query = supabase.from("properties").select(
     `
       id, title, price, currency, bedrooms, bathrooms,
-      total_area, city, street_address, status,
-      property_images ( image_url ),
+      total_area, city, street_address, status, latitude, longitude,
+      property_images ( image_url, order ),
       ${amenityJoin} ( amenity_id ) 
     `,
   );
@@ -54,6 +61,21 @@ export default async function PropiedadesPage({
 
   if (searchParams.loc) {
     query = query.eq("city", searchParams.loc);
+  }
+
+  // Búsqueda libre: título, calle, barrio o ciudad. Se quitan los
+  // caracteres que PostgREST interpreta dentro de .or() y los comodines.
+  const q = searchParams.q?.replace(/[,()%*\\]/g, " ").trim().slice(0, 80);
+  if (q) {
+    const like = `%${q}%`;
+    query = query.or(
+      [
+        `title.ilike.${like}`,
+        `street_address.ilike.${like}`,
+        `neighborhood.ilike.${like}`,
+        `city.ilike.${like}`,
+      ].join(","),
+    );
   }
 
   if (searchParams.bedrooms) {
@@ -98,64 +120,81 @@ export default async function PropiedadesPage({
   }
 
   const properties: PropertyCardData[] = (data as PropertyCardData[]) || [];
+  const view = searchParams.vista === "mapa" ? "mapa" : "lista";
 
   return (
     <main className="flex min-h-screen w-full flex-col bg-complementary">
       <div className="container mx-auto max-w-[1600px] p-4 md:py-16">
-        {/* Header y Sort (Sin cambios) */}
-        <div className="flex flex-col md:flex-row justify-between md:items-center mb-8">
-          <h1 className="text-3xl md:text-4xl font-clash font-semibold">
-            Propiedades Disponibles
-          </h1>
-          <SortDropdown currentSort={searchParams.sortBy || "default"} />
+        <h1 className="mb-6 text-3xl md:text-4xl font-clash font-semibold">
+          Propiedades Disponibles
+        </h1>
+
+        {/* Barra de herramientas: búsqueda + vista + orden */}
+        <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div className="w-full md:max-w-md">
+            <PropertySearchInput initial={searchParams.q ?? ""} />
+          </div>
+          <div className="flex flex-wrap items-center gap-3">
+            <ViewToggle current={view} />
+            <SortDropdown currentSort={searchParams.sortBy || "default"} />
+          </div>
         </div>
 
-        {/* --- Layout de Grilla  --- */}
-        <div className="grid grid-cols-1 md:grid-cols-[280px_1fr] gap-2">
-          {/* Sidebar */}
-          <aside
-            className="
-          order-1 
-          lg:order-0 
-          h-fit 
-          lg:sticky top-24
-        "
-          >
-            <PropertyFilterList
-              types={propertyTypes as PropertyType[]}
-              amenities={amenities as Amenity[]}
+        {view === "mapa" ? (
+          /* --- Vista mapa: filtros arriba, mapa a todo el ancho --- */
+          <div className="space-y-3">
+            <PropertyFilterBar
+              types={(propertyTypes ?? []) as PropertyType[]}
+              amenities={(amenities ?? []) as Amenity[]}
               cities={cities as string[]}
-              currentParams={searchParams}
             />
-          </aside>
-
-          {/* Cards Section */}
-          <section
-            className="
-          order-2
-          lg:order-0 
-        "
-          >
             {properties.length > 0 ? (
-              <div className="grid grid-cols-1 sm:grid-cols-1 md:grid-cols-1 lg:grid-cols-3 gap-2">
-                {properties.map((property) => (
-                  <PropertyCard
-                    key={property.id}
-                    property={property as PropertyCardData}
-                  />
-                ))}
-              </div>
+              <PublicMapView properties={(data ?? []) as unknown as MapProperty[]} />
             ) : (
               <div className="flex flex-col items-center justify-center h-96 w-full bg-white border border-zinc-200 rounded-lg">
                 <Search size={48} className="text-zinc-400 mb-4" />
                 <h3 className="text-xl mb-2 font-semibold">Sin resultados</h3>
                 <p className="text-zinc-500 px-4 text-center">
-                  No se encontraron propiedades con esos filtros.
+                  {q
+                    ? `No encontramos propiedades para “${q}” con esos filtros.`
+                    : "No se encontraron propiedades con esos filtros."}
                 </p>
               </div>
             )}
-          </section>
-        </div>
+          </div>
+        ) : (
+          /* --- Vista lista: filtros al costado --- */
+          <div className="grid grid-cols-1 md:grid-cols-[280px_1fr] gap-2">
+            <aside className="order-1 h-fit top-24 lg:order-0 lg:sticky">
+              <PropertyFilterList
+                types={propertyTypes as PropertyType[]}
+                amenities={amenities as Amenity[]}
+                cities={cities as string[]}
+                currentParams={searchParams}
+              />
+            </aside>
+
+            <section className="order-2 min-w-0 lg:order-0">
+              {properties.length > 0 ? (
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                  {properties.map((property) => (
+                    <PropertyCard key={property.id} property={property} />
+                  ))}
+                </div>
+              ) : (
+              <div className="flex flex-col items-center justify-center h-96 w-full bg-white border border-zinc-200 rounded-lg">
+                <Search size={48} className="text-zinc-400 mb-4" />
+                <h3 className="text-xl mb-2 font-semibold">Sin resultados</h3>
+                <p className="text-zinc-500 px-4 text-center">
+                  {q
+                    ? `No encontramos propiedades para “${q}” con esos filtros.`
+                    : "No se encontraron propiedades con esos filtros."}
+                </p>
+              </div>
+            )}
+            </section>
+          </div>
+        )}
       </div>
     </main>
   );

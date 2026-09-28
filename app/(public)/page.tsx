@@ -21,7 +21,7 @@ export default async function Home() {
       city,
       street_address, 
       status,
-      property_images ( image_url )
+      property_images ( image_url, order )
     `,
     )
     .eq("status", "EN_VENTA")

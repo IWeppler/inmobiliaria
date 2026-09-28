@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
+import { ArrowDownWideNarrow, ArrowUpNarrowWide, Clock } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -29,20 +30,27 @@ export function SortDropdown({ currentSort }: SortDropdownProps) {
   };
 
   return (
-    <div className="flex items-center gap-2">
-      <span className="text-sm text-zinc-600">
-        Ordenar por:
-      </span>
-      <Select value={currentSort} onValueChange={handleSortChange}>
-        <SelectTrigger className="w-[180px] bg-white">
-          <SelectValue placeholder="Ordenar" />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="default">Más Recientes</SelectItem>
-          <SelectItem value="price_asc">Más Barato</SelectItem>
-          <SelectItem value="price_desc">Más Caro</SelectItem>
-        </SelectContent>
-      </Select>
-    </div>
+    <Select value={currentSort} onValueChange={handleSortChange}>
+      <SelectTrigger
+        aria-label="Ordenar"
+        className="h-10 w-[190px] gap-2 rounded-lg border-zinc-200 bg-white text-sm data-[size=default]:h-10"
+      >
+        <SelectValue placeholder="Ordenar" />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value="default">
+          <Clock className="h-4 w-4 text-zinc-400" />
+          Más recientes
+        </SelectItem>
+        <SelectItem value="price_asc">
+          <ArrowUpNarrowWide className="h-4 w-4 text-zinc-400" />
+          Menor precio
+        </SelectItem>
+        <SelectItem value="price_desc">
+          <ArrowDownWideNarrow className="h-4 w-4 text-zinc-400" />
+          Mayor precio
+        </SelectItem>
+      </SelectContent>
+    </Select>
   );
 }

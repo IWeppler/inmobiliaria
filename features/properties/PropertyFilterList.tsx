@@ -1,7 +1,6 @@
 "use client";
 
-import { useRouter, usePathname, useSearchParams } from "next/navigation";
-import { useCallback } from "react";
+import { useFilterParams } from "@/features/properties/useFilterParams";
 import {
   Accordion,
   AccordionContent,
@@ -35,42 +34,7 @@ export function PropertyFilterList({
   cities,
   currentParams,
 }: PropertyFilterListProps) {
-  const router = useRouter();
-  const pathname = usePathname();
-  const searchParams = useSearchParams();
-
-  // --- Lógica para crear la nueva URL ---
-  const createQueryString = useCallback(
-    (name: string, value: string) => {
-      const params = new URLSearchParams(searchParams.toString());
-
-      if (name === "amenities") {
-        const currentAmenities = params.get("amenities")?.split(",") || [];
-        const isChecked = currentAmenities.includes(value);
-
-        if (isChecked) {
-          const newAmenities = currentAmenities.filter((id) => id !== value);
-          if (newAmenities.length > 0) {
-            params.set(name, newAmenities.join(","));
-          } else {
-            params.delete(name);
-          }
-        } else {
-          currentAmenities.push(value);
-          params.set(name, currentAmenities.join(","));
-        }
-      } else {
-        if (params.get(name) === value) {
-          params.delete(name);
-        } else {
-          params.set(name, value);
-        }
-      }
-
-      return params.toString();
-    },
-    [searchParams]
-  );
+  const { toggle, clear, activeCount } = useFilterParams();
 
   // --- Helpers  ---
   const selectedTipo = currentParams.tipo || "";
@@ -82,7 +46,18 @@ export function PropertyFilterList({
 
   return (
     <div className="w-full bg-white border border-zinc-200 rounded-lg p-6">
-      <h3 className="text-xl font-semibold">Filtros</h3>
+      <div className="flex items-center justify-between">
+        <h3 className="text-xl font-semibold">Filtros</h3>
+        {activeCount > 0 && (
+          <button
+            type="button"
+            onClick={() => clear()}
+            className="text-sm font-medium text-zinc-500 hover:text-zinc-900"
+          >
+            Limpiar ({activeCount})
+          </button>
+        )}
+      </div>
 
       <Accordion
         type="multiple"
@@ -97,9 +72,7 @@ export function PropertyFilterList({
                 id="op-venta"
                 checked={selectedTipo === "venta"}
                 onCheckedChange={() =>
-                  router.push(
-                    pathname + "?" + createQueryString("tipo", "venta")
-                  )
+                  toggle("tipo", "venta")
                 }
               />
               <Label htmlFor="op-venta">Venta</Label>
@@ -109,9 +82,7 @@ export function PropertyFilterList({
                 id="op-alquiler"
                 checked={selectedTipo === "alquiler"}
                 onCheckedChange={() =>
-                  router.push(
-                    pathname + "?" + createQueryString("tipo", "alquiler")
-                  )
+                  toggle("tipo", "alquiler")
                 }
               />
               <Label htmlFor="op-alquiler">Alquiler</Label>
@@ -128,11 +99,7 @@ export function PropertyFilterList({
                   id={`type-${type.id}`}
                   checked={selectedTypeId === String(type.id)}
                   onCheckedChange={() =>
-                    router.push(
-                      pathname +
-                        "?" +
-                        createQueryString("typeId", String(type.id))
-                    )
+                    toggle("typeId", String(type.id))
                   }
                 />
                 <Label htmlFor={`type-${type.id}`}>{type.name}</Label>
@@ -151,7 +118,7 @@ export function PropertyFilterList({
                   id={`loc-${city}`}
                   checked={selectedLocation === city}
                   onCheckedChange={() =>
-                    router.push(pathname + "?" + createQueryString("loc", city))
+                    toggle("loc", city)
                   }
                 />
                 <Label htmlFor={`loc-${city}`}>{city}</Label>
@@ -170,11 +137,7 @@ export function PropertyFilterList({
                   id={`bed-${num}`}
                   checked={selectedBedrooms === String(num)}
                   onCheckedChange={() =>
-                    router.push(
-                      pathname +
-                        "?" +
-                        createQueryString("bedrooms", String(num))
-                    )
+                    toggle("bedrooms", String(num))
                   }
                 />
                 <Label htmlFor={`bed-${num}`}>{num}+ Dormitorios</Label>
@@ -193,11 +156,7 @@ export function PropertyFilterList({
                   id={`bath-${num}`}
                   checked={selectedBathrooms === String(num)}
                   onCheckedChange={() =>
-                    router.push(
-                      pathname +
-                        "?" +
-                        createQueryString("bathrooms", String(num))
-                    )
+                    toggle("bathrooms", String(num))
                   }
                 />
                 <Label htmlFor={`bath-${num}`}>{num}+ Baños</Label>
@@ -216,11 +175,7 @@ export function PropertyFilterList({
                   id={`amenity-${amenity.id}`}
                   checked={selectedAmenities.includes(String(amenity.id))}
                   onCheckedChange={() =>
-                    router.push(
-                      pathname +
-                        "?" +
-                        createQueryString("amenities", String(amenity.id))
-                    )
+                    toggle("amenities", String(amenity.id))
                   }
                 />
                 <Label htmlFor={`amenity-${amenity.id}`}>{amenity.name}</Label>

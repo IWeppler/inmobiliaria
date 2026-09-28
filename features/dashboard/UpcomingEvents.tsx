@@ -7,7 +7,6 @@ import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { ArrowRight, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import { createClientBrowser } from "@/lib/supabase-browser";
 import { addDays, ymdInAppTz } from "@/lib/dates";
 import { eventTypeLabel } from "@/features/dashboard/eventTypes";
 import { Button } from "@/shared/components/ui/button";
@@ -18,6 +17,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/shared/components/ui/sheet";
+import { deleteEventAction } from "@/features/dashboard/google-calendar/actions";
 
 export type UpcomingEvent = {
   id: string;
@@ -124,7 +124,6 @@ function EventRow({
 // / Próximos días. El widget muestra un anticipo; "Ver todos" abre la
 // lista completa (por día) con opción de borrar. Reemplaza al calendario.
 export function UpcomingEvents({ events: initial }: { events: UpcomingEvent[] }) {
-  const supabase = createClientBrowser();
   const router = useRouter();
   const [events, setEvents] = useState(initial);
   const [allOpen, setAllOpen] = useState(false);
@@ -132,10 +131,10 @@ export function UpcomingEvents({ events: initial }: { events: UpcomingEvent[] })
   const handleDelete = async (id: string) => {
     const previous = events;
     setEvents(events.filter((e) => e.id !== id));
-    const { error } = await supabase.from("events").delete().eq("id", id);
+    const { error } = await deleteEventAction(id);
     if (error) {
       setEvents(previous);
-      toast.error(`No se pudo eliminar: ${error.message}`);
+      toast.error(`No se pudo eliminar: ${error}`);
       return;
     }
     router.refresh();

@@ -1,156 +1,217 @@
 import Image from "next/image";
-import { Phone, CalendarCheck } from "lucide-react";
-import { Button } from "@/shared/components/ui/button";
-import { Input } from "@/shared/components/ui/input";
-import { Textarea } from "@/shared/components/ui/textarea";
 import Link from "next/link";
+import { CalendarCheck, ChevronRight, Mail, MessageCircle, Phone, ShieldCheck } from "lucide-react";
+import { BRAND } from "@/lib/brand";
+
+type Agent = {
+  id: string;
+  full_name: string | null;
+  phone: string | null;
+  email: string | null;
+  avatar_url: string | null;
+} | null;
 
 type AgentCardProps = {
-  agent: {
-    id: string; 
-    full_name: string | null;
-    phone: string | null;
-    email: string | null;
-    avatar_url: string | null;
-  } | null;
+  agent: Agent;
   propertyTitle: string;
-  propertyId: string; 
+  propertyId: string;
+  available: boolean;
+  priceDisplay: string;
+  priceLabel: string;
+  statusDisplay: string;
+  expensasDisplay?: string | null;
 };
 
-export function AgentCard({ agent, propertyTitle, propertyId }: AgentCardProps) {
-  const displayAgent = agent || {
-    full_name: "TerraNova Inmobiliaria",
-    phone: "5491154702118",
-    email: "contacto@terranova.com",
-    avatar_url: null,
-  };
-
-  const cleanPhone = (displayAgent.phone || "").replace(/[^0-9]/g, "");
-
-  // Mensaje predeterminado
-  const whatsappMessage = encodeURIComponent(
-    `Hola ${displayAgent.full_name}, estoy interesado en la propiedad: ${propertyTitle}.\n\n¿Podríamos coordinar una visita o podrían brindarme más información al respecto?`
+function contactData(agent: Agent, propertyTitle: string) {
+  const name = agent?.full_name || BRAND.name;
+  const phone = agent?.phone?.replace(/[^0-9]/g, "") || "";
+  const message = encodeURIComponent(
+    `Hola ${name}, estoy interesado en la propiedad: ${propertyTitle}. ¿Podrías darme más información?`,
   );
+  return {
+    name,
+    phone,
+    whatsappUrl: phone ? `https://wa.me/${phone}?text=${message}` : null,
+    mailUrl: agent?.email
+      ? `mailto:${agent.email}?subject=${encodeURIComponent(`Consulta por ${propertyTitle}`)}`
+      : null,
+  };
+}
+
+export function AgentCard({
+  agent,
+  propertyTitle,
+  propertyId,
+  available,
+  priceDisplay,
+  priceLabel,
+  statusDisplay,
+  expensasDisplay,
+}: AgentCardProps) {
+  const { name, phone, whatsappUrl, mailUrl } = contactData(agent, propertyTitle);
 
   return (
-    <div className="bg-white p-6 rounded-xl shadow-lg border border-zinc-100 sticky top-24">
-      <h3 className="text-xl font-clash font-semibold mb-4 text-zinc-900">
-        Consultá por esta propiedad
-      </h3>
-
-      {/* 1. Perfil del Agente */}
-      <div className="flex items-center gap-4 mb-6">
-        <div className="relative w-16 h-16 rounded-full overflow-hidden bg-zinc-100 border border-zinc-200">
-          {displayAgent.avatar_url ? (
-            <Image
-              src={displayAgent.avatar_url}
-              alt={displayAgent.full_name || "Agente"}
-              fill
-              className="object-cover"
-            />
-          ) : (
-            // Placeholder si no hay foto
-            <div className="w-full h-full flex items-center justify-center text-zinc-400 font-bold text-xl">
-              {displayAgent.full_name?.[0] || "A"}
-            </div>
-          )}
+    <div className="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-[0_1px_2px_rgb(0_0_0/0.04),0_12px_32px_-12px_rgb(0_0_0/0.12)]">
+      {/* Precio */}
+      <div className="border-b border-zinc-100 p-6">
+        <div className="flex items-center justify-between gap-3">
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-zinc-500">{priceLabel}</p>
+          <span
+            className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ${
+              available ? "bg-emerald-50 text-emerald-700" : "bg-zinc-100 text-zinc-600"
+            }`}
+          >
+            <span className={`h-1.5 w-1.5 rounded-full ${available ? "bg-emerald-500" : "bg-zinc-400"}`} />
+            {statusDisplay}
+          </span>
         </div>
-        <div>
-          <p className="font-semibold text-lg text-zinc-900">
-            {displayAgent.full_name}
-          </p>
-          <p className="text-sm text-zinc-500">Agente Inmobiliario</p>
-        </div>
+        <p className="mt-2 font-clash text-3xl font-semibold tracking-tight text-zinc-900">{priceDisplay}</p>
+        {expensasDisplay && <p className="mt-1 text-sm text-zinc-500">+ {expensasDisplay} de expensas</p>}
       </div>
 
-      {/* 2. Botones de Acción Directa */}
-      <div className="grid grid-cols-2 gap-3 mb-6">
-        <Button
-          className="w-full bg-[#22c962] hover:bg-[#20bb5b] text-white"
-          asChild
-        >
-          <a
-            href={`https://wa.me/${cleanPhone}?text=${whatsappMessage}`}
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width={20}
-              height={20}
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="white"
-              strokeWidth={2}
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              className="icon icon-tabler icons-tabler-outline icon-tabler-brand-whatsapp mr-2 text-green-600"
-            >
-              <path stroke="none" d="M0 0h24v24H0z" fill="none" />
-              <path d="M3 21l1.65 -3.8a9 9 0 1 1 3.4 2.9l-5.05 .9" />
-              <path d="M9 10a.5 .5 0 0 0 1 0v-1a.5 .5 0 0 0 -1 0v1a5 5 0 0 0 5 5h1a.5 .5 0 0 0 0 -1h-1a.5 .5 0 0 0 0 1" />
-            </svg>{" "}
-            WhatsApp
-          </a>
-        </Button>
-        <Button variant="outline" className="w-full border-zinc-300" asChild>
+      <div className="p-6">
+        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-zinc-500">Tu próximo paso</p>
+        <h2 className="mt-1.5 font-clash text-xl font-semibold text-zinc-900">
+          {available ? "Conocé esta propiedad en persona" : "Consultá por esta propiedad"}
+        </h2>
+        <p className="mt-1.5 text-sm leading-6 text-zinc-600">
+          {available
+            ? "Elegí día y horario para visitarla o escribinos con tus dudas."
+            : "Ya no está disponible para visitas, pero podemos mostrarte alternativas similares."}
+        </p>
+
+        {available && (
           <Link
-            href={`tel:${cleanPhone}`}
+            href={`/agendar/${propertyId}`}
+            className="group mt-5 flex items-center gap-3 rounded-xl bg-zinc-900 p-3 pr-4 text-white transition hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900 focus-visible:ring-offset-2"
+          >
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white/10">
+              <CalendarCheck className="h-5 w-5" />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-sm font-semibold">Agendar una visita</span>
+              <span className="block text-xs text-white/60">Elegí el horario que te quede cómodo</span>
+            </span>
+            <ChevronRight className="h-5 w-5 text-white/60 transition-transform group-hover:translate-x-0.5" />
+          </Link>
+        )}
+
+        {(whatsappUrl || mailUrl) && (
+          <div className="mt-3 grid grid-cols-2 gap-2.5">
+            {whatsappUrl && (
+              <a
+                href={whatsappUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 text-sm font-semibold text-emerald-800 transition hover:bg-emerald-100"
+              >
+                <MessageCircle className="h-4 w-4" />
+                WhatsApp
+              </a>
+            )}
+            {phone && (
+              <a
+                href={`tel:+${phone}`}
+                className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-zinc-200 text-sm font-semibold text-zinc-800 transition hover:bg-zinc-50"
+              >
+                <Phone className="h-4 w-4" />
+                Llamar
+              </a>
+            )}
+            {mailUrl && (
+              <a
+                href={mailUrl}
+                className="col-span-2 inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-zinc-200 text-sm font-semibold text-zinc-800 transition hover:bg-zinc-50"
+              >
+                <Mail className="h-4 w-4" />
+                Escribir por email
+              </a>
+            )}
+          </div>
+        )}
+
+        {!whatsappUrl && !mailUrl && (
+          <Link
+            href="/contacto"
+            className="mt-3 inline-flex h-11 w-full items-center justify-center rounded-xl border border-zinc-200 text-sm font-semibold text-zinc-800 transition hover:bg-zinc-50"
+          >
+            Contactar a la inmobiliaria
+          </Link>
+        )}
+
+        {/* Asesor */}
+        <div className="mt-6 flex items-center gap-3 rounded-xl bg-zinc-50 p-3">
+          <div className="relative h-11 w-11 shrink-0 overflow-hidden rounded-full border-2 border-white bg-zinc-200 shadow-sm">
+            {agent?.avatar_url ? (
+              <Image src={agent.avatar_url} alt={name} fill sizes="44px" className="object-cover" />
+            ) : (
+              <span className="flex h-full items-center justify-center font-semibold text-zinc-600" aria-hidden="true">
+                {name[0]}
+              </span>
+            )}
+          </div>
+          <div className="min-w-0">
+            <p className="truncate text-sm font-semibold text-zinc-900">{name}</p>
+            <p className="text-xs text-zinc-500">Te acompaña en todo el proceso</p>
+          </div>
+        </div>
+
+        <p className="mt-4 flex items-center gap-2 text-xs text-zinc-500">
+          <ShieldCheck className="h-4 w-4 shrink-0 text-zinc-400" />
+          Consultar y visitar no tiene costo ni compromiso.
+        </p>
+      </div>
+    </div>
+  );
+}
+
+// Barra fija inferior en móvil: la card del aside queda al final de la
+// página en pantallas chicas, así el contacto siempre está a mano.
+export function MobileContactBar({
+  agent,
+  propertyTitle,
+  propertyId,
+  available,
+  priceDisplay,
+  priceLabel,
+}: Pick<AgentCardProps, "agent" | "propertyTitle" | "propertyId" | "available" | "priceDisplay" | "priceLabel">) {
+  const { whatsappUrl } = contactData(agent, propertyTitle);
+
+  return (
+    <div className="fixed inset-x-0 bottom-0 z-40 border-t border-zinc-200 bg-white/95 px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur lg:hidden">
+      <div className="flex items-center gap-3">
+        <div className="min-w-0 flex-1">
+          <p className="text-[11px] font-medium uppercase tracking-wide text-zinc-500">{priceLabel}</p>
+          <p className="truncate font-clash text-lg font-semibold text-zinc-900">{priceDisplay}</p>
+        </div>
+        {whatsappUrl && (
+          <a
+            href={whatsappUrl}
             target="_blank"
             rel="noopener noreferrer"
+            aria-label="Consultar por WhatsApp"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-800"
           >
-            <Phone className="w-4 h-4 mr-2" />
-            Llamar
+            <MessageCircle className="h-5 w-5" />
+          </a>
+        )}
+        {available ? (
+          <Link
+            href={`/agendar/${propertyId}`}
+            className="inline-flex h-11 shrink-0 items-center gap-2 rounded-xl bg-zinc-900 px-4 text-sm font-semibold text-white"
+          >
+            <CalendarCheck className="h-4 w-4" />
+            Agendar visita
           </Link>
-        </Button>
+        ) : (
+          <Link
+            href="/contacto"
+            className="inline-flex h-11 shrink-0 items-center rounded-xl bg-zinc-900 px-4 text-sm font-semibold text-white"
+          >
+            Consultar
+          </Link>
+        )}
       </div>
-
-      {/* E3.2: booking page pública */}
-      <Button className="w-full mb-6" asChild>
-        <Link href={`/agendar/${propertyId}`}>
-          <CalendarCheck className="w-4 h-4 mr-2" />
-          Agendar una visita
-        </Link>
-      </Button>
-
-      <div className="relative flex py-2 items-center">
-        <div className="grow border-t border-zinc-200"></div>
-        <span className="shrink mx-4 text-zinc-400 text-xs uppercase">
-          O envíanos un email
-        </span>
-        <div className="grow border-t border-zinc-200"></div>
-      </div>
-
-      {/* 3. Formulario (Visual - Conectar lógica luego) */}
-      <form className="space-y-4 mt-4">
-        <div>
-          <Input
-            placeholder="Tu nombre"
-            className="bg-zinc-50 border-zinc-200"
-          />
-        </div>
-        <div>
-          <Input
-            placeholder="Tu teléfono"
-            className="bg-zinc-50 border-zinc-200"
-          />
-        </div>
-        <div>
-          <Input
-            placeholder="Tu email"
-            className="bg-zinc-50 border-zinc-200"
-          />
-        </div>
-        <div>
-          <Textarea
-            placeholder="Hola, quisiera saber más sobre..."
-            className="bg-zinc-50 border-zinc-200 min-h-[100px]"
-          />
-        </div>
-        <Button type="submit" className="w-full cursor-pointer bg-foreground hover:bg-foreground/90">
-          Enviar consulta
-        </Button>
-      </form>
     </div>
   );
 }

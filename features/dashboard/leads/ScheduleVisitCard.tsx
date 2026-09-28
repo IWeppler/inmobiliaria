@@ -19,6 +19,7 @@ import {
 import { Input } from "@/shared/components/ui/input";
 import { Label } from "@/shared/components/ui/label";
 import { Separator } from "@/shared/components/ui/separator";
+import { syncEventAction } from "@/features/dashboard/google-calendar/actions";
 
 type Props = {
   lead: LeadWithDetails;
@@ -84,6 +85,7 @@ export function ScheduleVisitCard({ lead, currentUserId }: Props) {
       setSaving(false);
       return;
     }
+    void syncEventAction(data.id);
 
     const current = normalizeStatus(lead.status);
     if (current === "NUEVO" || current === "CONTACTADO") {

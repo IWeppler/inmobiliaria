@@ -9,6 +9,8 @@ import {
 import { Integrations } from "@/features/dashboard/settings/Integrations";
 import { IndexValues, type IndexValueRow } from "@/features/dashboard/settings/IndexValues";
 import { whatsappEnabled } from "@/lib/whatsapp";
+import { googleCalendarEnabled } from "@/lib/google-calendar";
+import { supabaseAdmin } from "@/lib/supabase-admin";
 import { Page, PageHeader } from "@/shared/components/PageShell";
 
 export default async function DashboardPage() {
@@ -34,6 +36,20 @@ export default async function DashboardPage() {
     supabase.from("property_types").select("name").order("name"),
     supabase.from("index_values").select("id, index_code, period, value").order("period", { ascending: false }),
   ]);
+
+  // Quién del equipo conectó Google Calendar. La tabla es solo
+  // service_role; se lee con admin únicamente si quien mira es admin.
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  const { data: me } = user
+    ? await supabase.from("agents").select("role").eq("id", user.id).single()
+    : { data: null };
+  const { data: googleRows } =
+    googleCalendarEnabled && me?.role === "admin"
+      ? await supabaseAdmin.from("google_calendar_connections").select("agent_id")
+      : { data: null };
+  const googleConnected = new Set((googleRows ?? []).map((r) => r.agent_id));
 
   const currentRate = rate?.usd_to_ars || 1500;
   const cities = Array.from(
@@ -63,6 +79,13 @@ export default async function DashboardPage() {
       <IndexValues initial={(indexRows ?? []) as IndexValueRow[]} />
       <Integrations
         whatsappEnabled={whatsappEnabled}
+        googleCalendar={{
+          enabled: googleCalendarEnabled,
+          agents: (agents ?? []).map((a) => ({
+            name: a.full_name ?? "Sin nombre",
+            connected: googleConnected.has(a.id),
+          })),
+        }}
       />
     </Page>
   );
