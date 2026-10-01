@@ -4,8 +4,8 @@ import "./globals.css";
 import { Toaster } from "@/shared/components/ui/sonner";
 import { ThemeProvider } from "next-themes";
 
-// Tipografía del producto (panel + login). El sitio público restaura la
-// suya con el scope `.site-public` (ver globals.css).
+// Tipografía del producto (panel + login). El sitio público carga la suya
+// en app/(public)/layout.tsx y la aplica con el scope `.site-public`.
 const inter = Inter({
   subsets: ["latin"],
   variable: "--font-inter",
@@ -28,16 +28,6 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="es" className={inter.variable} suppressHydrationWarning>
-      <head>
-        <link
-          href="https://api.fontshare.com/v2/css?f[]=clash-grotesk@500,600,700&f[]=general-sans@400,500,600,700&display=swap"
-          rel="stylesheet"
-        />
-        <link
-          href="https://fonts.googleapis.com/css2?family=Lora:wght@500;600&display=swap"
-          rel="stylesheet"
-        />
-      </head>
       <body>
         <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false} disableTransitionOnChange>
           {children}

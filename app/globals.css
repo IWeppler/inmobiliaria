@@ -14,16 +14,20 @@
 
 @theme inline {
   /* --- FUENTES ---
-     --font-sans (Inter) es la del producto. Clash / General Sans /
-     Lora quedan solo para el sitio público (marca). */
+     --font-sans (Inter) es la del producto. Clash Grotesk / General Sans
+     son del sitio público: se cargan en app/(public)/layout.tsx y llegan
+     como --site-font-display / --site-font-body. */
   --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
-  --font-clash: "Clash Grotesk", sans-serif;
-  --font-general: "General Sans", sans-serif;
-  --font-serif: "Lora", Georgia, serif;
+  --font-clash: var(--site-font-display, ui-sans-serif), sans-serif;
+  --font-general: var(--site-font-body, ui-sans-serif), sans-serif;
 
-  /* --- COLORES DE MARCA (solo sitio público) --- */
-  --color-main: #004fbe;
+  /* --- COLOR DE MARCA ---
+     Indirecto vía --brand-main: el panel lo define en :root y el sitio
+     público lo pisa en su scope. */
+  --color-main: var(--brand-main);
   --color-main-red: #c4171d;
+  --color-main-soft: var(--brand-main-soft);
+  --color-main-hover: var(--brand-main-hover);
 
   /* --- SUPERFICIES Y TEXTO (semánticos) --- */
   --color-background: var(--background);
@@ -92,8 +96,62 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-.site-public {
-  font-family: var(--font-general), sans-serif;
+/* ============================================================
+   SITIO PÚBLICO — TOKENS DE MARCA
+   Independientes del panel. Se aplican al wrapper `.site-public` y a
+   <body> mientras el sitio público está montado, así los portales de
+   Radix (selects, popovers, menús, toasts) heredan lo mismo.
+   Paleta: monocromo (blanco roto + casi negro) con un único acento
+   verde petróleo. Siempre claro: no reacciona al `.dark` del panel.
+   Radios: 10 controles, 16 cards, 24 bloques grandes; píldora solo
+   para toggles y chips.
+   ============================================================ */
+.site-public,
+body:has(.site-public) {
+  color-scheme: light;
+
+  --brand-main: #0e5c63;
+  --brand-main-hover: #0a4a50;
+  --brand-main-soft: #e2eeee;
+
+  --background: #f4f4f2;
+  --foreground: #16181a;
+  --sunken: #ebebe8;
+  --fg-secondary: #45494d;
+  --fg-disabled: #9a9ea2;
+  --border-subtle: #e6e6e2;
+  --border-strong: #c4c5c1;
+
+  --card: #fcfcfb;
+  --card-foreground: #16181a;
+  --popover: #fcfcfb;
+  --popover-foreground: #16181a;
+
+  --primary: #0e5c63;
+  --primary-foreground: #fcfcfb;
+  --secondary: #ebebe8;
+  --secondary-foreground: #16181a;
+  --muted: #ebebe8;
+  --muted-foreground: #5c6166;
+  --accent: #ebebe8;
+  --accent-foreground: #16181a;
+  --destructive: #b42318;
+  --border: #e0e0dc;
+  --input: #d3d4d0;
+  --ring: #0e5c63;
+
+  --radius: 10px;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --radius-xl: 16px;
+  --radius-2xl: 16px;
+  --radius-3xl: 24px;
+  --radius-4xl: 24px;
+
+  /* Directo a --site-font-body: --font-general se resuelve en :root,
+     donde esa variable no existe. */
+  font-family: var(--site-font-body, ui-sans-serif), sans-serif;
   font-variant-numeric: normal;
   --text-xs: 0.75rem;
   --text-xs--line-height: 1rem;
@@ -109,8 +167,57 @@ body {
   --text-2xl--line-height: 2rem;
 }
 
+/* Entrada del hero del sitio público (solo CSS, sin JS). La foto se
+   asienta y el texto sube en cascada con --rise-delay. Con "reducir
+   movimiento" no se anima nada. */
+@keyframes site-rise {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes site-settle {
+  from {
+    transform: scale(1.06);
+  }
+  to {
+    transform: scale(1);
+  }
+}
+
+/* Cambio de contenido sin mover el encabezado (ej. lista ↔ mapa). */
+@keyframes site-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .site-fade {
+    animation: site-fade 0.25s ease-out both;
+  }
+  .site-rise {
+    animation: site-rise 0.8s cubic-bezier(0.16, 1, 0.3, 1) var(--rise-delay, 0ms) both;
+  }
+  .site-settle {
+    animation: site-settle 1.6s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+}
+
 :root {
   --radius: 6px;
+
+  --brand-main: #004fbe;
+  --brand-main-soft: #e6eefa;
+  --brand-main-hover: #003f98;
 
   /* Escala tipográfica del panel (6 pasos): 12 meta y labels de
      tabla, 13 información, 14 contenido, 16 título de sección,

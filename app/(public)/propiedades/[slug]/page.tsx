@@ -30,6 +30,7 @@ import { ViewCounter } from "@/features/public/ViewCounter";
 import { PropertyJsonLd } from "@/features/public/seo/PropertyJsonLd";
 import { PropertyFullDetails } from "@/features/properties/types/index";
 import { ShareButton } from "@/features/properties/ShareButton";
+import { FactChip, KeyFacts, type Fact } from "@/features/properties/KeyFacts";
 
 // --- Carga de Datos Principal ---
 async function getPropertyDetails(
@@ -163,55 +164,6 @@ export async function generateMetadata({
 }
 
 // --- Helpers Visuales ---
-function KeyFact({
-  icon: Icon,
-  label,
-  value,
-  unit,
-}: {
-  icon: React.ElementType;
-  label: string;
-  value: number | string | null;
-  unit?: string;
-}) {
-  if (value === null || value === undefined || value === "") return null;
-  return (
-    <div className="flex flex-col gap-3 bg-white p-4 md:p-5">
-      <Icon className="h-5 w-5 text-zinc-400" strokeWidth={1.75} />
-      <div>
-        <dd className="font-clash text-2xl font-semibold leading-none text-zinc-900 md:text-[28px]">
-          {typeof value === "number" ? value.toLocaleString("es-AR") : value}
-          {unit && (
-            <span className="ml-1 text-base font-medium text-zinc-500">
-              {unit}
-            </span>
-          )}
-        </dd>
-        <dt className="mt-1.5 text-sm text-zinc-500">{label}</dt>
-      </div>
-    </div>
-  );
-}
-
-function FactChip({
-  icon: Icon,
-  label,
-  value,
-}: {
-  icon: React.ElementType;
-  label: string;
-  value: string | null;
-}) {
-  if (!value) return null;
-  return (
-    <div className="inline-flex items-center gap-2 rounded-full border border-zinc-200 bg-white px-3.5 py-2 text-sm">
-      <Icon className="h-4 w-4 text-zinc-400" />
-      <span className="text-zinc-500">{label}</span>
-      <span className="font-semibold text-zinc-900">{value}</span>
-    </div>
-  );
-}
-
 function TechSpecItem({
   label,
   value,
@@ -307,14 +259,16 @@ export default async function PropertyPage({
     property.total_area > 0
       ? `${currency || "USD"} $${Math.round(price / property.total_area).toLocaleString("es-AR")}`
       : null;
-  const keyFactCount = [
-    property.rooms,
-    property.bedrooms,
-    property.bathrooms,
-    property.total_area,
-    property.covered_area,
-    property.cocheras,
-  ].filter((v) => v !== null && v !== undefined && v !== "").length;
+  const keyFacts = (
+    [
+      { icon: DoorOpen, label: "Ambientes", value: property.rooms },
+      { icon: BedDouble, label: "Dormitorios", value: property.bedrooms },
+      { icon: Bath, label: "Baños", value: property.bathrooms },
+      { icon: Maximize2, label: "Sup. total", value: property.total_area, unit: "m²" },
+      { icon: Ruler, label: "Sup. cubierta", value: property.covered_area, unit: "m²" },
+      { icon: Car, label: "Cocheras", value: property.cocheras },
+    ] as { icon: React.ElementType; label: string; value: number | string | null | undefined; unit?: string }[]
+  ).filter((f): f is Fact => f.value !== null && f.value !== undefined && f.value !== "");
   const hasCoords =
     typeof property.latitude === "number" &&
     typeof property.longitude === "number";
@@ -382,20 +336,7 @@ export default async function PropertyPage({
               >
                 La propiedad de un vistazo
               </h2>
-              {keyFactCount > 0 && (
-                <dl
-                  className={`grid grid-cols-2 gap-px overflow-hidden rounded-2xl border border-zinc-200 bg-zinc-200 sm:grid-cols-3 ${
-                    keyFactCount === 6 ? "xl:grid-cols-6" : ""
-                  }`}
-                >
-                  <KeyFact icon={DoorOpen} label="Ambientes" value={property.rooms} />
-                  <KeyFact icon={BedDouble} label="Dormitorios" value={property.bedrooms} />
-                  <KeyFact icon={Bath} label="Baños" value={property.bathrooms} />
-                  <KeyFact icon={Maximize2} label="Sup. total" value={property.total_area} unit="m²" />
-                  <KeyFact icon={Ruler} label="Sup. cubierta" value={property.covered_area} unit="m²" />
-                  <KeyFact icon={Car} label="Cocheras" value={property.cocheras} />
-                </dl>
-              )}
+              <KeyFacts facts={keyFacts} />
               <div className="mt-4 flex flex-wrap gap-2">
                 <FactChip icon={Building} label="Tipo" value={property.property_types?.name ?? null} />
                 <FactChip icon={Tag} label="Precio / m²" value={pricePerM2} />

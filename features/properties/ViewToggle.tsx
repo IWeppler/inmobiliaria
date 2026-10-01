@@ -16,7 +16,9 @@ export function ViewToggle({ current }: { current: "lista" | "mapa" }) {
     if (view === "lista") params.delete("vista");
     else params.set("vista", view);
     const qs = params.toString();
-    router.push(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+    // Volver arriba: la vista mapa ocupa el viewport y no debe quedar
+    // cortada si se venía scrolleado en la lista.
+    router.push(qs ? `${pathname}?${qs}` : pathname);
   };
 
   const option = (view: "lista" | "mapa", label: string, Icon: React.ElementType) => (
@@ -25,10 +27,10 @@ export function ViewToggle({ current }: { current: "lista" | "mapa" }) {
       onClick={() => setView(view)}
       aria-pressed={current === view}
       className={cn(
-        "inline-flex h-9 items-center gap-1.5 rounded-md px-3 text-sm font-medium transition-colors",
+        "inline-flex h-9 items-center gap-1.5 rounded-sm px-3 text-sm font-medium transition-colors",
         current === view
-          ? "bg-zinc-900 text-white shadow-sm"
-          : "text-zinc-600 hover:text-zinc-900",
+          ? "bg-foreground text-background shadow-sm"
+          : "text-muted-foreground hover:text-foreground",
       )}
     >
       <Icon className="h-4 w-4" />
@@ -40,7 +42,7 @@ export function ViewToggle({ current }: { current: "lista" | "mapa" }) {
     <div
       role="group"
       aria-label="Tipo de vista"
-      className="inline-flex rounded-lg border border-zinc-200 bg-white p-0.5"
+      className="inline-flex h-10 items-center rounded-md border border-border bg-card p-0.5"
     >
       {option("lista", "Lista", LayoutGrid)}
       {option("mapa", "Mapa", MapIcon)}

@@ -63,13 +63,13 @@ export function SearchBar({ propertyTypes, locations }: HeroSearchCardProps) {
   ];
 
   return (
-    <div className="-mt-8 w-full max-w-5xl mx-auto bg-white p-2 rounded-xl md:rounded-full shadow-2xl transition-all duration-300 border border-zinc-100">
+    <div className="-mt-8 w-full max-w-5xl mx-auto bg-card p-2 rounded-xl md:rounded-full shadow-[0_24px_48px_-20px_rgb(22_24_26/0.3)] transition-all duration-300 border border-border">
       <form
         onSubmit={handleSearch}
         className="flex flex-col md:flex-row items-center w-full gap-2 md:gap-0"
       >
         {/* 1. TOGGLE DE OPERACIÓN */}
-        <div className="flex bg-zinc-100 p-1.5 rounded-full w-full md:w-auto shrink-0 md:mr-3">
+        <div role="group" aria-label="Operación" className="flex bg-muted p-1.5 rounded-full w-full md:w-auto shrink-0 md:mr-3">
           {tabs.map((tab) => {
             const isActive = operation === tab.value;
 
@@ -77,6 +77,7 @@ export function SearchBar({ propertyTypes, locations }: HeroSearchCardProps) {
               <button
                 key={tab.value}
                 type="button"
+                aria-pressed={isActive}
                 onClick={() => setOperation(tab.value)}
                 className={`
                   relative flex-1 md:flex-none px-6 py-2.5 text-[15px] font-semibold rounded-full transition-colors duration-200
@@ -90,7 +91,7 @@ export function SearchBar({ propertyTypes, locations }: HeroSearchCardProps) {
                 {isActive && (
                   <motion.div
                     layoutId="active-operation-pill"
-                    className="absolute inset-0 bg-white shadow-sm rounded-full"
+                    className="absolute inset-0 bg-card shadow-sm rounded-full"
                     transition={{ type: "spring", stiffness: 400, damping: 30 }}
                   />
                 )}
@@ -100,16 +101,16 @@ export function SearchBar({ propertyTypes, locations }: HeroSearchCardProps) {
           })}
         </div>
 
-        <div className="hidden md:block w-px h-10 bg-zinc-200 mx-2 shrink-0" />
+        <div className="hidden md:block w-px h-10 bg-border mx-2 shrink-0" />
 
         {/* 2. SELECT DE UBICACIÓN */}
         <div className="flex-1 w-full px-2 md:px-4 flex items-center gap-2 py-2 transition-colors group min-w-0">
-          <div className="bg-zinc-100 p-2.5 rounded-full text-muted-foreground hidden md:flex shrink-0">
+          <div className="bg-muted p-2.5 rounded-full text-muted-foreground hidden md:flex shrink-0">
             <MapPin className="w-[18px] h-[18px]" />
           </div>
           <div className="flex-1 min-w-0 flex flex-col justify-center">
             <Select value={locationValue} onValueChange={setLocationValue}>
-              <SelectTrigger className="w-full border-0 shadow-none focus:ring-0 focus:ring-offset-0 p-2 md:p-0 h-auto bg-transparent rounded-none text-[15px] md:text-base font-medium text-foreground transition-all [&>span]:truncate [&>svg]:text-muted-foreground [&>svg]:w-4 [&>svg]:h-4 [&>svg]:ml-2">
+              <SelectTrigger aria-label="Ubicación" className="w-full border-0 shadow-none focus:ring-0 focus:ring-offset-0 p-2 md:p-0 h-auto bg-transparent rounded-none text-[15px] md:text-base font-medium text-foreground transition-all [&>span]:truncate [&>svg]:text-muted-foreground [&>svg]:w-4 [&>svg]:h-4 [&>svg]:ml-2">
                 <SelectValue placeholder="Todas las zonas" />
               </SelectTrigger>
 
@@ -121,7 +122,7 @@ export function SearchBar({ propertyTypes, locations }: HeroSearchCardProps) {
                   value="all"
                   className="rounded-xl text-base py-3 cursor-pointer"
                 >
-                  Ubicación
+                  Todas las zonas
                 </SelectItem>
                 {locations?.length > 0 ? (
                   locations.map((loc, index) => (
@@ -146,17 +147,17 @@ export function SearchBar({ propertyTypes, locations }: HeroSearchCardProps) {
           </div>
         </div>
 
-        <div className="hidden md:block w-px h-10 bg-zinc-200 mx-2 shrink-0" />
+        <div className="hidden md:block w-px h-10 bg-border mx-2 shrink-0" />
 
         {/* 3. SELECT DE TIPO DE PROPIEDAD */}
         <div className="flex-1 w-full px-2 md:px-4 flex items-center gap-2 py-2 transition-colors group min-w-0">
-          <div className="bg-zinc-100 p-2.5 rounded-full text-muted-foreground  hidden md:flex shrink-0 ">
+          <div className="bg-muted p-2.5 rounded-full text-muted-foreground  hidden md:flex shrink-0 ">
             <Home className="w-[18px] h-[18px]" />
           </div>
           <div className="flex-1 min-w-0 flex flex-col justify-center">
             <Select value={propertyTypeId} onValueChange={setPropertyTypeId}>
-              <SelectTrigger className="w-full border-0 shadow-none focus:ring-0 focus:ring-offset-0 p-2 md:p-0 h-auto bg-transparent rounded-none text-[15px] md:text-base font-medium text-foreground transition-all [&>span]:truncate [&>svg]:text-muted-foreground [&>svg]:w-4 [&>svg]:h-4 [&>svg]:ml-2">
-                <SelectValue placeholder="Cualquier propiedad" />
+              <SelectTrigger aria-label="Tipo de propiedad" className="w-full border-0 shadow-none focus:ring-0 focus:ring-offset-0 p-2 md:p-0 h-auto bg-transparent rounded-none text-[15px] md:text-base font-medium text-foreground transition-all [&>span]:truncate [&>svg]:text-muted-foreground [&>svg]:w-4 [&>svg]:h-4 [&>svg]:ml-2">
+                <SelectValue placeholder="Todos los tipos" />
               </SelectTrigger>
               <SelectContent
                 side="bottom"
@@ -168,7 +169,7 @@ export function SearchBar({ propertyTypes, locations }: HeroSearchCardProps) {
                   value="all"
                   className="rounded-xl text-base py-3 cursor-pointer"
                 >
-                  Tipo
+                  Todos los tipos
                 </SelectItem>
                 {propertyTypes?.map((type) => (
                   <SelectItem
@@ -187,7 +188,7 @@ export function SearchBar({ propertyTypes, locations }: HeroSearchCardProps) {
         {/* 4. BOTÓN DE BÚSQUEDA */}
         <Button
           type="submit"
-          className="w-full md:w-auto h-12 md:h-14 px-8 rounded-3xl md:rounded-full bg-foreground hover:bg-foreground/90 text-background md:text-base font-semibold transition-all mt-2 md:mt-0 shrink-0 md:ml-3 cursor-pointer"
+          className="w-full md:w-auto h-12 md:h-14 px-8 rounded-full bg-foreground hover:bg-foreground/90 active:scale-[0.98] text-background md:text-base font-semibold transition-all mt-2 md:mt-0 shrink-0 md:ml-3 cursor-pointer"
         >
           <Search className="w-[18px] h-[18px] mr-1" />
           <span>Buscar</span>

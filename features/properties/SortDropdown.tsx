@@ -33,21 +33,21 @@ export function SortDropdown({ currentSort }: SortDropdownProps) {
     <Select value={currentSort} onValueChange={handleSortChange}>
       <SelectTrigger
         aria-label="Ordenar"
-        className="h-10 w-[190px] gap-2 rounded-lg border-zinc-200 bg-white text-sm data-[size=default]:h-10"
+        className="h-10 w-[190px] gap-2 rounded-md border-border bg-card text-sm data-[size=default]:h-10"
       >
         <SelectValue placeholder="Ordenar" />
       </SelectTrigger>
       <SelectContent>
         <SelectItem value="default">
-          <Clock className="h-4 w-4 text-zinc-400" />
+          <Clock className="h-4 w-4 text-muted-foreground" />
           Más recientes
         </SelectItem>
         <SelectItem value="price_asc">
-          <ArrowUpNarrowWide className="h-4 w-4 text-zinc-400" />
+          <ArrowUpNarrowWide className="h-4 w-4 text-muted-foreground" />
           Menor precio
         </SelectItem>
         <SelectItem value="price_desc">
-          <ArrowDownWideNarrow className="h-4 w-4 text-zinc-400" />
+          <ArrowDownWideNarrow className="h-4 w-4 text-muted-foreground" />
           Mayor precio
         </SelectItem>
       </SelectContent>

@@ -12,6 +12,14 @@ export const BRAND = {
   instagram: process.env.NEXT_PUBLIC_BRAND_INSTAGRAM ?? null,
   siteUrl:
     process.env.NEXT_PUBLIC_SITE_URL ?? "https://terranova-demo.vercel.app",
+  // Contacto de la inmobiliaria para el sitio público. WhatsApp en
+  // formato internacional, solo dígitos (ej. 5491154702118).
+  whatsapp: process.env.NEXT_PUBLIC_BRAND_WHATSAPP ?? "541154702118",
+  email: process.env.NEXT_PUBLIC_BRAND_EMAIL ?? "info@terranova.com",
+  // Teléfono tal como se muestra en el sitio.
+  phoneDisplay: process.env.NEXT_PUBLIC_BRAND_PHONE_DISPLAY ?? "+54 11 5470-2118",
+  // Dirección de la oficina. Opcional: si falta, no se muestra.
+  address: process.env.NEXT_PUBLIC_BRAND_ADDRESS ?? null,
   // Color primario de la pieza (hex). Default: el navy del design system.
   color: process.env.NEXT_PUBLIC_BRAND_COLOR ?? "#111a2e",
 };
@@ -30,6 +38,10 @@ export function formatLocation(p: {
   province?: string | null;
 }) {
   return [p.neighborhood, p.city, p.province].filter(Boolean).join(", ");
+}
+
+export function whatsappLink(message: string) {
+  return `https://wa.me/${BRAND.whatsapp}?text=${encodeURIComponent(message)}`;
 }
 
 export function propertyUrl(id: string) {

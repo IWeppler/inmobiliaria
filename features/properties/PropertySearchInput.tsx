@@ -54,25 +54,25 @@ export function PropertySearchInput({ initial }: { initial: string }) {
       }}
       className="relative w-full"
     >
-      <Search className="pointer-events-none absolute top-1/2 left-3.5 h-4 w-4 -translate-y-1/2 text-zinc-400" />
+      <Search className="pointer-events-none absolute top-1/2 left-3.5 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
       <input
         type="search"
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder="Buscar por barrio, ciudad o calle…"
         aria-label="Buscar propiedades"
-        className="h-10 w-full rounded-lg border border-zinc-200 bg-white pr-10 pl-10 text-sm text-zinc-900 shadow-xs outline-none transition placeholder:text-zinc-400 focus:border-zinc-900 focus:ring-3 focus:ring-zinc-900/5 [&::-webkit-search-cancel-button]:hidden"
+        className="h-10 w-full rounded-md border border-border bg-card pr-10 pl-10 text-sm text-foreground shadow-xs outline-none transition placeholder:text-muted-foreground focus:border-main focus:ring-3 focus:ring-ring/15 [&::-webkit-search-cancel-button]:hidden"
       />
       <span className="absolute top-1/2 right-2 flex -translate-y-1/2 items-center">
         {pending ? (
-          <Loader2 className="h-4 w-4 animate-spin text-zinc-400" />
+          <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
         ) : (
           value && (
             <button
               type="button"
               onClick={() => onChange("")}
               aria-label="Borrar búsqueda"
-              className="flex h-7 w-7 items-center justify-center rounded-full text-zinc-400 transition hover:bg-zinc-100 hover:text-zinc-900"
+              className="flex h-7 w-7 items-center justify-center rounded-full text-muted-foreground transition hover:bg-muted hover:text-foreground"
             >
               <X className="h-4 w-4" />
             </button>

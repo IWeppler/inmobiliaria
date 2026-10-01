@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { Bath, BedDouble, Maximize2 } from "lucide-react";
 import { LngLatBounds } from "maplibre-gl";
@@ -13,6 +13,7 @@ import {
   useMap,
 } from "@/shared/components/ui/map";
 import { cn } from "@/lib/utils";
+import { cardImages } from "@/features/properties/PropertyCard";
 
 export type MapProperty = {
   id: string;
@@ -42,6 +43,10 @@ export function fullPrice(price: number | null, currency: string | null) {
   return `${currency || "USD"} $${price.toLocaleString("es-AR")}`;
 }
 
+function boundsOf(points: LocatedProperty[]) {
+  return points.reduce((b, p) => b.extend([p.longitude, p.latitude]), new LngLatBounds());
+}
+
 function FitBounds({ points }: { points: LocatedProperty[] }) {
   const { map, isLoaded } = useMap();
   useEffect(() => {
@@ -50,11 +55,7 @@ function FitBounds({ points }: { points: LocatedProperty[] }) {
       map.jumpTo({ center: [points[0].longitude, points[0].latitude], zoom: 14 });
       return;
     }
-    const bounds = points.reduce(
-      (b, p) => b.extend([p.longitude, p.latitude]),
-      new LngLatBounds(),
-    );
-    map.fitBounds(bounds, { padding: 60, maxZoom: 15, duration: 0 });
+    map.fitBounds(boundsOf(points), { padding: 72, maxZoom: 15, duration: 0 });
   }, [map, isLoaded, points]);
   return null;
 }
@@ -65,35 +66,179 @@ function FlyTo({ target }: { target: LocatedProperty | null }) {
     if (!map || !isLoaded || !target) return;
     map.flyTo({
       center: [target.longitude, target.latitude],
-      zoom: Math.max(map.getZoom(), 14),
+      // Al menos el zoom donde ya no se agrupa, así el pin elegido queda suelto.
+      zoom: Math.max(map.getZoom(), NO_CLUSTER_ZOOM),
       duration: 600,
     });
   }, [map, isLoaded, target]);
   return null;
 }
 
+// --- Agrupación de pines ---------------------------------------------
+// Los pines de precio miden ~100x30px: si dos se superponen en pantalla
+// se agrupan en uno ("3 propiedades") que al hacer click acerca el mapa.
+// Se recalcula al terminar cada movimiento; desde zoom 16 no se agrupa
+// (a esa escala las superposiciones son direcciones casi iguales).
+const OVERLAP_X = 96;
+const OVERLAP_Y = 34;
+const NO_CLUSTER_ZOOM = 16;
+
+type Group = { key: string; members: LocatedProperty[]; lng: number; lat: number };
+
+function useGroups(points: LocatedProperty[]) {
+  const { map, isLoaded } = useMap();
+  const [groups, setGroups] = useState<Group[]>([]);
+
+  useEffect(() => {
+    if (!map || !isLoaded) return;
+
+    const compute = () => {
+      if (map.getZoom() >= NO_CLUSTER_ZOOM) {
+        setGroups(points.map((p) => ({ key: p.id, members: [p], lng: p.longitude, lat: p.latitude })));
+        return;
+      }
+      const acc: { x: number; y: number; members: LocatedProperty[] }[] = [];
+      for (const p of points) {
+        const pt = map.project([p.longitude, p.latitude]);
+        const hit = acc.find((g) => Math.abs(g.x - pt.x) < OVERLAP_X && Math.abs(g.y - pt.y) < OVERLAP_Y);
+        if (hit) hit.members.push(p);
+        else acc.push({ x: pt.x, y: pt.y, members: [p] });
+      }
+      setGroups(
+        acc.map(({ members }) => ({
+          key: members.map((m) => m.id).join("|"),
+          members,
+          lng: members.reduce((s, m) => s + m.longitude, 0) / members.length,
+          lat: members.reduce((s, m) => s + m.latitude, 0) / members.length,
+        })),
+      );
+    };
+
+    compute();
+    map.on("moveend", compute);
+    return () => {
+      map.off("moveend", compute);
+    };
+  }, [map, isLoaded, points]);
+
+  return { groups, map };
+}
+
+function PriceMarkers({
+  points,
+  activeId,
+  selectedId,
+  onActiveChange,
+  onSelect,
+}: {
+  points: LocatedProperty[];
+  activeId: string | null;
+  selectedId: string | null;
+  onActiveChange: (id: string | null) => void;
+  onSelect: (id: string | null) => void;
+}) {
+  const { groups, map } = useGroups(points);
+
+  return (
+    <>
+      {groups.map((g) => {
+        if (g.members.length === 1) {
+          const p = g.members[0];
+          const highlighted = activeId === p.id || selectedId === p.id;
+          return (
+            <MapMarker
+              key={g.key}
+              longitude={p.longitude}
+              latitude={p.latitude}
+              anchor="bottom"
+              onClick={(e) => {
+                e.stopPropagation();
+                onSelect(p.id);
+              }}
+              onMouseEnter={() => onActiveChange(p.id)}
+              onMouseLeave={() => onActiveChange(null)}
+            >
+              <MarkerContent className={highlighted ? "z-10" : undefined}>
+                <span
+                  className={cn(
+                    "relative flex cursor-pointer flex-col items-center transition-transform duration-150 motion-reduce:transition-none",
+                    highlighted && "scale-110",
+                  )}
+                >
+                  <span
+                    className={cn(
+                      "rounded-full border px-2.5 py-1 text-xs font-semibold whitespace-nowrap shadow-[0_4px_12px_-4px_rgb(22_24_26/0.35)] transition-colors",
+                      highlighted
+                        ? "border-main bg-main text-primary-foreground"
+                        : "border-border bg-card text-foreground",
+                    )}
+                  >
+                    {fullPrice(p.price, p.currency)}
+                  </span>
+                  <span
+                    className={cn(
+                      "-mt-1 h-2 w-2 rotate-45 border-r border-b transition-colors",
+                      highlighted ? "border-main bg-main" : "border-border bg-card",
+                    )}
+                  />
+                </span>
+              </MarkerContent>
+            </MapMarker>
+          );
+        }
+
+        const highlighted = g.members.some((m) => m.id === activeId || m.id === selectedId);
+        return (
+          <MapMarker
+            key={g.key}
+            longitude={g.lng}
+            latitude={g.lat}
+            anchor="center"
+            onClick={(e) => {
+              e.stopPropagation();
+              map?.fitBounds(boundsOf(g.members), { padding: 96, maxZoom: NO_CLUSTER_ZOOM + 1, duration: 500 });
+            }}
+          >
+            <MarkerContent className={highlighted ? "z-10" : undefined}>
+              <span
+                role="button"
+                aria-label={`${g.members.length} propiedades en esta zona, acercar`}
+                className={cn(
+                  "flex cursor-pointer items-center rounded-full border-2 px-3 py-1.5 text-xs font-semibold whitespace-nowrap shadow-[0_4px_12px_-4px_rgb(22_24_26/0.4)] transition-[transform,background-color] duration-150 hover:scale-105 motion-reduce:transition-none",
+                  highlighted
+                    ? "border-card bg-main text-primary-foreground"
+                    : "border-card bg-foreground text-background",
+                )}
+              >
+                {g.members.length} propiedades
+              </span>
+            </MarkerContent>
+          </MapMarker>
+        );
+      })}
+    </>
+  );
+}
+
 function Popup({ property }: { property: LocatedProperty }) {
-  const image = property.property_images?.[0]?.image_url;
+  const image = cardImages(property.property_images)[0];
   return (
     <Link
       href={`/propiedades/${property.id}`}
-      className="group block w-[260px] overflow-hidden rounded-xl border border-zinc-200 bg-white text-zinc-900 shadow-xl"
+      className="site-public group block w-[260px] overflow-hidden rounded-lg border border-border bg-card text-foreground shadow-[0_16px_40px_-12px_rgb(22_24_26/0.35)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
     >
-      <div className="relative h-[150px] bg-zinc-100">
+      <div className="relative h-[150px] bg-muted">
         {image && (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={image} alt="" className="h-full w-full object-cover" />
         )}
-        <span className="absolute top-2 left-2 rounded-md bg-white px-2 py-1 text-[10px] font-semibold uppercase tracking-wide shadow-sm">
-          {property.status === "EN_ALQUILER" ? "En alquiler" : "En venta"}
-        </span>
       </div>
       <div className="space-y-1.5 p-3">
-        <p className="font-clash text-lg font-semibold leading-tight">
+        <p className="font-clash text-lg leading-tight font-semibold">
           {fullPrice(property.price, property.currency)}
         </p>
-        <p className="line-clamp-2 text-sm font-medium group-hover:underline">{property.title}</p>
-        <p className="truncate text-xs text-zinc-500">
+        <p className="line-clamp-2 text-sm font-medium underline-offset-2 group-hover:underline">{property.title}</p>
+        <p className="truncate text-xs text-muted-foreground">
           {[property.street_address, property.city].filter(Boolean).join(", ")}
         </p>
         <Specs property={property} />
@@ -104,16 +249,17 @@ function Popup({ property }: { property: LocatedProperty }) {
 
 export function Specs({ property, className }: { property: MapProperty; className?: string }) {
   const items = [
-    property.bedrooms ? { key: "bed", icon: BedDouble, text: `${property.bedrooms}` } : null,
-    property.bathrooms ? { key: "bath", icon: Bath, text: `${property.bathrooms}` } : null,
-    property.total_area ? { key: "area", icon: Maximize2, text: `${property.total_area} m²` } : null,
-  ].filter(Boolean) as { key: string; icon: React.ElementType; text: string }[];
+    property.bedrooms ? { key: "bed", icon: BedDouble, text: `${property.bedrooms}`, label: "dormitorios" } : null,
+    property.bathrooms ? { key: "bath", icon: Bath, text: `${property.bathrooms}`, label: "baños" } : null,
+    property.total_area ? { key: "area", icon: Maximize2, text: `${property.total_area} m²`, label: "superficie" } : null,
+  ].filter(Boolean) as { key: string; icon: React.ElementType; text: string; label: string }[];
   if (items.length === 0) return null;
   return (
-    <p className={cn("flex items-center gap-3 text-xs text-zinc-600", className)}>
-      {items.map(({ key, icon: Icon, text }) => (
-        <span key={key} className="inline-flex items-center gap-1">
-          <Icon className="h-3.5 w-3.5 text-zinc-400" />
+    <p className={cn("flex items-center gap-3 text-xs text-muted-foreground", className)}>
+      {items.map(({ key, icon: Icon, text, label }) => (
+        <span key={key} className="inline-flex items-center gap-1" title={label}>
+          <Icon className="h-3.5 w-3.5" aria-hidden="true" />
+          <span className="sr-only">{label}: </span>
           {text}
         </span>
       ))}
@@ -145,6 +291,8 @@ export default function PublicPropertiesMap({
 
   return (
     <Map
+      // El sitio público siempre es claro, aunque el panel haya quedado en oscuro.
+      theme="light"
       center={DEFAULT_CENTER}
       zoom={6}
       cooperativeGestures
@@ -159,49 +307,13 @@ export default function PublicPropertiesMap({
       <FlyTo target={focus} />
       <MapControls position="top-right" showZoom showFullscreen />
 
-      {properties.map((p) => {
-        const highlighted = activeId === p.id || selectedId === p.id;
-        return (
-          <MapMarker
-            key={p.id}
-            longitude={p.longitude}
-            latitude={p.latitude}
-            anchor="bottom"
-            onClick={(e) => {
-              e.stopPropagation();
-              onSelect(p.id);
-            }}
-            onMouseEnter={() => onActiveChange(p.id)}
-            onMouseLeave={() => onActiveChange(null)}
-          >
-            <MarkerContent className={highlighted ? "z-10" : undefined}>
-              <span
-                className={cn(
-                  "relative flex flex-col items-center transition-transform duration-150",
-                  highlighted && "scale-110",
-                )}
-              >
-                <span
-                  className={cn(
-                    "whitespace-nowrap rounded-full border px-2.5 py-1 text-xs font-semibold shadow-md",
-                    highlighted
-                      ? "border-zinc-900 bg-zinc-900 text-white"
-                      : "border-zinc-200 bg-white text-zinc-900",
-                  )}
-                >
-                  {fullPrice(p.price, p.currency)}
-                </span>
-                <span
-                  className={cn(
-                    "-mt-1 h-2 w-2 rotate-45 border-r border-b",
-                    highlighted ? "border-zinc-900 bg-zinc-900" : "border-zinc-200 bg-white",
-                  )}
-                />
-              </span>
-            </MarkerContent>
-          </MapMarker>
-        );
-      })}
+      <PriceMarkers
+        points={points}
+        activeId={activeId}
+        selectedId={selectedId}
+        onActiveChange={onActiveChange}
+        onSelect={onSelect}
+      />
 
       {selected && (
         <MapPopup
@@ -212,7 +324,7 @@ export default function PublicPropertiesMap({
           closeOnClick={false}
           onClose={() => onSelect(null)}
           key={selected.id}
-          className="max-w-none rounded-xl border-0 bg-transparent p-0 shadow-none"
+          className="max-w-none rounded-lg border-0 bg-transparent p-0 shadow-none"
         >
           <Popup property={selected} />
         </MapPopup>

@@ -58,6 +58,8 @@ export default function PropertyMap({ lat, lng, title }: PropertyMapProps) {
 
   return (
     <Map
+      // El sitio público siempre es claro, aunque el panel haya quedado en oscuro.
+      theme="light"
       center={[lng, lat]}
       zoom={DEFAULT_ZOOM}
       minZoom={4}
@@ -69,10 +71,10 @@ export default function PropertyMap({ lat, lng, title }: PropertyMapProps) {
       <MapMarker longitude={lng} latitude={lat} anchor="bottom">
         <MarkerContent>
           <span className="relative flex flex-col items-center">
-            <span className="flex size-11 items-center justify-center rounded-full border-[3px] border-white bg-zinc-900 text-white shadow-lg">
+            <span className="flex size-11 items-center justify-center rounded-full border-[3px] border-card bg-main text-primary-foreground shadow-[0_8px_20px_-6px_rgb(22_24_26/0.45)]">
               <Home className="size-5" aria-label={title} />
             </span>
-            <span className="-mt-1 size-3 rotate-45 border-r-[3px] border-b-[3px] border-white bg-zinc-900" />
+            <span className="-mt-1 size-3 rotate-45 border-r-[3px] border-b-[3px] border-card bg-main" />
           </span>
         </MarkerContent>
         <MarkerPopup offset={52}>

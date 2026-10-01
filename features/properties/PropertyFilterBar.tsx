@@ -53,11 +53,11 @@ export function PropertyFilterBar({ types, amenities, cities }: Props) {
             className={cn(
               "inline-flex h-10 shrink-0 items-center gap-2 rounded-full border px-3.5 text-sm font-medium transition",
               selected.length
-                ? "border-zinc-900 bg-zinc-900 text-white"
-                : "border-zinc-200 bg-white text-zinc-800 hover:border-zinc-400",
+                ? "border-foreground bg-foreground text-background"
+                : "border-border bg-card text-foreground hover:border-border-strong",
             )}
           >
-            <Icon className={cn("h-4 w-4", selected.length ? "text-white/80" : "text-zinc-400")} />
+            <Icon className={cn("h-4 w-4", selected.length ? "text-background/80" : "text-muted-foreground")} />
             {summary}
             <ChevronDown className="h-4 w-4 opacity-70" />
           </button>
@@ -72,7 +72,7 @@ export function PropertyFilterBar({ types, amenities, cities }: Props) {
                     type="button"
                     onClick={() => toggle(name, o.value)}
                     className={cn(
-                      "flex w-full items-center justify-between gap-2 rounded-md px-2.5 py-2 text-left text-sm transition-colors hover:bg-zinc-100",
+                      "flex w-full items-center justify-between gap-2 rounded-md px-2.5 py-2 text-left text-sm transition-colors hover:bg-muted",
                       on && "font-semibold",
                     )}
                   >
@@ -87,7 +87,7 @@ export function PropertyFilterBar({ types, amenities, cities }: Props) {
             <button
               type="button"
               onClick={() => clear([name])}
-              className="mt-1 w-full rounded-md border-t border-zinc-100 px-2.5 py-2 text-left text-xs text-zinc-500 hover:text-zinc-900"
+              className="mt-1 w-full rounded-md border-t border-border px-2.5 py-2 text-left text-xs text-muted-foreground hover:text-foreground"
             >
               Quitar filtro
             </button>
@@ -114,6 +114,7 @@ export function PropertyFilterBar({ types, amenities, cities }: Props) {
         "Ubicación",
         MapPin,
         cities.map((c) => ({ value: c, label: c })),
+        true,
       )}
       {pill(
         "bedrooms",
@@ -138,7 +139,7 @@ export function PropertyFilterBar({ types, amenities, cities }: Props) {
         <button
           type="button"
           onClick={() => clear()}
-          className="inline-flex h-10 shrink-0 items-center gap-1 rounded-full px-3 text-sm font-medium text-zinc-600 hover:text-zinc-900"
+          className="inline-flex h-10 shrink-0 items-center gap-1 rounded-full px-3 text-sm font-medium text-muted-foreground hover:text-foreground"
         >
           <X className="h-4 w-4" />
           Limpiar ({activeCount})

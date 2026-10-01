@@ -39,20 +39,20 @@ export function PropertyFilterList({
   // --- Helpers  ---
   const selectedTipo = currentParams.tipo || "";
   const selectedTypeId = currentParams.typeId || ""; 
-  const selectedLocation = currentParams.loc || "";
+  const selectedLocations = currentParams.loc?.split(",").filter(Boolean) || [];
   const selectedAmenities = currentParams.amenities?.split(",") || [];
   const selectedBedrooms = currentParams.bedrooms || "";
   const selectedBathrooms = currentParams.bathrooms || "";
 
   return (
-    <div className="w-full bg-white border border-zinc-200 rounded-lg p-6">
+    <div className="w-full rounded-lg border border-border bg-card p-5 text-foreground md:max-h-[calc(100dvh-6rem)] md:overflow-y-auto md:overscroll-contain">
       <div className="flex items-center justify-between">
-        <h3 className="text-xl font-semibold">Filtros</h3>
+        <h2 className="font-clash text-xl font-semibold tracking-tight">Filtros</h2>
         {activeCount > 0 && (
           <button
             type="button"
             onClick={() => clear()}
-            className="text-sm font-medium text-zinc-500 hover:text-zinc-900"
+            className="cursor-pointer rounded-sm text-sm font-medium text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
             Limpiar ({activeCount})
           </button>
@@ -65,7 +65,7 @@ export function PropertyFilterList({
       >
         {/* --- Filtro de Operación --- */}
         <AccordionItem value="operation">
-          <AccordionTrigger>Tipo de Operación</AccordionTrigger>
+          <AccordionTrigger>Operación</AccordionTrigger>
           <AccordionContent className="space-y-3">
             <div className="flex items-center space-x-2">
               <Checkbox
@@ -91,7 +91,7 @@ export function PropertyFilterList({
         </AccordionItem>
 
         <AccordionItem value="propertyType">
-          <AccordionTrigger>Tipo de Propiedad</AccordionTrigger>
+          <AccordionTrigger>Tipo</AccordionTrigger>
           <AccordionContent className="space-y-3">
             {(types || []).map((type) => (
               <div key={type.id} className="flex items-center space-x-2">
@@ -116,7 +116,7 @@ export function PropertyFilterList({
               <div key={city} className="flex items-center space-x-2">
                 <Checkbox
                   id={`loc-${city}`}
-                  checked={selectedLocation === city}
+                  checked={selectedLocations.includes(city)}
                   onCheckedChange={() =>
                     toggle("loc", city)
                   }
@@ -140,7 +140,7 @@ export function PropertyFilterList({
                     toggle("bedrooms", String(num))
                   }
                 />
-                <Label htmlFor={`bed-${num}`}>{num}+ Dormitorios</Label>
+                <Label htmlFor={`bed-${num}`}>{num}+ dormitorios</Label>
               </div>
             ))}
           </AccordionContent>
@@ -159,7 +159,7 @@ export function PropertyFilterList({
                     toggle("bathrooms", String(num))
                   }
                 />
-                <Label htmlFor={`bath-${num}`}>{num}+ Baños</Label>
+                <Label htmlFor={`bath-${num}`}>{num}+ baños</Label>
               </div>
             ))}
           </AccordionContent>
