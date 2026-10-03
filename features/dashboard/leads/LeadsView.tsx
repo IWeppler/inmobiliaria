@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Plus, KanbanSquare, List, Search, X, ArrowLeft, Archive } from "lucide-react";
+import { Plus, KanbanSquare, List, Search, X, ArrowLeft, Archive, Target } from "lucide-react";
 import type { LeadWithDetails } from "@/app/types";
 import { Button } from "@/shared/components/ui/button";
 import { PageHeader } from "@/shared/components/PageShell";
@@ -22,6 +22,8 @@ import {
 import { LeadForm } from "@/features/dashboard/leads/LeadForm";
 import { LeadBoard } from "@/features/dashboard/leads/LeadBoard";
 import { LeadTable } from "@/features/dashboard/leads/LeadTable";
+import { DemandTab } from "@/features/dashboard/leads/DemandTab";
+import type { DemandGap } from "@/features/dashboard/buyers/queries";
 import { LEAD_STATUSES, normalizeStatus, type LeadStatus } from "@/features/dashboard/leads/leadStatus";
 import { Input } from "@/shared/components/ui/input";
 import {
@@ -44,14 +46,19 @@ type LeadsViewProps = {
   userRole: string;
   /** Filtro de estado inicial (desde ?estado= en la URL). */
   initialStatus?: string;
+  /** Pestaña inicial (?vista=demanda en la URL). */
+  initialView?: "board" | "list" | "demand";
+  /** Demanda sin oferta de toda la base (Buyer Intelligence). */
+  demandGaps: DemandGap[];
+  propertyTypes: { id: number; name: string | null }[];
 };
 
 // E1.1: /dashboard/leads con dos vistas sobre los mismos datos: Tablero
 // (Kanban, default) y Lista (tabla). El alta de lead vive acá, común a
 // ambas.
-export function LeadsView({ leads, userRole, initialStatus }: LeadsViewProps) {
+export function LeadsView({ leads, userRole, initialStatus, initialView = "board", demandGaps, propertyTypes }: LeadsViewProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [activeView, setActiveView] = useState("board");
+  const [activeView, setActiveView] = useState<string>(initialView);
   const [leadUpdates, setLeadUpdates] = useState<Record<string, { status: LeadStatus; changedAt: string }>>({});
   const isAdmin = userRole === "admin";
   const currentLeads = useMemo(() => leads.map((lead) => {
@@ -104,7 +111,12 @@ export function LeadsView({ leads, userRole, initialStatus }: LeadsViewProps) {
   }, [currentLeads, q, status, operation, agent, source]);
 
   const hasFilters = q.trim() !== "" || status !== ALL || operation !== ALL || agent !== ALL || source !== ALL;
-  const visibleCount = activeView === "board" && status !== "DESCARTADO"
+  const demandCount = filtered.filter(
+    (lead) => lead.search_operation && !["CERRADO", "DESCARTADO"].includes(normalizeStatus(lead.status)),
+  ).length;
+  const visibleCount = activeView === "demand"
+    ? demandCount
+    : activeView === "board" && status !== "DESCARTADO"
     ? filtered.filter((lead) => normalizeStatus(lead.status) !== "DESCARTADO").length
     : filtered.length;
   const isArchive = status === "DESCARTADO";
@@ -125,7 +137,11 @@ export function LeadsView({ leads, userRole, initialStatus }: LeadsViewProps) {
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
         <PageHeader
           title="Leads"
-          description={`${visibleCount} ${visibleCount === 1 ? "lead" : "leads"}${hasFilters ? ` de ${currentLeads.length}` : ""}`}
+          description={
+            activeView === "demand"
+              ? `${visibleCount} ${visibleCount === 1 ? "comprador" : "compradores"}${hasFilters ? ` de ${currentLeads.length} leads` : ""}`
+              : `${visibleCount} ${visibleCount === 1 ? "lead" : "leads"}${hasFilters ? ` de ${currentLeads.length}` : ""}`
+          }
           actions={
             <>
               <TabsList>
@@ -136,6 +152,10 @@ export function LeadsView({ leads, userRole, initialStatus }: LeadsViewProps) {
                 <TabsTrigger value="list" className="gap-1.5">
                   <List className="size-4" />
                   <span className="hidden sm:inline">Lista</span>
+                </TabsTrigger>
+                <TabsTrigger value="demand" className="gap-1.5">
+                  <Target className="size-4" />
+                  <span className="hidden sm:inline">Demanda</span>
                 </TabsTrigger>
               </TabsList>
               <DialogTrigger asChild>
@@ -247,6 +267,9 @@ export function LeadsView({ leads, userRole, initialStatus }: LeadsViewProps) {
       </TabsContent>
       <TabsContent value="list" className="min-w-0 overflow-x-auto">
         <LeadTable key={filterKey} initialLeads={filtered} userRole={userRole} />
+      </TabsContent>
+      <TabsContent value="demand" className="min-w-0">
+        <DemandTab leads={filtered} gaps={demandGaps} propertyTypes={propertyTypes} />
       </TabsContent>
     </Tabs>
   );

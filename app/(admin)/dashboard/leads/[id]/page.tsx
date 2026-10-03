@@ -1,6 +1,8 @@
 import { createClientServer } from "@/lib/supabase";
 import { notFound, redirect } from "next/navigation";
 import { LeadDetailClient } from "@/features/dashboard/leads/LeadDetailClient";
+import { findPropertyMatches } from "@/features/dashboard/buyers/queries";
+import { demandFromLead } from "@/features/dashboard/buyers/matching";
 
 export default async function LeadDetailPage({
   params: paramsPromise,
@@ -23,6 +25,11 @@ export default async function LeadDetailPage({
     .eq("id", user.id)
     .single();
   const isAdmin = agent?.role === "admin";
+
+  const { data: propertyTypes } = await supabase
+    .from("property_types")
+    .select("id, name")
+    .order("name", { ascending: true });
 
   const { data: allProperties } = await supabase
     .from("properties")
@@ -48,6 +55,8 @@ export default async function LeadDetailPage({
     notFound();
   }
 
+  const propertyMatches = await findPropertyMatches(supabase, demandFromLead(lead));
+
   let allAgents: { id: string; full_name: string }[] = [];
   if (isAdmin) {
     const { data } = await supabase
@@ -64,6 +73,8 @@ export default async function LeadDetailPage({
       userRole={agent?.role || "agente"}
       allAgents={allAgents}
       allProperties={allProperties || []}
+      propertyTypes={propertyTypes || []}
+      propertyMatches={propertyMatches}
     />
   );
 }

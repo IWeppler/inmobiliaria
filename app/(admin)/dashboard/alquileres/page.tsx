@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Plus, AlertTriangle, CalendarClock, TrendingUp, FileText, Upload, MessageCircle } from "lucide-react";
+import { Plus, AlertTriangle, Banknote, CalendarClock, TrendingUp, FileText, Upload, MessageCircle, Wrench } from "lucide-react";
 import { createClientServer } from "@/lib/supabase";
 import { ymdInAppTz } from "@/lib/dates";
 import { Button } from "@/shared/components/ui/button";
@@ -53,7 +53,10 @@ export default async function AlquileresPage() {
 
   const today = ymdInAppTz();
 
-  const [{ data: contractsRaw }, { data: overdueRaw }, { data: isAdmin }] = await Promise.all([
+  const [
+    { data: contractsRaw }, { data: overdueRaw }, { data: isAdmin },
+    { data: openMaintenance }, { data: unpaidSettlements },
+  ] = await Promise.all([
     supabase
       .from("rental_contracts")
       .select(
@@ -67,7 +70,23 @@ export default async function AlquileresPage() {
       .lt("due_date", today)
       .order("due_date"),
     supabase.rpc("is_admin"),
+    supabase
+      .from("rental_maintenance")
+      .select("id, contract_id, title, priority, reported_at")
+      .in("status", ["ABIERTO", "EN_CURSO"])
+      .order("reported_at"),
+    supabase
+      .from("rental_settlements")
+      .select("id, net_amount, currency")
+      .is("paid_to_owner_at", null)
+      .order("period"),
   ]);
+  const maintenance = openMaintenance ?? [];
+  const pendingPayouts = unpaidSettlements ?? [];
+  const payoutTotals = [...new Set(pendingPayouts.map((s) => s.currency))].map((currency) => ({
+    currency,
+    amount: pendingPayouts.filter((s) => s.currency === currency).reduce((sum, s) => sum + s.net_amount, 0),
+  }));
 
   const contracts = (contractsRaw ?? []) as unknown as ContractRow[];
   const overdue = ((overdueRaw ?? []) as {
@@ -160,7 +179,7 @@ export default async function AlquileresPage() {
         ))}
       </div>
 
-      {(overdue.length > 0 || expiring.length > 0 || adjusting.length > 0) && (
+      {(overdue.length > 0 || expiring.length > 0 || adjusting.length > 0 || maintenance.length > 0 || pendingPayouts.length > 0) && (
         <section className="overflow-hidden rounded-lg border border-border bg-card">
           <div className="border-b border-border px-4 py-3">
             <h2 className="text-lg font-semibold tracking-tight">Requiere acción</h2>
@@ -197,6 +216,31 @@ export default async function AlquileresPage() {
                 </span>
               </li>
             ))}
+            {maintenance.map((m) => (
+              <li key={`mnt-${m.id}`} className="flex h-10 items-center justify-between gap-3 px-4">
+                <span className="flex items-center gap-2 min-w-0">
+                  <Wrench className={`size-4 shrink-0 ${m.priority === "URGENTE" || m.priority === "ALTA" ? "text-danger" : "text-warning"}`} />
+                  <Link href={`/dashboard/alquileres/${m.contract_id}`} className="truncate font-medium underline-offset-4 hover:underline">
+                    {byId.get(m.contract_id)?.properties?.title ?? "Contrato"}
+                  </Link>
+                  <span className="text-muted-foreground truncate">· {m.title}</span>
+                </span>
+                <span className="shrink-0 text-muted-foreground">hace {daysBetween(m.reported_at, today)} días</span>
+              </li>
+            ))}
+            {pendingPayouts.length > 0 && (
+              <li className="flex h-10 items-center justify-between gap-3 px-4">
+                <span className="flex items-center gap-2 min-w-0">
+                  <Banknote className="size-4 shrink-0 text-info" />
+                  <Link href="/dashboard/alquileres/propietarios?pendientes=1" className="truncate font-medium underline-offset-4 hover:underline">
+                    {pendingPayouts.length} {pendingPayouts.length === 1 ? "liquidación" : "liquidaciones"} sin transferir al propietario
+                  </Link>
+                </span>
+                <span className="tabular-nums shrink-0">
+                  {payoutTotals.map((t) => money(t.amount, t.currency)).join(" · ")}
+                </span>
+              </li>
+            )}
             {expiring.map((c) => (
               <li key={`exp-${c.id}`} className="flex h-10 items-center justify-between gap-3 px-4">
                 <span className="flex items-center gap-2 min-w-0">

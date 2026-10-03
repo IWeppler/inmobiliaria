@@ -10,16 +10,16 @@ import { z } from "zod";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import Link from "next/link";
-import {
-  Send,
-  Mail,
-  Phone,
-} from "lucide-react";
+import { Send, Mail, Phone } from "lucide-react";
 import type { User } from "@supabase/supabase-js";
 
 import { LeadWithDetails, Note } from "@/app/types";
 import { statusMeta } from "@/features/dashboard/leads/leadStatus";
+import { lostReasonLabel } from "@/features/dashboard/leads/lostReasons";
 import { ScheduleVisitCard } from "@/features/dashboard/leads/ScheduleVisitCard";
+import { BuyerDemandCard } from "@/features/dashboard/buyers/BuyerDemandCard";
+import { LeadPropertyMatches } from "@/features/dashboard/buyers/LeadPropertyMatches";
+import type { PropertyMatch } from "@/features/dashboard/buyers/queries";
 
 // UI Components
 import { Button } from "@/shared/components/ui/button";
@@ -60,6 +60,8 @@ interface LeadDetailClientProps {
   userRole: string;
   allAgents: { id: string; full_name: string }[];
   allProperties: { id: string; title: string }[];
+  propertyTypes: { id: number; name: string | null }[];
+  propertyMatches: PropertyMatch[];
 }
 
 export function LeadDetailClient({
@@ -68,6 +70,8 @@ export function LeadDetailClient({
   userRole,
   allAgents,
   allProperties,
+  propertyTypes,
+  propertyMatches,
 }: LeadDetailClientProps) {
   const supabase = createClientBrowser();
   const router = useRouter();
@@ -83,7 +87,7 @@ export function LeadDetailClient({
   // --- ESTADOS PARA PROPIEDAD (Expandible) ---
   const [isAssignPropertyOpen, setIsAssignPropertyOpen] = useState(false);
   const [selectedPropertyId, setSelectedPropertyId] = useState(
-    lead.property_id || ""
+    lead.property_id || "",
   );
   const [isAssigningProperty, setIsAssigningProperty] = useState(false);
 
@@ -173,6 +177,21 @@ export function LeadDetailClient({
         description={`Fuente: ${lead.source?.toLowerCase() ?? ""} · ${format(new Date(lead.created_at), "dd MMM yyyy", { locale: es })}`}
       />
 
+      {lead.status === "DESCARTADO" && (
+        <p className="rounded-md border border-border bg-muted/60 px-4 py-3 text-sm text-fg-secondary">
+          <span className="font-medium text-foreground">
+            Motivo de descarte:{" "}
+          </span>
+          {lostReasonLabel(lead.lost_reason) ?? "sin registrar"}
+          {lead.lost_reason_note && (
+            <span className="text-muted-foreground">
+              {" "}
+              · {lead.lost_reason_note}
+            </span>
+          )}
+        </p>
+      )}
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* COLUMNA PRINCIPAL (Notas) */}
         <div className="lg:col-span-2 space-y-6">
@@ -209,7 +228,9 @@ export function LeadDetailClient({
                     className="self-end"
                   >
                     <Send />
-                    {form.formState.isSubmitting ? "Guardando…" : "Guardar nota"}
+                    {form.formState.isSubmitting
+                      ? "Guardando…"
+                      : "Guardar nota"}
                   </Button>
                 </form>
               </Form>
@@ -241,7 +262,10 @@ export function LeadDetailClient({
                 )}
 
                 {notes.map((note) => (
-                  <li key={note.id} className="flex gap-4 py-3 first:pt-0 last:pb-0">
+                  <li
+                    key={note.id}
+                    className="flex gap-4 py-3 first:pt-0 last:pb-0"
+                  >
                     <span className="w-24 shrink-0 text-xs text-muted-foreground">
                       {format(new Date(note.created_at), "d MMM HH:mm", {
                         locale: es,
@@ -322,6 +346,12 @@ export function LeadDetailClient({
             </CardContent>
           </Card>
 
+          {/* Buyer Intelligence: qué busca este comprador */}
+          <BuyerDemandCard lead={lead} propertyTypes={propertyTypes} />
+          {lead.search_operation && (
+            <LeadPropertyMatches matches={propertyMatches} />
+          )}
+
           {/* Visitas (E0.2 / E1.4): eventos vinculados al lead */}
           <ScheduleVisitCard lead={lead} currentUserId={currentUser.id} />
 
@@ -356,8 +386,8 @@ export function LeadDetailClient({
                   {isAssignPropertyOpen
                     ? "Cerrar"
                     : lead.properties
-                    ? "Cambiar"
-                    : "Asignar"}
+                      ? "Cambiar"
+                      : "Asignar"}
                 </Button>
               </div>
 
@@ -408,9 +438,7 @@ export function LeadDetailClient({
           {/* 3. CARD: CONTACTO (Simple) */}
           <Card>
             <CardHeader>
-              <CardTitle>
-                Datos de Contacto
-              </CardTitle>
+              <CardTitle>Datos de Contacto</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="flex items-center gap-3">

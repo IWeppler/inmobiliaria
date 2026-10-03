@@ -50,6 +50,7 @@ import {
   formatPrice,
 } from "@/features/dashboard/property/propertyStatus";
 import type { GeocodeCandidate } from "@/app/api/geocode/route";
+import { notifyBuyerMatchesAction } from "@/features/dashboard/buyers/actions";
 
 const LocationPicker = dynamic(
   () => import("@/features/dashboard/property/LocationPicker"),
@@ -510,6 +511,11 @@ export function PropertyForm({
     });
     form.reset(data);
     setFiles([]);
+    // Buyer Intelligence: avisa a los asesores con compradores compatibles.
+    // Es un aviso, no parte del alta: un fallo no corta la navegación.
+    if (!isEditMode && propertyId) {
+      await notifyBuyerMatchesAction(propertyId).catch(() => undefined);
+    }
     router.push(`/dashboard/propiedades/${propertyId}`);
     router.refresh();
   };

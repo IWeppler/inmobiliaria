@@ -27,6 +27,11 @@ import {
   KanbanOverlay,
 } from "@/shared/components/ui/kanban";
 import { TemperatureBadge } from "@/features/dashboard/leads/TemperatureBadge";
+import { LostReasonDialog } from "@/features/dashboard/leads/LostReasonDialog";
+import {
+  lostReasonLabel,
+  type LostReason,
+} from "@/features/dashboard/leads/lostReasons";
 import {
   LEAD_STATUSES,
   daysBetween,
@@ -145,6 +150,17 @@ function LeadCard({
         )}
       </div>
 
+      {currentStatus === "DESCARTADO" && (
+        <p
+          className="mt-2 line-clamp-2 text-xs text-fg-secondary"
+          title={lead.lost_reason_note ?? undefined}
+        >
+          <span className="text-muted-foreground">Motivo: </span>
+          {lostReasonLabel(lead.lost_reason) ?? "sin registrar"}
+          {lead.lost_reason_note ? `. ${lead.lost_reason_note}` : ""}
+        </p>
+      )}
+
       <div className="mt-3 flex items-center justify-between gap-2 border-t border-border pt-2 text-xs text-muted-foreground">
         <span className="min-w-0 truncate capitalize">
           {lead.source?.toLowerCase().replaceAll("_", " ") ?? "Sin fuente"}
@@ -189,6 +205,7 @@ export function LeadBoard({
   const [leads, setLeads] = useState(initialLeads);
   const [movingIds, setMovingIds] = useState<string[]>([]);
   const pendingIds = useRef(new Set<string>());
+  const [discarding, setDiscarding] = useState<LeadWithDetails | null>(null);
   const isArchive = statusFilter === "DESCARTADO";
 
   useEffect(() => {
@@ -216,7 +233,11 @@ export function LeadBoard({
     [visibleLeads],
   );
 
-  const moveLead = async (leadId: string, newStatus: LeadStatus) => {
+  const moveLead = async (
+    leadId: string,
+    newStatus: LeadStatus,
+    lost?: { reason: LostReason; note: string | null },
+  ) => {
     const lead = leads.find((item) => item.id === leadId);
     if (
       !lead ||
@@ -224,6 +245,15 @@ export function LeadBoard({
       pendingIds.current.has(leadId)
     )
       return;
+    // Descartar pide el motivo antes de tocar nada.
+    if (newStatus === "DESCARTADO" && !lost) {
+      setDiscarding(lead);
+      return;
+    }
+    const lostFields =
+      newStatus === "DESCARTADO" && lost
+        ? { lost_reason: lost.reason, lost_reason_note: lost.note }
+        : {};
 
     pendingIds.current.add(leadId);
     setMovingIds((ids) => [...ids, leadId]);
@@ -233,6 +263,7 @@ export function LeadBoard({
         item.id === leadId
           ? {
               ...item,
+              ...lostFields,
               status: newStatus,
               status_since: changedAt,
               last_activity_at: changedAt,
@@ -243,7 +274,7 @@ export function LeadBoard({
 
     const { error } = await supabase
       .from("leads")
-      .update({ status: newStatus })
+      .update({ status: newStatus, ...lostFields })
       .eq("id", leadId)
       .select("id")
       .single();
@@ -285,6 +316,18 @@ export function LeadBoard({
 
   return (
     <div className="space-y-3">
+      <LostReasonDialog
+        leadName={discarding?.name ?? null}
+        open={!!discarding}
+        onOpenChange={(open) => {
+          if (!open) setDiscarding(null);
+        }}
+        onConfirm={(reason, note) => {
+          const lead = discarding;
+          setDiscarding(null);
+          if (lead) void moveLead(lead.id, "DESCARTADO", { reason, note });
+        }}
+      />
       {isArchive ? (
         visibleLeads.length > 0 ? (
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">

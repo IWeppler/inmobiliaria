@@ -25,6 +25,15 @@ export const CONTRACT_STATUS_TONE: Record<string, "success" | "neutral" | "dange
   RESCINDIDO: "danger",
 };
 
+export const CHARGE_LABELS: Record<string, string> = {
+  ALQUILER: "Alquiler", EXPENSAS: "Expensas", SERVICIOS: "Servicios",
+  PUNITORIOS: "Punitorios", REPARACIONES: "Reparaciones", PENALIDAD: "Penalidad",
+};
+
+// Conceptos que se cargan a mano (ALQUILER lo generan las cuotas).
+export const MANUAL_CHARGE_KINDS = ["EXPENSAS", "SERVICIOS", "PUNITORIOS", "REPARACIONES", "PENALIDAD"] as const;
+export type ManualChargeKind = (typeof MANUAL_CHARGE_KINDS)[number];
+
 export function ymd(d: Date) {
   return d.toISOString().slice(0, 10);
 }

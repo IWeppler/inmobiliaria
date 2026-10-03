@@ -1,6 +1,7 @@
 import { createClientServer } from "@/lib/supabase";
 import { LeadsView } from "@/features/dashboard/leads/LeadsView";
 import { enrichLeadsWithActivity } from "@/features/dashboard/leads/enrichLeads";
+import { findDemandGaps } from "@/features/dashboard/buyers/queries";
 import type { LeadWithDetails } from "@/app/types";
 import { Page } from "@/shared/components/PageShell";
 import { redirect } from "next/navigation";
@@ -8,9 +9,9 @@ import { redirect } from "next/navigation";
 export default async function LeadsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ estado?: string }>;
+  searchParams: Promise<{ estado?: string; vista?: string }>;
 }) {
-  const { estado } = await searchParams;
+  const { estado, vista } = await searchParams;
   const supabase = await createClientServer();
 
   // 1. Usuario
@@ -62,9 +63,24 @@ export default async function LeadsPage({
     (leads ?? []) as LeadWithDetails[]
   );
 
+  // Buyer Intelligence: demanda sin oferta de toda la base. Solo se calcula
+  // si hay alguna búsqueda cargada, para no frenar el tablero.
+  const hasDemand = enriched.some((lead) => lead.search_operation);
+  const [demandGaps, { data: propertyTypes }] = await Promise.all([
+    hasDemand ? findDemandGaps(supabase) : Promise.resolve([]),
+    supabase.from("property_types").select("id, name").order("name", { ascending: true }),
+  ]);
+
   return (
     <Page>
-      <LeadsView leads={enriched} userRole={agentProfile?.role || "agente"} initialStatus={estado} />
+      <LeadsView
+        leads={enriched}
+        userRole={agentProfile?.role || "agente"}
+        initialStatus={estado}
+        initialView={vista === "demanda" ? "demand" : vista === "lista" ? "list" : "board"}
+        demandGaps={demandGaps}
+        propertyTypes={propertyTypes ?? []}
+      />
     </Page>
   );
 }

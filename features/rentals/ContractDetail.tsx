@@ -14,13 +14,20 @@ import { Page, PageHeader } from "@/shared/components/PageShell";
 import { StatusBadge } from "@/shared/components/StatusBadge";
 import {
   addRentalChargeAction, applyAdjustmentAction, createSettlementAction,
-  deleteRentalPaymentAction, recordRentalPaymentAction, setContractStatusAction,
+  deleteRentalPaymentAction, recordRentalPaymentAction,
 } from "@/features/rentals/actions";
+import { PayoutButton } from "@/features/rentals/PayoutButton";
 import {
-  ADJUSTMENT_LABELS, CONTRACT_STATUS_LABELS, CONTRACT_STATUS_TONE,
+  ADJUSTMENT_LABELS, CHARGE_LABELS, CONTRACT_STATUS_LABELS, CONTRACT_STATUS_TONE,
   computeSettlement, daysBetween, formatDate, formatPeriod, lateFee, money, periodOf,
-  type AdjustmentIndex, type SettlementExpense,
+  type AdjustmentIndex, type ManualChargeKind, type SettlementExpense,
 } from "@/features/rentals/logic";
+import { CloseContractDialog } from "@/features/rentals/CloseContractDialog";
+import { EditContractDialog, type ContactData } from "@/features/rentals/EditContractDialog";
+import { PartiesCard, type Party } from "@/features/rentals/PartiesCard";
+import { DepositCard, type DepositData } from "@/features/rentals/DepositCard";
+import { MaintenanceCard, type MaintenanceItem } from "@/features/rentals/MaintenanceCard";
+import { DocumentsCard, type RentalDocument } from "@/features/rentals/DocumentsCard";
 
 type Entry = { id: string; amount: number; paid_at: string; method: string; account: string | null; receipt_number: number };
 type Charge = { id: string; period: string; due_date: string; kind: string; description: string; amount: number; currency: string; entries: Entry[] };
@@ -30,21 +37,21 @@ export type ContractDetailData = {
   adjustment_index: string; adjustment_months: number; adjustment_pct: number | null;
   base_period: string; next_adjustment_date: string | null; last_adjustment_date: string | null;
   commission_pct: number; late_fee_pct_daily: number; late_fee_fixed: number; payment_due_day: number;
-  guarantee_type: string; guarantee_detail: string | null; deposit_amount: number; notes: string | null;
+  guarantee_type: string; guarantee_detail: string | null; notes: string | null;
   renewed_from_id: string | null;
   property: { id: string; title: string } | null;
-  owner: { id: string; full_name: string; phone: string | null; email: string | null } | null;
-  tenant: { id: string; full_name: string; phone: string | null; email: string | null } | null;
+  owner: ContactData | null;
+  tenant: ContactData | null;
   charges: Charge[];
-  settlements: { id: string; period: string; net_amount: number; currency: string; issued_at: string }[];
+  settlements: { id: string; period: string; net_amount: number; currency: string; issued_at: string; paid_to_owner_at: string | null }[];
   adjustments: { id: string; effective_date: string; previous_amount: number; new_amount: number; index_code: string }[];
   adjustmentPreview: { amount: number; factor: number } | { error: string } | null;
+  parties: Party[];
+  deposit: DepositData;
+  maintenance: MaintenanceItem[];
+  documents: RentalDocument[];
+  contacts: { id: string; label: string; kind: string }[];
   today: string;
-};
-
-const CHARGE_LABELS: Record<string, string> = {
-  ALQUILER: "Alquiler", EXPENSAS: "Expensas", SERVICIOS: "Servicios",
-  PUNITORIOS: "Punitorios", REPARACIONES: "Reparaciones",
 };
 
 function collected(charge: Charge) {
@@ -106,12 +113,20 @@ export function ContractDetail({ c }: { c: ContractDetailData }) {
         title={c.property ? <Link href={`/dashboard/propiedades/${c.property.id}`} className="hover:underline">{c.property.title}</Link> : "Contrato"}
         aside={<StatusBadge tone={CONTRACT_STATUS_TONE[c.status] ?? "neutral"}>{CONTRACT_STATUS_LABELS[c.status] ?? c.status}</StatusBadge>}
         description={`${formatDate(c.start_date)} → ${formatDate(c.end_date)} · ${ADJUSTMENT_LABELS[c.adjustment_index as AdjustmentIndex]} cada ${c.adjustment_months} meses`}
-        actions={<div className="flex gap-2">
+        actions={<div className="flex flex-wrap gap-2">
+          <EditContractDialog
+            contractId={c.id}
+            owners={c.contacts.filter((o) => o.kind === "owner")}
+            tenants={c.contacts.filter((o) => o.kind === "tenant")}
+            initial={{
+              owner_id: c.owner?.id ?? "", tenant_id: c.tenant?.id ?? "", commission_pct: c.commission_pct,
+              late_fee_pct_daily: c.late_fee_pct_daily, late_fee_fixed: c.late_fee_fixed,
+              guarantee_type: c.guarantee_type as "NINGUNA" | "GARANTE" | "CAUCION",
+              guarantee_detail: c.guarantee_detail ?? "", notes: c.notes ?? "",
+            }}
+          />
           <Button asChild variant="outline"><Link href={`/dashboard/alquileres/nuevo?renovar=${c.id}`}>Renovar</Link></Button>
-          {c.status === "ACTIVO" && <Select onValueChange={(value) => run("status", () => setContractStatusAction(c.id, value as "FINALIZADO" | "RESCINDIDO"))}>
-            <SelectTrigger className="w-40"><SelectValue placeholder="Cerrar contrato" /></SelectTrigger>
-            <SelectContent><SelectItem value="FINALIZADO">Finalizar</SelectItem><SelectItem value="RESCINDIDO">Rescindir</SelectItem></SelectContent>
-          </Select>}
+          {c.status === "ACTIVO" && <CloseContractDialog contractId={c.id} startDate={c.start_date} endDate={c.end_date} today={c.today} currency={c.currency} />}
         </div>}
       />
 
@@ -162,7 +177,7 @@ export function ContractDetail({ c }: { c: ContractDetailData }) {
             <div><Label>Importe</Label><Input type="number" min="0.01" step="0.01" value={newCharge.amount || ""} onChange={(event) => setNewCharge({ ...newCharge, amount: Number(event.target.value) })} /></div>
             <div><Label>Vencimiento</Label><Input type="date" value={newCharge.due_date} onChange={(event) => setNewCharge({ ...newCharge, due_date: event.target.value, period: periodOf(event.target.value) })} /></div>
             <Button size="sm" className="sm:col-span-2 sm:justify-self-end" disabled={!!busy || newCharge.description.trim().length < 3 || newCharge.amount <= 0} onClick={async () => {
-              const ok = await run("charge", () => addRentalChargeAction({ contract_id: c.id, ...newCharge, kind: newCharge.kind as "EXPENSAS" | "SERVICIOS" | "PUNITORIOS" | "REPARACIONES" }));
+              const ok = await run("charge", () => addRentalChargeAction({ contract_id: c.id, ...newCharge, kind: newCharge.kind as ManualChargeKind }));
               if (ok) setNewCharge({ kind: "EXPENSAS", description: "", amount: 0, due_date: c.today, period: periodOf(c.today) });
             }}><Plus /> Agregar cargo</Button>
           </CardContent></Card>
@@ -182,8 +197,16 @@ export function ContractDetail({ c }: { c: ContractDetailData }) {
               </div>}
             </>}
             {eligiblePeriods.length === 0 && <p className="text-sm text-muted-foreground">Los períodos completamente cobrados aparecen aquí para liquidar.</p>}
-            {c.settlements.length > 0 && <div className="space-y-2 border-t border-border pt-3 text-sm">{c.settlements.map((item) => <div key={item.id} className="flex items-center justify-between gap-2"><span className="capitalize">{formatPeriod(item.period)} · {money(item.net_amount, item.currency)}</span><Button asChild size="sm" variant="outline"><Link href={`/dashboard/alquileres/${c.id}/liquidacion/${item.id}`} target="_blank"><FileText /> PDF</Link></Button></div>)}</div>}
+            {c.settlements.length > 0 && <div className="space-y-2 border-t border-border pt-3 text-sm">{c.settlements.map((item) => <div key={item.id} className="flex flex-wrap items-center justify-between gap-2">
+              <span className="capitalize">{formatPeriod(item.period)} · {money(item.net_amount, item.currency)}</span>
+              <div className="flex items-center gap-2">
+                <PayoutButton settlementId={item.id} paidAt={item.paid_to_owner_at} today={c.today} />
+                <Button asChild size="sm" variant="outline"><Link href={`/dashboard/alquileres/${c.id}/liquidacion/${item.id}`} target="_blank"><FileText /> PDF</Link></Button>
+              </div>
+            </div>)}</div>}
           </CardContent></Card>
+
+          <MaintenanceCard contractId={c.id} currency={c.currency} items={c.maintenance} today={c.today} />
         </div>
 
         <div className="space-y-6">
@@ -199,15 +222,18 @@ export function ContractDetail({ c }: { c: ContractDetailData }) {
             {c.adjustments.length > 0 && <div className="space-y-1 border-t border-border pt-3 text-xs text-muted-foreground">{c.adjustments.map((item) => <p key={item.id}>{formatDate(item.effective_date)} · {item.index_code} · {money(item.previous_amount, c.currency)} → {money(item.new_amount, c.currency)}</p>)}</div>}
           </CardContent></Card>
 
-          <Card><CardHeader><CardTitle>Partes y condiciones</CardTitle></CardHeader><CardContent className="space-y-3 text-sm">
-            <div><p className="text-xs text-muted-foreground">Propietario</p><p className="font-medium">{c.owner?.full_name ?? "—"}</p><p className="text-muted-foreground">{c.owner?.phone}</p></div>
-            <div><p className="text-xs text-muted-foreground">Inquilino</p><p className="font-medium">{c.tenant?.full_name ?? "—"}</p><p className="text-muted-foreground">{c.tenant?.phone}</p></div>
+          <PartiesCard contractId={c.id} owner={c.owner} tenant={c.tenant} parties={c.parties} contacts={c.contacts} editable={c.status === "ACTIVO"} />
+
+          <DepositCard contractId={c.id} currency={c.currency} deposit={c.deposit} today={c.today} />
+
+          <Card><CardHeader><CardTitle>Condiciones</CardTitle></CardHeader><CardContent className="space-y-3 text-sm">
             <div><p className="text-xs text-muted-foreground">Garantía</p><p>{c.guarantee_type === "GARANTE" ? "Garante" : c.guarantee_type === "CAUCION" ? "Seguro de caución" : "Sin garantía"}{c.guarantee_detail ? ` · ${c.guarantee_detail}` : ""}</p></div>
-            <div><p className="text-xs text-muted-foreground">Depósito</p><p>{money(c.deposit_amount, c.currency)}</p></div>
             <div><p className="text-xs text-muted-foreground">Administración</p><p>{c.commission_pct} % del alquiler cobrado</p></div>
             <div><p className="text-xs text-muted-foreground">Punitorio</p><p>{c.late_fee_pct_daily} % diario{c.late_fee_fixed > 0 ? ` + ${money(c.late_fee_fixed, c.currency)} fijo` : ""}</p></div>
             {c.notes && <div><p className="text-xs text-muted-foreground">Notas</p><p className="whitespace-pre-line">{c.notes}</p></div>}
           </CardContent></Card>
+
+          <DocumentsCard contractId={c.id} documents={c.documents} />
         </div>
       </div>
     </Page>

@@ -9,6 +9,7 @@ import {
   computeSettlement,
   contractPeriods,
   dueDateFor,
+  MANUAL_CHARGE_KINDS,
   periodOf,
   round2,
   type SettlementExpense,
@@ -187,40 +188,15 @@ export async function createContractAction(
   return { success: true, message: "Contrato creado.", data: { id: contract.id } };
 }
 
-export async function setContractStatusAction(
-  contractId: string,
-  status: "ACTIVO" | "FINALIZADO" | "RESCINDIDO"
-): Promise<ActionResult> {
-  const { supabase, user } = await currentUser();
-  if (!user) return { success: false, message: "No autenticado" };
-
-  const { data: contract, error } = await supabase
-    .from("rental_contracts")
-    .update({ status })
-    .eq("id", contractId)
-    .select("property_id")
-    .single();
-  if (error || !contract) return { success: false, message: error?.message ?? "Error" };
-
-  // Al cerrar el contrato la propiedad vuelve a estar disponible.
-  if (status !== "ACTIVO") {
-    const { count } = await supabase.from("rental_contracts").select("id", { count: "exact", head: true })
-      .eq("property_id", contract.property_id).eq("status", "ACTIVO");
-    if (!count) {
-      await supabase.from("properties").update({ status: "EN_ALQUILER" }).eq("id", contract.property_id);
-    }
-  }
-  revalidatePath("/dashboard/alquileres");
-  revalidatePath(`/dashboard/alquileres/${contractId}`);
-  return { success: true, message: "Estado actualizado." };
-}
+// El cierre de contrato vive en lifecycleActions.closeContractAction
+// (RPC rental_close_contract): además del estado, anula cuotas futuras.
 
 // === E4.3 — Pagos ===
 const chargeSchema = z.object({
   contract_id: z.string().uuid(),
   period: z.string().regex(/^\d{4}-\d{2}-01$/),
   due_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-  kind: z.enum(["EXPENSAS", "SERVICIOS", "PUNITORIOS", "REPARACIONES"]),
+  kind: z.enum(MANUAL_CHARGE_KINDS),
   description: z.string().trim().min(3).max(160),
   amount: z.coerce.number().positive(),
 });

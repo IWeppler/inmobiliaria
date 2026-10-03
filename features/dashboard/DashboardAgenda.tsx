@@ -13,6 +13,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Inbox,
+  KeyRound,
   Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -146,7 +147,14 @@ function DashboardAttention({
   attention: AttentionData;
   onShowToday: () => void;
 }) {
-  const pendingCount = attention.untouchedLeads.length + attention.visitsToday.length;
+  const { rentals } = attention;
+  const rentalParts = [
+    rentals.overdueCharges > 0 && `${rentals.overdueCharges} ${rentals.overdueCharges === 1 ? "cuota vencida" : "cuotas vencidas"}`,
+    rentals.openMaintenance > 0 && `${rentals.openMaintenance} ${rentals.openMaintenance === 1 ? "reclamo abierto" : "reclamos abiertos"}`,
+    rentals.expiringContracts > 0 && `${rentals.expiringContracts} ${rentals.expiringContracts === 1 ? "contrato vence" : "contratos vencen"} en 30 d`,
+  ].filter(Boolean);
+  const rentalCount = rentals.overdueCharges + rentals.openMaintenance + rentals.expiringContracts;
+  const pendingCount = attention.untouchedLeads.length + attention.visitsToday.length + rentalCount;
 
   return (
     <section className="overflow-hidden rounded-lg border border-border bg-card">
@@ -245,6 +253,24 @@ function DashboardAttention({
             </ul>
           )}
         </div>
+
+        {rentalCount > 0 && (
+          <div className="p-3">
+            <Link
+              href="/dashboard/alquileres"
+              className="flex items-center gap-3 rounded-md bg-muted/60 p-3 transition-colors hover:bg-muted"
+            >
+              <span className="flex size-8 shrink-0 items-center justify-center rounded-md bg-card text-fg-secondary">
+                <KeyRound className="size-4" />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-sm font-medium">Alquileres</span>
+                <span className="block truncate text-xs text-muted-foreground">{rentalParts.join(" · ")}</span>
+              </span>
+              <ArrowRight className="size-4 shrink-0 text-muted-foreground" />
+            </Link>
+          </div>
+        )}
       </div>
     </section>
   );

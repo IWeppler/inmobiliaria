@@ -2,7 +2,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { notFound, redirect } from "next/navigation";
 import type { Metadata } from "next";
-import { ExternalLink, FileText, Instagram, MoreHorizontal, Pencil } from "lucide-react";
+import { BarChart3, ExternalLink, FileText, Instagram, MoreHorizontal, Pencil } from "lucide-react";
 import { createClientServer } from "@/lib/supabase";
 import { Page, PageHeader } from "@/shared/components/PageShell";
 import { StatusBadge } from "@/shared/components/StatusBadge";
@@ -28,6 +28,9 @@ import {
 import { statusMeta } from "@/features/dashboard/leads/leadStatus";
 import { CONTRACT_STATUS_LABELS, CONTRACT_STATUS_TONE, formatDate, money } from "@/features/rentals/logic";
 import { PROPERTY_STATUSES } from "@/features/dashboard/property/propertyStatus";
+import { PropertyBuyersCard } from "@/features/dashboard/buyers/PropertyBuyersCard";
+import { PropertyFunnelCard } from "@/features/dashboard/property/PropertyFunnelCard";
+import type { Period } from "@/features/dashboard/property/performance";
 
 export const metadata: Metadata = { title: "Propiedad" };
 
@@ -37,10 +40,14 @@ export const metadata: Metadata = { title: "Propiedad" };
 // (status_history), sin tabla nueva.
 export default async function PropertyDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ periodo?: string }>;
 }) {
   const { id } = await params;
+  const { periodo } = await searchParams;
+  const period: Period = periodo === "30" || periodo === "90" ? periodo : "todo";
   const supabase = await createClientServer();
   const {
     data: { user },
@@ -50,7 +57,7 @@ export default async function PropertyDetailPage({
   const { data: property } = await supabase
     .from("properties")
     .select(
-      "*, property_types(name), property_images(image_url), agents(full_name)",
+      "*, property_types(name), property_images(image_url), agents!properties_agent_id_fkey(full_name)",
     )
     .eq("id", id)
     .single();
@@ -185,6 +192,11 @@ export default async function PropertyDetailPage({
                   </Link>
                 </DropdownMenuItem>
                 <DropdownMenuItem asChild>
+                  <Link href={`/dashboard/propiedades/informe/${property.id}?periodo=${period}`} target="_blank" rel="noopener noreferrer">
+                    <BarChart3 /> Informe al propietario
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
                   <Link href={`/dashboard/propiedades/instagram/${property.id}`}>
                     <Instagram /> Pieza Instagram
                   </Link>
@@ -212,6 +224,12 @@ export default async function PropertyDetailPage({
               </div>
             </div>
           )}
+
+          <PropertyFunnelCard
+            property={property}
+            baseHref={`/dashboard/propiedades/${property.id}`}
+            period={period}
+          />
 
           <Card>
             <CardHeader>
@@ -246,6 +264,10 @@ export default async function PropertyDetailPage({
 
         {/* Columna lateral: relaciones */}
         <div className="flex flex-col gap-6">
+          {property.status !== "VENDIDO" && property.status !== "ALQUILADO" && (
+            <PropertyBuyersCard supabase={supabase} property={property} />
+          )}
+
           <Card>
             <CardHeader>
               <CardTitle>

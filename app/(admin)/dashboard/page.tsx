@@ -20,6 +20,7 @@ import { Page, PageHeader } from "@/shared/components/PageShell";
 import { addMonths, format } from "date-fns";
 import { es } from "date-fns/locale";
 import type { PropertyWithDetails } from "@/app/types/entities";
+import { businessMinutes } from "@/features/dashboard/reports/responseTime";
 
 const WEEKS = 12;
 const MONTHS = 12;
@@ -64,7 +65,7 @@ async function getDashboardData() {
   let propQuery = supabase
     .from("properties")
     .select(
-      `*, property_types(name), property_images(image_url), agents(full_name), views_count`,
+      `*, property_types(name), property_images(image_url), agents!properties_agent_id_fkey(full_name), views_count`,
     )
     .order("created_at", { ascending: false });
 
@@ -138,6 +139,18 @@ async function getDashboardData() {
     ? supabase.from("recurring_expenses").select("amount, currency").eq("active", true)
     : Promise.resolve({ data: [] as { amount: number; currency: string }[] });
 
+  // Alquileres para "Requiere tu atención". RLS ya limita a los contratos
+  // del agente (admin ve todos).
+  const openMaintenanceQuery = supabase
+    .from("rental_maintenance")
+    .select("id", { count: "exact", head: true })
+    .in("status", ["ABIERTO", "EN_CURSO"]);
+  const expiringContractsQuery = supabase
+    .from("rental_contracts")
+    .select("id", { count: "exact", head: true })
+    .eq("status", "ACTIVO")
+    .lte("end_date", addDays(today, 30));
+
   if (!isAdmin) {
     propQuery = propQuery.eq("agent_id", user.id);
     untouchedQuery = untouchedQuery.eq("agent_id", user.id);
@@ -155,6 +168,8 @@ async function getDashboardData() {
     { data: rate },
     { data: movements },
     { data: recurring },
+    { count: openMaintenance },
+    { count: expiringContracts },
   ] = await Promise.all([
     propQuery,
     untouchedQuery,
@@ -166,12 +181,19 @@ async function getDashboardData() {
     rateQuery,
     movementsQuery,
     recurringQuery,
+    openMaintenanceQuery,
+    expiringContractsQuery,
   ]);
 
   const props = (properties || []) as PropertyWithDetails[];
   const untouchedLeads = (untouched ?? [])
     .filter((l) => !l.lead_notes || l.lead_notes.length === 0)
-    .map(({ id, name, created_at }) => ({ id, name, created_at }));
+    .map(({ id, name, created_at }) => ({
+      id,
+      name,
+      created_at,
+      waitingMinutes: businessMinutes(new Date(created_at), new Date()),
+    }));
 
   const leadRows = leads ?? [];
   const leadIds = leadRows.map((lead) => lead.id);
@@ -213,6 +235,21 @@ async function getDashboardData() {
     );
   }
 
+  // Estancadas: activas hace más de 30 días y sin ninguna consulta en los
+  // últimos 30. Se arma con los leads visibles del usuario (un agente ve
+  // los suyos), igual que el resto del dashboard.
+  const DAY_MS = 86_400_000;
+  const recentLeadProperties = new Set(
+    leadRows
+      .filter((l) => l.property_id && Date.now() - new Date(l.created_at).getTime() < 30 * DAY_MS)
+      .map((l) => l.property_id),
+  );
+  const stalledProperties = props
+    .filter((p) => p.status === "EN_VENTA" || p.status === "EN_ALQUILER")
+    .map((p) => ({ id: p.id, title: p.title, days: Math.floor((Date.now() - new Date(p.created_at).getTime()) / DAY_MS) }))
+    .filter((p) => p.days >= 30 && !recentLeadProperties.has(p.id))
+    .sort((a, b) => b.days - a.days);
+
   const propertyPerformance: DashboardPropertyRow[] = props
     .filter(
       (property) =>
@@ -242,7 +279,19 @@ async function getDashboardData() {
     cashFlow,
     propertyPerformance,
     agendaEvents: (agendaEvents ?? []) as UpcomingEvent[],
-    attention: { untouchedLeads, visitsToday: visitsToday ?? [] },
+    attention: {
+      untouchedLeads,
+      visitsToday: visitsToday ?? [],
+      stalledProperties,
+      rentals: {
+        overdueCharges: ((charges ?? []) as ChargeRow[]).filter((charge) =>
+          charge.due_date < today
+          && charge.amount - charge.rental_payment_entries.reduce((sum, entry) => sum + entry.amount, 0) > 0.005,
+        ).length,
+        openMaintenance: openMaintenance ?? 0,
+        expiringContracts: expiringContracts ?? 0,
+      },
+    },
     conversion: {
       closed: closedLeads.length,
       discarded: discardedLeads.length,

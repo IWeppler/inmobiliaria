@@ -3,10 +3,12 @@
 import { createClientBrowser } from "@/lib/supabase-browser";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { findDuplicateLead, type DuplicateLead } from "@/features/dashboard/buyers/duplicates";
 
 // Importaciones de Shadcn
 import { Button } from "@/shared/components/ui/button";
@@ -62,6 +64,8 @@ export function LeadForm({ onSuccess }: LeadFormProps) {
   const router = useRouter();
   const [properties, setProperties] = useState<PropertyMini[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  // Aviso de duplicado: el asesor puede confirmar que igual quiere crearlo.
+  const [duplicate, setDuplicate] = useState<DuplicateLead | null>(null);
 
   useEffect(() => {
     const fetchProperties = async () => {
@@ -88,7 +92,15 @@ export function LeadForm({ onSuccess }: LeadFormProps) {
     },
   });
 
-  const onSubmit = async (data: LeadForm) => {
+  const create = async (data: LeadForm, skipDuplicateCheck: boolean) => {
+    if (!skipDuplicateCheck) {
+      const dup = await findDuplicateLead(supabase, data);
+      if (dup) {
+        setDuplicate(dup);
+        return;
+      }
+    }
+    setDuplicate(null);
     setIsSubmitting(true);
     const toastId = toast.loading("Creando nuevo lead...");
 
@@ -148,6 +160,8 @@ export function LeadForm({ onSuccess }: LeadFormProps) {
       onSuccess?.();
     }
   };
+
+  const onSubmit = (data: LeadForm) => create(data, false);
 
   return (
     <Form {...form}>
@@ -284,6 +298,26 @@ export function LeadForm({ onSuccess }: LeadFormProps) {
             </FormItem>
           )}
         />
+
+        {duplicate && (
+          <div className="flex items-center justify-between gap-3 rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-sm">
+            <span>
+              Ya existe{" "}
+              <Link href={`/dashboard/leads/${duplicate.id}`} className="font-medium underline underline-offset-4">
+                {duplicate.name}
+              </Link>{" "}
+              con el mismo {duplicate.by}.
+            </span>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => form.handleSubmit((d) => create(d, true))()}
+            >
+              Crear igual
+            </Button>
+          </div>
+        )}
 
         <Button
           type="submit"

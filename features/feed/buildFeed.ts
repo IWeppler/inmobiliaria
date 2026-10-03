@@ -58,7 +58,7 @@ export async function buildFeed(): Promise<FeedProperty[]> {
        property_types(name),
        property_images(image_url, order),
        property_amenities(amenities(name)),
-       agents(full_name, phone, email)`
+       agents!properties_agent_id_fkey(full_name, phone, email)`
     )
     .in("status", ["EN_VENTA", "EN_ALQUILER"])
     .order("created_at", { ascending: false });

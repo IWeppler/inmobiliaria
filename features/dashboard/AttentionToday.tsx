@@ -1,12 +1,14 @@
 import Link from "next/link";
 import { daysBetween } from "@/features/dashboard/leads/leadStatus";
+import { ON_TIME_MINUTES } from "@/features/dashboard/reports/responseTime";
 
 // Alto compartido del bloque operativo del dashboard.
 export const DASHBOARD_CARD_H = "h-[300px]";
 
 export type AttentionData = {
   // Leads en NUEVO (o sin status) sin ninguna nota: nadie los tocó.
-  untouchedLeads: { id: string; name: string; created_at: string }[];
+  // waitingMinutes: tiempo hábil (lun-sáb, 9 a 18 hs) desde que entró.
+  untouchedLeads: { id: string; name: string; created_at: string; waitingMinutes: number }[];
   // events.type = 'visita' con fecha de hoy, vinculados a un lead.
   visitsToday: {
     id: string;
@@ -14,6 +16,12 @@ export type AttentionData = {
     title: string;
     lead_id: string | null;
   }[];
+  // Propiedades activas con más de 30 días publicadas y ninguna consulta
+  // en los últimos 30.
+  stalledProperties: { id: string; title: string; days: number }[];
+  // Alquileres: cargos vencidos con saldo (últimos 12 meses), reclamos de
+  // mantenimiento abiertos y contratos activos que vencen en ≤ 30 días.
+  rentals: { overdueCharges: number; openMaintenance: number; expiringContracts: number };
 };
 
 const MAX_ITEMS = 6;
@@ -21,9 +29,9 @@ const MAX_ITEMS = 6;
 // E1.4 — "Requiere tu atención". Dos listas de hasta 6 ítems; el color solo
 // marca urgencia (> 7 d).
 export function AttentionToday({ data }: { data: AttentionData }) {
-  const { untouchedLeads, visitsToday } = data;
-  const empty = untouchedLeads.length === 0 && visitsToday.length === 0;
-  const total = untouchedLeads.length + visitsToday.length;
+  const { untouchedLeads, visitsToday, stalledProperties } = data;
+  const empty = untouchedLeads.length === 0 && visitsToday.length === 0 && stalledProperties.length === 0;
+  const total = untouchedLeads.length + visitsToday.length + stalledProperties.length;
 
   return (
     <div className="flex h-full min-h-0 min-w-0 flex-col">
@@ -48,7 +56,7 @@ export function AttentionToday({ data }: { data: AttentionData }) {
               <ul className="flex flex-col">
                 {untouchedLeads.slice(0, MAX_ITEMS).map((l) => {
                   const days = daysBetween(l.created_at);
-                  const late = days > 7;
+                  const late = days > 7 || l.waitingMinutes > ON_TIME_MINUTES;
                   return (
                     <li
                       key={l.id}
@@ -67,7 +75,13 @@ export function AttentionToday({ data }: { data: AttentionData }) {
                             : "shrink-0 text-xs text-muted-foreground"
                         }
                       >
-                        {days === 0 ? "hoy" : `hace ${days} d`}
+                        {days > 0
+                          ? `hace ${days} d`
+                          : l.waitingMinutes < 1
+                            ? "hoy"
+                            : l.waitingMinutes < 60
+                              ? `${Math.round(l.waitingMinutes)} min háb.`
+                              : `${(l.waitingMinutes / 60).toLocaleString("es-AR", { maximumFractionDigits: 1 })} h háb.`}
                       </span>
                     </li>
                   );
@@ -119,6 +133,32 @@ export function AttentionToday({ data }: { data: AttentionData }) {
               </ul>
             )}
           </div>
+
+          {stalledProperties.length > 0 && (
+            <div className="px-4 py-3">
+              <h3 className="mb-1 text-xs font-medium text-muted-foreground">
+                Sin consultas en 30 días · {stalledProperties.length}
+              </h3>
+              <ul className="flex flex-col">
+                {stalledProperties.slice(0, MAX_ITEMS).map((p) => (
+                  <li key={p.id} className="flex h-7 items-center justify-between gap-3 text-sm">
+                    <Link
+                      href={`/dashboard/propiedades/${p.id}`}
+                      className="truncate font-medium text-foreground underline-offset-4 hover:underline"
+                    >
+                      {p.title}
+                    </Link>
+                    <span className="shrink-0 text-xs text-muted-foreground">publicada hace {p.days} d</span>
+                  </li>
+                ))}
+                {stalledProperties.length > MAX_ITEMS && (
+                  <li className="flex h-7 items-center text-xs text-muted-foreground">
+                    y {stalledProperties.length - MAX_ITEMS} más en Propiedades
+                  </li>
+                )}
+              </ul>
+            </div>
+          )}
           </div>
         </div>
       )}

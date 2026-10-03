@@ -34,7 +34,7 @@ export default async function PropiedadesPage({
   for (let from = 0; ; from += 1000) {
     let query = supabase
       .from("properties")
-      .select(`*, property_types(name), property_images(image_url), agents(full_name), views_count`)
+      .select(`*, property_types(name), property_images(image_url), agents!properties_agent_id_fkey(full_name), views_count`)
       .order("created_at", { ascending: false })
       .order("id", { ascending: false });
     if (!isAdmin) query = query.eq("agent_id", user.id);

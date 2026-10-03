@@ -45,13 +45,14 @@ export async function Hero() {
       <div className="w-full max-w-7xl mx-auto px-4 md:px-6 relative z-10">
         <div className="relative w-full h-[400px] md:h-[600px] rounded-t-3xl md:rounded-4xl overflow-hidden shadow-[0_30px_60px_-20px_rgb(22_24_26/0.5)]">
           <Image
-            src="/bghero3.jpg"
+            src="/by-the-sea-second-intro.avif"
             alt="Casa de una planta con frente de piedra y madera, ventanales y jardín"
             fill
             priority
             sizes="(min-width: 1280px) 1232px, 100vw"
             className="object-cover"
           />
+          {/* public/ */}
         </div>
       </div>
 

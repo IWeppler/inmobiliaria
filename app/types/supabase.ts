@@ -14,6 +14,142 @@ export type Database = {
   }
   public: {
     Tables: {
+      lead_source_costs: {
+        Row: {
+          amount: number
+          created_at: string
+          created_by: string | null
+          currency: string
+          id: string
+          month: string
+          source: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          created_by?: string | null
+          currency: string
+          id?: string
+          month: string
+          source: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          created_by?: string | null
+          currency?: string
+          id?: string
+          month?: string
+          source?: string
+        }
+        Relationships: []
+      }
+      property_price_history: {
+        Row: {
+          changed_at: string
+          changed_by: string | null
+          currency: string | null
+          id: string
+          price: number
+          property_id: string
+        }
+        Insert: {
+          changed_at?: string
+          changed_by?: string | null
+          currency?: string | null
+          id?: string
+          price: number
+          property_id: string
+        }
+        Update: {
+          changed_at?: string
+          changed_by?: string | null
+          currency?: string | null
+          id?: string
+          price?: number
+          property_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "property_price_history_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      property_views_daily: {
+        Row: {
+          day: string
+          property_id: string
+          views: number
+        }
+        Insert: {
+          day: string
+          property_id: string
+          views?: number
+        }
+        Update: {
+          day?: string
+          property_id?: string
+          views?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "property_views_daily_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      buyer_contacts: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          lead_id: string
+          outcome: string
+          property_id: string
+          reason: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          lead_id: string
+          outcome: string
+          property_id: string
+          reason?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          lead_id?: string
+          outcome?: string
+          property_id?: string
+          reason?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "buyer_contacts_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "buyer_contacts_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       agents: {
         Row: {
           avatar_url: string | null
@@ -286,6 +422,8 @@ export type Database = {
           created_by: string | null
           email: string | null
           id: string
+          lost_reason: string | null
+          lost_reason_note: string | null
           name: string
           notes: string | null
           phone: string | null
@@ -293,6 +431,17 @@ export type Database = {
           read_at: string | null
           source: string | null
           status: Database["public"]["Enums"]["lead_status"] | null
+          search_bathrooms_min: number | null
+          search_bedrooms_min: number | null
+          search_budget_max: number | null
+          search_budget_min: number | null
+          search_confirmed_at: string | null
+          search_currency: string | null
+          search_financing: boolean | null
+          search_locations: string[]
+          search_operation: string | null
+          search_type_ids: number[]
+          search_urgency: string | null
         }
         Insert: {
           agent_id?: string | null
@@ -300,6 +449,8 @@ export type Database = {
           created_by?: string | null
           email?: string | null
           id?: string
+          lost_reason?: string | null
+          lost_reason_note?: string | null
           name: string
           notes?: string | null
           phone?: string | null
@@ -307,6 +458,17 @@ export type Database = {
           read_at?: string | null
           source?: string | null
           status?: Database["public"]["Enums"]["lead_status"] | null
+          search_bathrooms_min?: number | null
+          search_bedrooms_min?: number | null
+          search_budget_max?: number | null
+          search_budget_min?: number | null
+          search_confirmed_at?: string | null
+          search_currency?: string | null
+          search_financing?: boolean | null
+          search_locations?: string[]
+          search_operation?: string | null
+          search_type_ids?: number[]
+          search_urgency?: string | null
         }
         Update: {
           agent_id?: string | null
@@ -314,6 +476,8 @@ export type Database = {
           created_by?: string | null
           email?: string | null
           id?: string
+          lost_reason?: string | null
+          lost_reason_note?: string | null
           name?: string
           notes?: string | null
           phone?: string | null
@@ -321,6 +485,17 @@ export type Database = {
           read_at?: string | null
           source?: string | null
           status?: Database["public"]["Enums"]["lead_status"] | null
+          search_bathrooms_min?: number | null
+          search_bedrooms_min?: number | null
+          search_budget_max?: number | null
+          search_budget_min?: number | null
+          search_confirmed_at?: string | null
+          search_currency?: string | null
+          search_financing?: boolean | null
+          search_locations?: string[]
+          search_operation?: string | null
+          search_type_ids?: number[]
+          search_urgency?: string | null
         }
         Relationships: [
           {
@@ -631,8 +806,12 @@ export type Database = {
           commission_pct: number
           created_at: string
           currency: string
-          end_date: string
           deposit_amount: number
+          deposit_deductions: Json
+          deposit_received_at: string | null
+          deposit_returned_amount: number | null
+          deposit_returned_at: string | null
+          end_date: string
           guarantee_detail: string | null
           guarantee_type: string
           id: string
@@ -644,8 +823,8 @@ export type Database = {
           owner_id: string
           payment_due_day: number
           property_id: string
-          rent_amount: number
           renewed_from_id: string | null
+          rent_amount: number
           start_date: string
           status: string
           tenant_id: string
@@ -660,8 +839,12 @@ export type Database = {
           commission_pct?: number
           created_at?: string
           currency?: string
-          end_date: string
           deposit_amount?: number
+          deposit_deductions?: Json
+          deposit_received_at?: string | null
+          deposit_returned_amount?: number | null
+          deposit_returned_at?: string | null
+          end_date: string
           guarantee_detail?: string | null
           guarantee_type?: string
           id?: string
@@ -673,8 +856,8 @@ export type Database = {
           owner_id: string
           payment_due_day?: number
           property_id: string
-          rent_amount: number
           renewed_from_id?: string | null
+          rent_amount: number
           start_date: string
           status?: string
           tenant_id: string
@@ -689,8 +872,12 @@ export type Database = {
           commission_pct?: number
           created_at?: string
           currency?: string
-          end_date?: string
           deposit_amount?: number
+          deposit_deductions?: Json
+          deposit_received_at?: string | null
+          deposit_returned_amount?: number | null
+          deposit_returned_at?: string | null
+          end_date?: string
           guarantee_detail?: string | null
           guarantee_type?: string
           id?: string
@@ -702,8 +889,8 @@ export type Database = {
           owner_id?: string
           payment_due_day?: number
           property_id?: string
-          rent_amount?: number
           renewed_from_id?: string | null
+          rent_amount?: number
           start_date?: string
           status?: string
           tenant_id?: string
@@ -742,6 +929,168 @@ export type Database = {
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "rental_contacts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      rental_contract_parties: {
+        Row: {
+          contact_id: string
+          contract_id: string
+          created_at: string
+          id: string
+          notes: string | null
+          role: string
+          share_pct: number | null
+        }
+        Insert: {
+          contact_id: string
+          contract_id: string
+          created_at?: string
+          id?: string
+          notes?: string | null
+          role: string
+          share_pct?: number | null
+        }
+        Update: {
+          contact_id?: string
+          contract_id?: string
+          created_at?: string
+          id?: string
+          notes?: string | null
+          role?: string
+          share_pct?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rental_contract_parties_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "rental_contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "rental_contract_parties_contract_id_fkey"
+            columns: ["contract_id"]
+            isOneToOne: false
+            referencedRelation: "rental_contracts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      rental_documents: {
+        Row: {
+          contract_id: string
+          created_at: string
+          file_name: string
+          id: string
+          kind: string
+          path: string
+          uploaded_by: string | null
+        }
+        Insert: {
+          contract_id: string
+          created_at?: string
+          file_name: string
+          id?: string
+          kind: string
+          path: string
+          uploaded_by?: string | null
+        }
+        Update: {
+          contract_id?: string
+          created_at?: string
+          file_name?: string
+          id?: string
+          kind?: string
+          path?: string
+          uploaded_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rental_documents_contract_id_fkey"
+            columns: ["contract_id"]
+            isOneToOne: false
+            referencedRelation: "rental_contracts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      rental_maintenance: {
+        Row: {
+          charge_id: string | null
+          contract_id: string
+          cost: number | null
+          created_at: string
+          created_by: string | null
+          currency: string | null
+          description: string | null
+          id: string
+          payer: string | null
+          priority: string
+          provider: string | null
+          reported_at: string
+          resolved_at: string | null
+          settlement_id: string | null
+          status: string
+          title: string
+        }
+        Insert: {
+          charge_id?: string | null
+          contract_id: string
+          cost?: number | null
+          created_at?: string
+          created_by?: string | null
+          currency?: string | null
+          description?: string | null
+          id?: string
+          payer?: string | null
+          priority?: string
+          provider?: string | null
+          reported_at?: string
+          resolved_at?: string | null
+          settlement_id?: string | null
+          status?: string
+          title: string
+        }
+        Update: {
+          charge_id?: string | null
+          contract_id?: string
+          cost?: number | null
+          created_at?: string
+          created_by?: string | null
+          currency?: string | null
+          description?: string | null
+          id?: string
+          payer?: string | null
+          priority?: string
+          provider?: string | null
+          reported_at?: string
+          resolved_at?: string | null
+          settlement_id?: string | null
+          status?: string
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rental_maintenance_charge_id_fkey"
+            columns: ["charge_id"]
+            isOneToOne: false
+            referencedRelation: "rental_charges"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "rental_maintenance_contract_id_fkey"
+            columns: ["contract_id"]
+            isOneToOne: false
+            referencedRelation: "rental_contracts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "rental_maintenance_settlement_id_fkey"
+            columns: ["settlement_id"]
+            isOneToOne: false
+            referencedRelation: "rental_settlements"
             referencedColumns: ["id"]
           },
         ]
@@ -815,6 +1164,9 @@ export type Database = {
           net_amount: number
           notes: string | null
           other_collected_amount: number
+          paid_to_owner_at: string | null
+          payout_method: string | null
+          payout_reference: string | null
           period: string
           rent_amount: number
         }
@@ -830,6 +1182,9 @@ export type Database = {
           net_amount: number
           notes?: string | null
           other_collected_amount?: number
+          paid_to_owner_at?: string | null
+          payout_method?: string | null
+          payout_reference?: string | null
           period: string
           rent_amount: number
         }
@@ -845,6 +1200,9 @@ export type Database = {
           net_amount?: number
           notes?: string | null
           other_collected_amount?: number
+          paid_to_owner_at?: string | null
+          payout_method?: string | null
+          payout_reference?: string | null
           period?: string
           rent_amount?: number
         }
@@ -895,6 +1253,10 @@ export type Database = {
       is_admin: { Args: never; Returns: boolean }
       rental_apply_adjustment: { Args: { p_contract_id: string; p_manual_amount?: number | null }; Returns: Json }
       rental_apply_due_adjustments: { Args: never; Returns: number }
+      rental_close_contract: {
+        Args: { p_contract_id: string; p_end_date?: string; p_penalty?: number; p_status: string }
+        Returns: Json
+      }
       rental_import_contracts: { Args: { p_rows: Json }; Returns: number }
       next_agent_for_lead: {
         Args: { p_city?: string | null; p_property_type?: string | null }
