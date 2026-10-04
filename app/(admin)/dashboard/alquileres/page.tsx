@@ -1,317 +1,231 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Plus, AlertTriangle, Banknote, CalendarClock, TrendingUp, FileText, Upload, MessageCircle, Wrench } from "lucide-react";
+import { AlertTriangle, Banknote, CalendarClock, Plus, TrendingUp, Upload, Wrench } from "lucide-react";
 import { createClientServer } from "@/lib/supabase";
 import { ymdInAppTz } from "@/lib/dates";
 import { Button } from "@/shared/components/ui/button";
 import { Page, PageHeader } from "@/shared/components/PageShell";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/shared/components/ui/table";
-import { StatusBadge } from "@/shared/components/StatusBadge";
-import {
-  ADJUSTMENT_ALERT_DAYS,
-  CONTRACT_STATUS_LABELS,
-  CONTRACT_STATUS_TONE,
-  EXPIRY_ALERT_DAYS,
-  daysBetween,
-  formatDate,
-  money,
+  ADJUSTMENT_LABELS, daysBetween, formatDate, money, periodOf,
+  type AdjustmentIndex,
 } from "@/features/rentals/logic";
+import { RentalsNav } from "@/features/rentals/RentalsNav";
+import { Stat, StatStrip } from "@/features/rentals/StatStrip";
+import { ContractsTable, type ContractListRow } from "@/features/rentals/ContractsTable";
+import { getRentalAlertSettings } from "@/features/rentals/settings";
 
 type ContractRow = {
-  id: string;
-  status: string;
-  start_date: string;
-  end_date: string;
-  rent_amount: number;
-  currency: string;
-  next_adjustment_date: string | null;
-  adjustment_index: string;
-  renewed_from_id: string | null;
-  late_fee_pct_daily: number;
-  late_fee_fixed: number;
+  id: string; status: string; end_date: string; rent_amount: number; currency: string;
+  next_adjustment_date: string | null; adjustment_index: string; renewed_from_id: string | null;
   properties: { title: string } | null;
   owner: { full_name: string } | null;
-  tenant: { full_name: string; phone: string | null } | null;
+  tenant: { full_name: string } | null;
+};
+type ChargeRow = {
+  contract_id: string; period: string; due_date: string; kind: string; amount: number; currency: string;
+  rental_payment_entries: { amount: number }[];
 };
 
-// Tier 4 — /dashboard/alquileres: contratos + alertas (vencimientos,
-// ajustes, mora). RLS: agente ve los suyos, admin todos.
+const GROUP_LIMIT = 4;
+
+function totalsByCurrency(items: { amount: number; currency: string }[]) {
+  const totals = new Map<string, number>();
+  for (const item of items) totals.set(item.currency, (totals.get(item.currency) ?? 0) + item.amount);
+  return [...totals.entries()].map(([currency, amount]) => money(amount, currency)).join(" + ");
+}
+
+// /dashboard/alquileres: indicadores, lo que requiere acción y la cartera de
+// contratos. RLS: agente ve los suyos, admin todos.
 export default async function AlquileresPage() {
   const supabase = await createClientServer();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
+  // Ajustes y punitorios al día antes de leer (el cron lo hace a diario;
+  // acá cubre lo que pasó desde la última corrida). En orden: el ajuste
+  // cambia las cuotas sobre las que se calcula el punitorio.
   await supabase.rpc("rental_apply_due_adjustments");
+  await supabase.rpc("rental_accrue_late_fees");
+  const alerts = await getRentalAlertSettings(supabase);
 
   const today = ymdInAppTz();
+  const thisPeriod = periodOf(today);
 
   const [
-    { data: contractsRaw }, { data: overdueRaw }, { data: isAdmin },
+    { data: contractsRaw }, { data: chargesRaw }, { data: isAdmin },
     { data: openMaintenance }, { data: unpaidSettlements },
   ] = await Promise.all([
     supabase
       .from("rental_contracts")
-      .select(
-        "id, status, start_date, end_date, rent_amount, currency, next_adjustment_date, adjustment_index, renewed_from_id, late_fee_pct_daily, late_fee_fixed, properties(title), owner:rental_contacts!rental_contracts_owner_id_fkey(full_name), tenant:rental_contacts!rental_contracts_tenant_id_fkey(full_name, phone)"
-      )
-      .order("status")
+      .select("id, status, end_date, rent_amount, currency, next_adjustment_date, adjustment_index, renewed_from_id, properties(title), owner:rental_contacts!rental_contracts_owner_id_fkey(full_name), tenant:rental_contacts!rental_contracts_tenant_id_fkey(full_name)")
       .order("end_date"),
+    // Vencidos (para la mora) y los del mes en curso (para la cobranza).
     supabase
       .from("rental_charges")
-      .select("id, contract_id, period, due_date, amount, currency, rental_payment_entries(amount)")
-      .lt("due_date", today)
-      .order("due_date"),
+      .select("contract_id, period, due_date, kind, amount, currency, rental_payment_entries(amount)")
+      .or(`due_date.lt.${today},period.eq.${thisPeriod}`),
     supabase.rpc("is_admin"),
     supabase
       .from("rental_maintenance")
       .select("id, contract_id, title, priority, reported_at")
       .in("status", ["ABIERTO", "EN_CURSO"])
       .order("reported_at"),
-    supabase
-      .from("rental_settlements")
-      .select("id, net_amount, currency")
-      .is("paid_to_owner_at", null)
-      .order("period"),
+    // Partes sin pagar: con co-propietarios una liquidación puede estar pagada a medias.
+    supabase.from("rental_settlement_shares").select("id, amount, settlement:rental_settlements(currency)").is("paid_to_owner_at", null),
   ]);
-  const maintenance = openMaintenance ?? [];
-  const pendingPayouts = unpaidSettlements ?? [];
-  const payoutTotals = [...new Set(pendingPayouts.map((s) => s.currency))].map((currency) => ({
-    currency,
-    amount: pendingPayouts.filter((s) => s.currency === currency).reduce((sum, s) => sum + s.net_amount, 0),
-  }));
 
   const contracts = (contractsRaw ?? []) as unknown as ContractRow[];
-  const overdue = ((overdueRaw ?? []) as {
-    id: string;
-    contract_id: string;
-    period: string;
-    due_date: string;
-    amount: number;
-    currency: string;
-    rental_payment_entries: { amount: number }[];
-  }[]).map((charge) => ({ ...charge, balance: charge.amount - charge.rental_payment_entries.reduce((sum, entry) => sum + entry.amount, 0) }))
-    .filter((charge) => charge.balance > 0.005);
+  const charges = ((chargesRaw ?? []) as ChargeRow[]).map((charge) => ({
+    ...charge,
+    balance: charge.amount - charge.rental_payment_entries.reduce((sum, entry) => sum + entry.amount, 0),
+  }));
   const byId = new Map(contracts.map((c) => [c.id, c]));
-
   const active = contracts.filter((c) => c.status === "ACTIVO");
-  const renewedIds = new Set(contracts.map((contract) => contract.renewed_from_id).filter(Boolean));
-  const expiring = active.filter((c) => !renewedIds.has(c.id) && daysBetween(today, c.end_date) <= EXPIRY_ALERT_DAYS);
-  const expiryCounts = [90, 60, 30].map((days, index) => expiring.filter((contract) => {
-    const remaining = daysBetween(today, contract.end_date);
-    return remaining <= days && (index === 2 || remaining > [90, 60, 30][index + 1]);
-  }).length);
-  const adjusting = active.filter(
-    (c) =>
-      c.next_adjustment_date &&
-      daysBetween(today, c.next_adjustment_date) <= ADJUSTMENT_ALERT_DAYS
-  );
-  const overdueByContract = new Map<string, number>();
-  for (const p of overdue) {
-    overdueByContract.set(p.contract_id, (overdueByContract.get(p.contract_id) ?? 0) + 1);
+  const renewedIds = new Set(contracts.map((c) => c.renewed_from_id).filter(Boolean));
+
+  const overdue = charges.filter((charge) => charge.due_date < today && charge.balance > 0.005);
+  const overdueByContract = new Map<string, { count: number; balance: number }>();
+  for (const charge of overdue) {
+    const current = overdueByContract.get(charge.contract_id) ?? { count: 0, balance: 0 };
+    overdueByContract.set(charge.contract_id, { count: current.count + 1, balance: current.balance + charge.balance });
   }
 
-  const alerts = [
-    {
-      icon: AlertTriangle,
-      label: "Cuotas vencidas",
-      value: overdue.length,
-      tone: "text-danger",
-    },
-    {
-      icon: CalendarClock,
-      label: "Vencen en 90 / 60 / 30 días",
-      value: `${expiryCounts[0]} / ${expiryCounts[1]} / ${expiryCounts[2]}`,
-      tone: "text-warning",
-    },
-    {
-      icon: TrendingUp,
-      label: `Ajuste en ≤ ${ADJUSTMENT_ALERT_DAYS} días`,
-      value: adjusting.length,
-      tone: "text-info",
-    },
-    {
-      icon: FileText,
-      label: "Contratos activos",
-      value: active.length,
-      tone: "text-muted-foreground",
-    },
-  ];
+  const monthRent = charges.filter((charge) => charge.period === thisPeriod && charge.kind === "ALQUILER");
+  const monthPaid = monthRent.filter((charge) => charge.balance <= 0.005).length;
+  const expiring = active.filter((c) => !renewedIds.has(c.id) && daysBetween(today, c.end_date) <= alerts.expiryAlertDays);
+  const adjusting = active.filter((c) => c.next_adjustment_date && daysBetween(today, c.next_adjustment_date) <= alerts.adjustmentAlertDays)
+    .sort((a, b) => (a.next_adjustment_date ?? "").localeCompare(b.next_adjustment_date ?? ""));
+  // El cron aplica solo los ajustes con índice cargado: los que siguen acá
+  // con fecha pasada esperan el valor del índice o un monto manual.
+  const adjustDue = adjusting.filter((c) => c.next_adjustment_date! <= today);
+  const maintenance = openMaintenance ?? [];
+  const pendingPayouts = ((unpaidSettlements ?? []) as unknown as { id: string; amount: number; settlement: { currency: string } | null }[])
+    .map((share) => ({ amount: share.amount, currency: share.settlement?.currency ?? "ARS" }));
+
+  const rows: ContractListRow[] = contracts.map((c) => ({
+    id: c.id,
+    status: c.status,
+    propertyTitle: c.properties?.title ?? "Propiedad sin título",
+    tenantName: c.tenant?.full_name ?? null,
+    ownerName: c.owner?.full_name ?? null,
+    rentAmount: c.rent_amount,
+    currency: c.currency,
+    endDate: c.end_date,
+    nextAdjustmentDate: c.status === "ACTIVO" ? c.next_adjustment_date : null,
+    overdueBalance: overdueByContract.get(c.id)?.balance ?? 0,
+    overdueCount: overdueByContract.get(c.id)?.count ?? 0,
+    renewed: renewedIds.has(c.id),
+  }));
+
+  const hasActions = overdue.length + adjusting.length + expiring.length + maintenance.length + pendingPayouts.length > 0;
 
   return (
     <Page>
       <PageHeader
         title="Alquileres"
-        description="Contratos, cobranzas y liquidaciones."
-        actions={
-          <div className="flex flex-wrap gap-2">
-          <Button asChild variant="outline"><Link href="/dashboard/alquileres/propietarios"><FileText /> Por propietario</Link></Button>
-          {isAdmin && <Button asChild variant="outline"><Link href="/dashboard/alquileres/importar"><Upload /> Importar CSV</Link></Button>}
-          <Button asChild>
-            <Link href="/dashboard/alquileres/nuevo">
-              <Plus />
-              Nuevo contrato
-            </Link>
-          </Button>
-          </div>
-        }
+        description={`${active.length} ${active.length === 1 ? "contrato activo" : "contratos activos"}`}
+        actions={<>
+          {isAdmin && <Button asChild variant="outline"><Link href="/dashboard/alquileres/importar"><Upload /> Importar</Link></Button>}
+          <Button asChild><Link href="/dashboard/alquileres/nuevo"><Plus /> Nuevo contrato</Link></Button>
+        </>}
       />
+      <RentalsNav />
 
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        {alerts.map((a) => (
-          <div
-            key={a.label}
-            className="flex flex-col gap-1 rounded-lg border border-border bg-card px-4 py-3"
-          >
-            <span className="text-xs font-medium text-muted-foreground">{a.label}</span>
-            {/* El color solo aparece cuando hay algo que atender */}
-            <span className={`text-2xl font-semibold tracking-tight ${Number(a.value) > 0 || (typeof a.value === "string" && expiring.length > 0) ? a.tone : "text-foreground"}`}>
-              {a.value}
-            </span>
-          </div>
-        ))}
-      </div>
+      <StatStrip>
+        <Stat
+          label="Cobranza del mes"
+          value={monthRent.length ? `${monthPaid} de ${monthRent.length}` : "Sin cuotas"}
+          detail={monthRent.length ? `${Math.round((monthPaid / monthRent.length) * 100)} % de los alquileres cobrados` : "No hay alquileres este mes"}
+        />
+        <Stat
+          label="Deuda vencida"
+          value={overdue.length ? totalsByCurrency(overdue.map((c) => ({ amount: c.balance, currency: c.currency }))) : "Al día"}
+          tone={overdue.length ? "danger" : undefined}
+          detail={overdue.length ? `${overdueByContract.size} ${overdueByContract.size === 1 ? "contrato" : "contratos"} en mora` : "Ningún contrato en mora"}
+        />
+        <Stat
+          label={`Ajustes en ${alerts.adjustmentAlertDays} días`}
+          value={adjusting.length}
+          tone={adjustDue.length ? "warning" : adjusting.length ? "info" : undefined}
+          detail={adjustDue.length
+            ? `${adjustDue.length} ${adjustDue.length === 1 ? "vencido sin aplicar" : "vencidos sin aplicar"}`
+            : adjusting[0]?.next_adjustment_date ? `El próximo el ${formatDate(adjusting[0].next_adjustment_date)}` : "Ninguno próximo"}
+        />
+        <Stat
+          label={`Vencen en ${alerts.expiryAlertDays} días`}
+          value={expiring.length}
+          tone={expiring.length ? "warning" : undefined}
+          detail={expiring.length ? "Sin renovación cargada" : "Ninguno sin renovar"}
+        />
+      </StatStrip>
 
-      {(overdue.length > 0 || expiring.length > 0 || adjusting.length > 0 || maintenance.length > 0 || pendingPayouts.length > 0) && (
+      {hasActions && (
         <section className="overflow-hidden rounded-lg border border-border bg-card">
-          <div className="border-b border-border px-4 py-3">
-            <h2 className="text-lg font-semibold tracking-tight">Requiere acción</h2>
-          </div>
+          <h2 className="border-b border-border px-4 py-3 text-base font-semibold tracking-tight">Requiere acción</h2>
           <ul className="divide-y divide-border-subtle text-sm">
-            {overdue.map((p) => {
-              const c = byId.get(p.contract_id);
-              return (
-                <li key={p.id} className="flex h-10 items-center justify-between gap-3 px-4">
-                  <span className="flex items-center gap-2 min-w-0">
-                    <AlertTriangle className="size-4 shrink-0 text-danger" />
-                    <Link href={`/dashboard/alquileres/${p.contract_id}`} className="truncate font-medium underline-offset-4 hover:underline">
-                      {c?.properties?.title ?? "Contrato"}
-                    </Link>
-                    <span className="text-muted-foreground truncate">
-                      · {c?.tenant?.full_name} · cuota vencida el {formatDate(p.due_date)}
-                    </span>
-                  </span>
-                  <span className="tabular-nums shrink-0">{money(p.balance, p.currency)} · {daysBetween(p.due_date, today)} días</span>
-                  {c?.tenant?.phone && <a href={`https://wa.me/${c.tenant.phone.replace(/\D/g, "")}?text=${encodeURIComponent(`Hola ${c.tenant.full_name}, registramos un saldo pendiente de ${money(p.balance, p.currency)} por ${c.properties?.title ?? "tu alquiler"}. Por favor, contactanos para coordinar el pago.`)}`} target="_blank" rel="noopener noreferrer" aria-label={`Reclamar a ${c.tenant.full_name} por WhatsApp`} className="text-success"><MessageCircle className="size-4" /></a>}
-                </li>
-              );
-            })}
-            {adjusting.map((c) => (
-              <li key={`adj-${c.id}`} className="flex h-10 items-center justify-between gap-3 px-4">
-                <span className="flex items-center gap-2 min-w-0">
-                  <TrendingUp className="size-4 shrink-0 text-info" />
-                  <Link href={`/dashboard/alquileres/${c.id}`} className="truncate font-medium underline-offset-4 hover:underline">
-                    {c.properties?.title ?? "Contrato"}
-                  </Link>
-                  <span className="text-muted-foreground truncate">
-                    · ajuste {c.adjustment_index} el {formatDate(c.next_adjustment_date)}
-                  </span>
+            {overdue.length > 0 && (
+              <li className="flex items-center justify-between gap-3 px-4 py-2.5">
+                <span className="flex min-w-0 items-center gap-2">
+                  <AlertTriangle className="size-4 shrink-0 text-danger" />
+                  <span className="truncate">{overdue.length} {overdue.length === 1 ? "cuota vencida" : "cuotas vencidas"} en {overdueByContract.size} {overdueByContract.size === 1 ? "contrato" : "contratos"}</span>
                 </span>
+                <Link href="/dashboard/alquileres/cobranzas" className="shrink-0 font-medium underline-offset-4 hover:underline">Ir a cobranzas</Link>
+              </li>
+            )}
+            {adjusting.slice(0, GROUP_LIMIT).map((c) => (
+              <li key={`adj-${c.id}`} className="flex items-center justify-between gap-3 px-4 py-2.5">
+                <span className="flex min-w-0 items-center gap-2">
+                  <TrendingUp className={`size-4 shrink-0 ${c.next_adjustment_date! <= today ? "text-warning" : "text-info"}`} />
+                  <span className="truncate"><span className="font-medium">{c.properties?.title ?? "Contrato"}</span><span className="text-muted-foreground">
+                    {c.next_adjustment_date! <= today
+                      ? ` · ajuste ${ADJUSTMENT_LABELS[c.adjustment_index as AdjustmentIndex] ?? c.adjustment_index} pendiente desde el ${formatDate(c.next_adjustment_date)}`
+                      : ` · ajuste ${ADJUSTMENT_LABELS[c.adjustment_index as AdjustmentIndex] ?? c.adjustment_index} el ${formatDate(c.next_adjustment_date)}`}
+                  </span></span>
+                </span>
+                <Link href={`/dashboard/alquileres/${c.id}`} className="shrink-0 font-medium underline-offset-4 hover:underline">
+                  {c.next_adjustment_date && c.next_adjustment_date <= today ? "Aplicar" : "Ver"}
+                </Link>
               </li>
             ))}
-            {maintenance.map((m) => (
-              <li key={`mnt-${m.id}`} className="flex h-10 items-center justify-between gap-3 px-4">
-                <span className="flex items-center gap-2 min-w-0">
-                  <Wrench className={`size-4 shrink-0 ${m.priority === "URGENTE" || m.priority === "ALTA" ? "text-danger" : "text-warning"}`} />
-                  <Link href={`/dashboard/alquileres/${m.contract_id}`} className="truncate font-medium underline-offset-4 hover:underline">
-                    {byId.get(m.contract_id)?.properties?.title ?? "Contrato"}
-                  </Link>
-                  <span className="text-muted-foreground truncate">· {m.title}</span>
+            {expiring.slice(0, GROUP_LIMIT).map((c) => (
+              <li key={`exp-${c.id}`} className="flex items-center justify-between gap-3 px-4 py-2.5">
+                <span className="flex min-w-0 items-center gap-2">
+                  <CalendarClock className="size-4 shrink-0 text-warning" />
+                  <span className="truncate"><span className="font-medium">{c.properties?.title ?? "Contrato"}</span><span className="text-muted-foreground"> · vence el {formatDate(c.end_date)} ({daysBetween(today, c.end_date)} días)</span></span>
                 </span>
-                <span className="shrink-0 text-muted-foreground">hace {daysBetween(m.reported_at, today)} días</span>
+                <Link href={`/dashboard/alquileres/nuevo?renovar=${c.id}`} className="shrink-0 font-medium underline-offset-4 hover:underline">Renovar</Link>
+              </li>
+            ))}
+            {maintenance.slice(0, GROUP_LIMIT).map((m) => (
+              <li key={`mnt-${m.id}`} className="flex items-center justify-between gap-3 px-4 py-2.5">
+                <span className="flex min-w-0 items-center gap-2">
+                  <Wrench className={`size-4 shrink-0 ${m.priority === "URGENTE" || m.priority === "ALTA" ? "text-danger" : "text-warning"}`} />
+                  <span className="truncate"><span className="font-medium">{byId.get(m.contract_id)?.properties?.title ?? "Contrato"}</span><span className="text-muted-foreground"> · {m.title} · hace {daysBetween(m.reported_at, today)} días</span></span>
+                </span>
+                <Link href={`/dashboard/alquileres/${m.contract_id}?tab=mantenimiento`} className="shrink-0 font-medium underline-offset-4 hover:underline">Ver</Link>
               </li>
             ))}
             {pendingPayouts.length > 0 && (
-              <li className="flex h-10 items-center justify-between gap-3 px-4">
-                <span className="flex items-center gap-2 min-w-0">
+              <li className="flex items-center justify-between gap-3 px-4 py-2.5">
+                <span className="flex min-w-0 items-center gap-2">
                   <Banknote className="size-4 shrink-0 text-info" />
-                  <Link href="/dashboard/alquileres/propietarios?pendientes=1" className="truncate font-medium underline-offset-4 hover:underline">
-                    {pendingPayouts.length} {pendingPayouts.length === 1 ? "liquidación" : "liquidaciones"} sin transferir al propietario
-                  </Link>
-                </span>
-                <span className="tabular-nums shrink-0">
-                  {payoutTotals.map((t) => money(t.amount, t.currency)).join(" · ")}
-                </span>
-              </li>
-            )}
-            {expiring.map((c) => (
-              <li key={`exp-${c.id}`} className="flex h-10 items-center justify-between gap-3 px-4">
-                <span className="flex items-center gap-2 min-w-0">
-                  <CalendarClock className="size-4 shrink-0 text-warning" />
-                  <Link href={`/dashboard/alquileres/${c.id}`} className="truncate font-medium underline-offset-4 hover:underline">
-                    {c.properties?.title ?? "Contrato"}
-                  </Link>
-                  <span className="text-muted-foreground truncate">
-                    · vence el {formatDate(c.end_date)} ({daysBetween(today, c.end_date)} días) · <Link href={`/dashboard/alquileres/nuevo?renovar=${c.id}`} className="underline">Renovar</Link>
+                  <span className="truncate">
+                    {pendingPayouts.length} {pendingPayouts.length === 1 ? "transferencia pendiente" : "transferencias pendientes"} a propietarios
+                    <span className="text-muted-foreground"> · {totalsByCurrency(pendingPayouts)}</span>
                   </span>
                 </span>
+                <Link href="/dashboard/alquileres/propietarios?pendientes=1" className="shrink-0 font-medium underline-offset-4 hover:underline">Ver</Link>
               </li>
-            ))}
+            )}
+            {(adjusting.length > GROUP_LIMIT || expiring.length > GROUP_LIMIT || maintenance.length > GROUP_LIMIT) && (
+              <li className="px-4 py-2.5 text-xs text-muted-foreground">
+                Hay más pendientes: filtrá la tabla por situación o revisá Mantenimiento.
+              </li>
+            )}
           </ul>
         </section>
       )}
 
-      <section className="overflow-hidden rounded-lg border border-border bg-card">
-        <div className="border-b border-border px-4 py-3">
-          <h2 className="text-lg font-semibold tracking-tight">Contratos</h2>
-        </div>
-        {contracts.length === 0 ? (
-          <p className="px-4 py-6 text-sm text-muted-foreground">
-            Todavía no hay contratos. Creá el primero con &ldquo;Nuevo contrato&rdquo;.
-          </p>
-        ) : (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Propiedad</TableHead>
-                <TableHead className="hidden md:table-cell">Inquilino</TableHead>
-                <TableHead className="hidden lg:table-cell">Propietario</TableHead>
-                <TableHead>Canon</TableHead>
-                <TableHead className="hidden md:table-cell">Vigencia</TableHead>
-                <TableHead>Estado</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {contracts.map((c) => (
-                <TableRow key={c.id}>
-                  <TableCell className="font-medium">
-                    <Link href={`/dashboard/alquileres/${c.id}`} className="hover:underline hover:text-primary">
-                      {c.properties?.title ?? "—"}
-                    </Link>
-                    {overdueByContract.get(c.id) && (
-                      <StatusBadge tone="danger" className="ml-2">
-                        {overdueByContract.get(c.id)} en mora
-                      </StatusBadge>
-                    )}
-                  </TableCell>
-                  <TableCell className="hidden md:table-cell text-muted-foreground">
-                    {c.tenant?.full_name}
-                  </TableCell>
-                  <TableCell className="hidden lg:table-cell text-muted-foreground">
-                    {c.owner?.full_name}
-                  </TableCell>
-                  <TableCell className="tabular-nums">{money(c.rent_amount, c.currency)}</TableCell>
-                  <TableCell className="hidden md:table-cell text-muted-foreground">
-                    {formatDate(c.start_date)} → {formatDate(c.end_date)}
-                  </TableCell>
-                  <TableCell>
-                    <StatusBadge tone={CONTRACT_STATUS_TONE[c.status] ?? "neutral"}>
-                      {CONTRACT_STATUS_LABELS[c.status] ?? c.status}
-                    </StatusBadge>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        )}
-      </section>
+      <ContractsTable rows={rows} today={today} alerts={alerts} />
     </Page>
   );
 }

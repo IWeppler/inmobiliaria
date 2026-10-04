@@ -22,6 +22,8 @@ export const CATEGORIES = {
   COMISION_AGENTE: { direction: "EGRESO", label: "Comisiones a agentes", group: "comisiones", manual: true, nature: "VARIABLE" },
   COMPRA_PROPIEDAD: { direction: "EGRESO", label: "Compra de propiedad", group: "inversion", manual: true, nature: "VARIABLE" },
   OBRA: { direction: "EGRESO", label: "Obra y refacciones", group: "inversion", manual: true, nature: "VARIABLE" },
+  // Reclamos de alquiler a cargo de la inmobiliaria (trigger sobre rental_maintenance).
+  MANTENIMIENTO: { direction: "EGRESO", label: "Mantenimiento de alquileres", group: "variables", manual: false, nature: "VARIABLE" },
   OTRO_EGRESO: { direction: "EGRESO", label: "Otro egreso", group: "variables", manual: true, nature: "VARIABLE" },
 } as const satisfies Record<string, { direction: Direction; label: string; group: string; manual: boolean; nature?: Nature }>;
 

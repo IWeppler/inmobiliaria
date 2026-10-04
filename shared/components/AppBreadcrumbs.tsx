@@ -41,10 +41,16 @@ function getCrumbs(pathname: string): Crumb[] {
     const labels: Record<string, string> = {
       nuevo: "Nuevo contrato",
       importar: "Importar contratos",
-      propietarios: "Liquidaciones de propietarios",
+      propietarios: "Liquidaciones",
+      cobranzas: "Cobranzas",
+      mantenimiento: "Mantenimiento",
+      contactos: "Contactos",
     };
 
-    if (labels[rest[0]]) {
+    if (rest[0] === "contactos" && rest[1]) {
+      crumbs.push({ label: labels.contactos, href: `${sectionHref}/contactos` });
+      crumbs.push({ label: "Cuenta corriente" });
+    } else if (labels[rest[0]]) {
       crumbs.push({ label: labels[rest[0]] });
     } else {
       crumbs.push({

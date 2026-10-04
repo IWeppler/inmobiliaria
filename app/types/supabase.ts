@@ -199,9 +199,9 @@ export type Database = {
         Relationships: []
       }
       cash_movements: {
-        Row: { id: string; occurred_on: string; direction: string; category: string; nature: string | null; description: string; amount: number; currency: string; property_id: string | null; contract_id: string | null; settlement_id: string | null; sale_id: string | null; recurring_expense_id: string | null; recurring_period: string | null; agent_id: string | null; created_by: string | null; created_at: string }
-        Insert: { id?: string; occurred_on: string; direction: string; category: string; nature?: string | null; description: string; amount: number; currency: string; property_id?: string | null; contract_id?: string | null; settlement_id?: string | null; sale_id?: string | null; recurring_expense_id?: string | null; recurring_period?: string | null; agent_id?: string | null; created_by?: string | null; created_at?: string }
-        Update: { id?: string; occurred_on?: string; direction?: string; category?: string; nature?: string | null; description?: string; amount?: number; currency?: string; property_id?: string | null; contract_id?: string | null; settlement_id?: string | null; sale_id?: string | null; recurring_expense_id?: string | null; recurring_period?: string | null; agent_id?: string | null; created_by?: string | null; created_at?: string }
+        Row: { id: string; occurred_on: string; direction: string; category: string; nature: string | null; description: string; amount: number; currency: string; property_id: string | null; contract_id: string | null; settlement_id: string | null; maintenance_id: string | null; sale_id: string | null; recurring_expense_id: string | null; recurring_period: string | null; agent_id: string | null; created_by: string | null; created_at: string }
+        Insert: { id?: string; occurred_on: string; direction: string; category: string; nature?: string | null; description: string; amount: number; currency: string; property_id?: string | null; contract_id?: string | null; settlement_id?: string | null; maintenance_id?: string | null; sale_id?: string | null; recurring_expense_id?: string | null; recurring_period?: string | null; agent_id?: string | null; created_by?: string | null; created_at?: string }
+        Update: { id?: string; occurred_on?: string; direction?: string; category?: string; nature?: string | null; description?: string; amount?: number; currency?: string; property_id?: string | null; contract_id?: string | null; settlement_id?: string | null; maintenance_id?: string | null; sale_id?: string | null; recurring_expense_id?: string | null; recurring_period?: string | null; agent_id?: string | null; created_by?: string | null; created_at?: string }
         Relationships: [
           { foreignKeyName: "cash_movements_property_id_fkey"; columns: ["property_id"]; isOneToOne: false; referencedRelation: "properties"; referencedColumns: ["id"] },
           { foreignKeyName: "cash_movements_contract_id_fkey"; columns: ["contract_id"]; isOneToOne: false; referencedRelation: "rental_contracts"; referencedColumns: ["id"] },
@@ -330,6 +330,8 @@ export type Database = {
           id: string
           index_code: string
           period: string
+          source: string
+          updated_at: string
           value: number
         }
         Insert: {
@@ -337,6 +339,8 @@ export type Database = {
           id?: string
           index_code: string
           period: string
+          source?: string
+          updated_at?: string
           value: number
         }
         Update: {
@@ -344,6 +348,8 @@ export type Database = {
           id?: string
           index_code?: string
           period?: string
+          source?: string
+          updated_at?: string
           value?: number
         }
         Relationships: []
@@ -787,9 +793,9 @@ export type Database = {
         Relationships: [{ foreignKeyName: "rental_adjustments_contract_id_fkey"; columns: ["contract_id"]; isOneToOne: false; referencedRelation: "rental_contracts"; referencedColumns: ["id"] }]
       }
       rental_charges: {
-        Row: { id: string; contract_id: string; rent_payment_id: string | null; period: string; due_date: string; kind: string; description: string; amount: number; currency: string; created_at: string }
-        Insert: { id?: string; contract_id: string; rent_payment_id?: string | null; period: string; due_date: string; kind: string; description: string; amount: number; currency: string; created_at?: string }
-        Update: { id?: string; contract_id?: string; rent_payment_id?: string | null; period?: string; due_date?: string; kind?: string; description?: string; amount?: number; currency?: string; created_at?: string }
+        Row: { id: string; contract_id: string; rent_payment_id: string | null; period: string; due_date: string; kind: string; description: string; amount: number; currency: string; created_at: string; late_fee_of: string | null }
+        Insert: { id?: string; contract_id: string; rent_payment_id?: string | null; period: string; due_date: string; kind: string; description: string; amount: number; currency: string; created_at?: string; late_fee_of?: string | null }
+        Update: { id?: string; contract_id?: string; rent_payment_id?: string | null; period?: string; due_date?: string; kind?: string; description?: string; amount?: number; currency?: string; created_at?: string; late_fee_of?: string | null }
         Relationships: [
           { foreignKeyName: "rental_charges_contract_id_fkey"; columns: ["contract_id"]; isOneToOne: false; referencedRelation: "rental_contracts"; referencedColumns: ["id"] },
           { foreignKeyName: "rental_charges_rent_payment_id_fkey"; columns: ["rent_payment_id"]; isOneToOne: true; referencedRelation: "rental_payments"; referencedColumns: ["id"] },
@@ -814,9 +820,12 @@ export type Database = {
           end_date: string
           guarantee_detail: string | null
           guarantee_type: string
+          index_lag_months: number
           id: string
           last_adjustment_date: string | null
           late_fee_fixed: number
+          late_fee_grace_days: number
+          late_fee_mode: string
           late_fee_pct_daily: number
           next_adjustment_date: string | null
           notes: string | null
@@ -847,9 +856,12 @@ export type Database = {
           end_date: string
           guarantee_detail?: string | null
           guarantee_type?: string
+          index_lag_months?: number
           id?: string
           last_adjustment_date?: string | null
           late_fee_fixed?: number
+          late_fee_grace_days?: number
+          late_fee_mode?: string
           late_fee_pct_daily?: number
           next_adjustment_date?: string | null
           notes?: string | null
@@ -880,9 +892,12 @@ export type Database = {
           end_date?: string
           guarantee_detail?: string | null
           guarantee_type?: string
+          index_lag_months?: number
           id?: string
           last_adjustment_date?: string | null
           late_fee_fixed?: number
+          late_fee_grace_days?: number
+          late_fee_mode?: string
           late_fee_pct_daily?: number
           next_adjustment_date?: string | null
           notes?: string | null
@@ -1151,6 +1166,108 @@ export type Database = {
           },
         ]
       }
+      rental_settings: {
+        Row: {
+          id: number; expiry_alert_days: number; adjustment_alert_days: number; updated_at: string
+          notify_receipts: boolean; notify_adjustments: boolean; notify_due: boolean; notify_overdue: boolean
+          adjustment_notice_days: number; due_reminder_days: number; overdue_reminder_days: number
+        }
+        Insert: {
+          id?: number; expiry_alert_days?: number; adjustment_alert_days?: number; updated_at?: string
+          notify_receipts?: boolean; notify_adjustments?: boolean; notify_due?: boolean; notify_overdue?: boolean
+          adjustment_notice_days?: number; due_reminder_days?: number; overdue_reminder_days?: number
+        }
+        Update: {
+          id?: number; expiry_alert_days?: number; adjustment_alert_days?: number; updated_at?: string
+          notify_receipts?: boolean; notify_adjustments?: boolean; notify_due?: boolean; notify_overdue?: boolean
+          adjustment_notice_days?: number; due_reminder_days?: number; overdue_reminder_days?: number
+        }
+        Relationships: []
+      }
+      rental_portal_links: {
+        Row: {
+          id: string; contact_id: string; token_hash: string; expires_at: string; revoked_at: string | null
+          last_viewed_at: string | null; view_count: number; created_by: string | null; created_at: string
+        }
+        Insert: {
+          id?: string; contact_id: string; token_hash: string; expires_at?: string; revoked_at?: string | null
+          last_viewed_at?: string | null; view_count?: number; created_by?: string | null; created_at?: string
+        }
+        Update: {
+          id?: string; contact_id?: string; token_hash?: string; expires_at?: string; revoked_at?: string | null
+          last_viewed_at?: string | null; view_count?: number; created_by?: string | null; created_at?: string
+        }
+        Relationships: []
+      }
+      rental_notifications: {
+        Row: {
+          id: string; contract_id: string; contact_id: string; kind: string; reference: string
+          phone: string | null; status: string; detail: string | null; created_at: string
+        }
+        Insert: {
+          id?: string; contract_id: string; contact_id: string; kind: string; reference: string
+          phone?: string | null; status: string; detail?: string | null; created_at?: string
+        }
+        Update: {
+          id?: string; contract_id?: string; contact_id?: string; kind?: string; reference?: string
+          phone?: string | null; status?: string; detail?: string | null; created_at?: string
+        }
+        Relationships: []
+      }
+      rental_settlement_shares: {
+        Row: {
+          amount: number
+          contact_id: string
+          created_at: string
+          id: string
+          is_primary: boolean
+          paid_to_owner_at: string | null
+          payout_method: string | null
+          payout_reference: string | null
+          settlement_id: string
+          share_pct: number
+        }
+        Insert: {
+          amount: number
+          contact_id: string
+          created_at?: string
+          id?: string
+          is_primary?: boolean
+          paid_to_owner_at?: string | null
+          payout_method?: string | null
+          payout_reference?: string | null
+          settlement_id: string
+          share_pct: number
+        }
+        Update: {
+          amount?: number
+          contact_id?: string
+          created_at?: string
+          id?: string
+          is_primary?: boolean
+          paid_to_owner_at?: string | null
+          payout_method?: string | null
+          payout_reference?: string | null
+          settlement_id?: string
+          share_pct?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rental_settlement_shares_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "rental_contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "rental_settlement_shares_settlement_id_fkey"
+            columns: ["settlement_id"]
+            isOneToOne: false
+            referencedRelation: "rental_settlements"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       rental_settlements: {
         Row: {
           commission_amount: number
@@ -1253,6 +1370,11 @@ export type Database = {
       is_admin: { Args: never; Returns: boolean }
       rental_apply_adjustment: { Args: { p_contract_id: string; p_manual_amount?: number | null }; Returns: Json }
       rental_apply_due_adjustments: { Args: never; Returns: number }
+      rental_accrue_late_fees: { Args: never; Returns: number }
+      rental_owner_shares: {
+        Args: { p_contract_id: string }
+        Returns: { contact_id: string; is_primary: boolean; share_pct: number }[]
+      }
       rental_close_contract: {
         Args: { p_contract_id: string; p_end_date?: string; p_penalty?: number; p_status: string }
         Returns: Json

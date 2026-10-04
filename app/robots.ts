@@ -7,7 +7,8 @@ export default function robots(): MetadataRoute.Robots {
     rules: {
       userAgent: '*',
       allow: '/',
-      disallow: ['/dashboard/', '/admin/', '/login'],
+      // /estado/: links privados de estado de cuenta (además llevan noindex).
+      disallow: ['/dashboard/', '/admin/', '/login', '/estado/'],
     },
     sitemap: `${baseUrl}/sitemap.xml`,
   };

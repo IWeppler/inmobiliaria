@@ -83,6 +83,7 @@ export function ImportContracts({ properties }: { properties: { id: string; titl
     <div className="rounded-lg border border-border bg-card p-5 text-sm">
       <h2 className="font-semibold">Preparar el archivo</h2>
       <p className="mt-2 text-muted-foreground">Descargá la plantilla y el catálogo de propiedades. Identificá cada inmueble por su ID o por un título único. Las fechas van como AAAA-MM-DD y los importes usan punto decimal. El canon debe ser el vigente y la fecha del último ajuste ya aplicado.</p>
+      <p className="mt-2 text-muted-foreground">adjustment_index acepta ICL, IPC, CASA_PROPIA, FIJO, MANUAL o NINGUNO (por defecto ICL). adjustment_months va de 1 a 36 (por defecto 3). Los contratos con IPC toman un rezago de 2 meses y los demás, ninguno.</p>
       <p className="mt-2 text-muted-foreground">El lote se importa completo o se rechaza completo. Completá first_unpaid_period (AAAA-MM-01) si la cuenta corriente debe empezar en otro mes; por defecto comienza en el actual. No se inventan deudas anteriores.</p>
       <div className="mt-4 flex flex-wrap gap-2">
         <Button variant="outline" onClick={() => downloadCsv("plantilla-contratos.csv", [HEADERS])}><Download /> Plantilla CSV</Button>

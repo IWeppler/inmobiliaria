@@ -8,27 +8,16 @@ import { Label } from "@/shared/components/ui/label";
 import { Textarea } from "@/shared/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/shared/components/ui/select";
-import { StatusBadge, type StatusTone } from "@/shared/components/StatusBadge";
+import { StatusBadge } from "@/shared/components/StatusBadge";
 import { billMaintenanceToTenantAction, saveMaintenanceAction } from "@/features/rentals/lifecycleActions";
 import { formatDate, money } from "@/features/rentals/logic";
+import {
+  MAINTENANCE_STATUS,
+  type MaintenanceItem, type MaintenancePayer as Payer, type MaintenancePriority as Priority, type MaintenanceStatus as Status,
+} from "@/features/rentals/maintenance";
 import { useRunAction } from "@/features/rentals/useRunAction";
 
-type Priority = "BAJA" | "MEDIA" | "ALTA" | "URGENTE";
-type Status = "ABIERTO" | "EN_CURSO" | "RESUELTO" | "CANCELADO";
-type Payer = "INQUILINO" | "PROPIETARIO" | "INMOBILIARIA";
-
-export type MaintenanceItem = {
-  id: string; title: string; description: string | null; priority: Priority; status: Status;
-  payer: Payer | null; provider: string | null; cost: number | null; reported_at: string;
-  resolved_at: string | null; charge_id: string | null;
-};
-
-export const MAINTENANCE_STATUS: Record<Status, { label: string; tone: StatusTone }> = {
-  ABIERTO: { label: "Abierto", tone: "warning" },
-  EN_CURSO: { label: "En curso", tone: "info" },
-  RESUELTO: { label: "Resuelto", tone: "success" },
-  CANCELADO: { label: "Cancelado", tone: "neutral" },
-};
+export type { MaintenanceItem };
 const PRIORITY_LABELS: Record<Priority, string> = { BAJA: "Baja", MEDIA: "Media", ALTA: "Alta", URGENTE: "Urgente" };
 const PAYER_LABELS: Record<Payer, string> = { INQUILINO: "Inquilino", PROPIETARIO: "Propietario", INMOBILIARIA: "Inmobiliaria" };
 const NONE = "__none__";
@@ -36,6 +25,8 @@ const NONE = "__none__";
 type Draft = {
   id?: string; title: string; description: string; priority: Priority; status: Status;
   payer: Payer | null; provider: string; cost: number | null; reported_at: string;
+  /** Motivo por el que costo y "a cargo de" ya no se pueden cambiar (lo valida también la base). */
+  locked?: string;
 };
 
 export function MaintenanceCard({ contractId, currency, items, today }: {
@@ -52,6 +43,8 @@ export function MaintenanceCard({ contractId, currency, items, today }: {
   const edit = (item?: MaintenanceItem) => setDraft(item ? {
     id: item.id, title: item.title, description: item.description ?? "", priority: item.priority, status: item.status,
     payer: item.payer, provider: item.provider ?? "", cost: item.cost, reported_at: item.reported_at,
+    locked: item.settlement_id ? "Ya se descontó en una liquidación del propietario."
+      : item.charge_id ? "Ya se cargó en la cuenta corriente del inquilino." : undefined,
   } : {
     title: "", description: "", priority: "MEDIA", status: "ABIERTO", payer: null, provider: "", cost: null, reported_at: today,
   });
@@ -71,10 +64,14 @@ export function MaintenanceCard({ contractId, currency, items, today }: {
             <div className="grid gap-1.5"><Label>Estado</Label><Select value={draft.status} onValueChange={(v) => set("status", v as Status)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{(Object.keys(MAINTENANCE_STATUS) as Status[]).map((k) => <SelectItem key={k} value={k}>{MAINTENANCE_STATUS[k].label}</SelectItem>)}</SelectContent></Select></div>
             <div className="grid gap-1.5"><Label>Reportado</Label><Input type="date" max={today} value={draft.reported_at} onChange={(e) => set("reported_at", e.target.value)} /></div>
             <div className="grid gap-1.5"><Label>Proveedor</Label><Input value={draft.provider} placeholder="Plomero, gasista…" onChange={(e) => set("provider", e.target.value)} /></div>
-            <div className="grid gap-1.5"><Label>Costo ({currency})</Label><Input type="number" min={0} step="0.01" value={draft.cost ?? ""} onChange={(e) => set("cost", e.target.value === "" ? null : Number(e.target.value))} /></div>
-            <div className="grid gap-1.5"><Label>A cargo de</Label><Select value={draft.payer ?? NONE} onValueChange={(v) => set("payer", v === NONE ? null : v as Payer)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value={NONE}>A definir</SelectItem>{(Object.keys(PAYER_LABELS) as Payer[]).map((k) => <SelectItem key={k} value={k}>{PAYER_LABELS[k]}</SelectItem>)}</SelectContent></Select></div>
+            <div className="grid gap-1.5"><Label>Costo ({currency})</Label><Input type="number" min={0} step="0.01" value={draft.cost ?? ""} disabled={!!draft.locked} onChange={(e) => set("cost", e.target.value === "" ? null : Number(e.target.value))} /></div>
+            <div className="grid gap-1.5"><Label>A cargo de</Label><Select value={draft.payer ?? NONE} disabled={!!draft.locked} onValueChange={(v) => set("payer", v === NONE ? null : v as Payer)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value={NONE}>A definir</SelectItem>{(Object.keys(PAYER_LABELS) as Payer[]).map((k) => <SelectItem key={k} value={k}>{PAYER_LABELS[k]}</SelectItem>)}</SelectContent></Select></div>
           </div>
-          {draft.payer === "PROPIETARIO" && <p className="text-xs text-muted-foreground">Agregalo como gasto al generar la liquidación del propietario.</p>}
+          {draft.locked
+            ? <p className="text-xs text-muted-foreground">{draft.locked} El costo y quién paga quedan fijos.</p>
+            : draft.payer === "PROPIETARIO" ? <p className="text-xs text-muted-foreground">Aparece sugerido para descontar al emitir la próxima liquidación.</p>
+            : draft.payer === "INMOBILIARIA" ? <p className="text-xs text-muted-foreground">Al marcarlo resuelto con costo se registra como egreso en Finanzas.</p>
+            : null}
           <div className="flex gap-2">
             <Button size="sm" disabled={!!busy || draft.title.trim().length < 3} onClick={async () => {
               const ok = await run("maintenance", () => saveMaintenanceAction({ contract_id: contractId, ...draft }));
@@ -108,6 +105,13 @@ export function MaintenanceCard({ contractId, currency, items, today }: {
               {billable && <Button className="mt-2" size="sm" variant="outline" disabled={!!busy}
                 onClick={() => run(`bill-${item.id}`, () => billMaintenanceToTenantAction(item.id))}><Receipt /> Cargar al inquilino</Button>}
               {item.charge_id && <p className="mt-2 text-xs text-muted-foreground">Cargado en la cuenta corriente del inquilino.</p>}
+              {item.settlement_id && <p className="mt-2 text-xs text-muted-foreground">Descontado en una liquidación del propietario.</p>}
+              {item.payer === "PROPIETARIO" && !item.settlement_id && (item.cost ?? 0) > 0 && item.status !== "CANCELADO" && (
+                <p className="mt-2 text-xs text-warning">Pendiente de descontar en la próxima liquidación.</p>
+              )}
+              {item.payer === "INMOBILIARIA" && item.status === "RESUELTO" && (item.cost ?? 0) > 0 && (
+                <p className="mt-2 text-xs text-muted-foreground">Registrado como egreso en Finanzas.</p>
+              )}
             </div>
           );
         })}

@@ -8,6 +8,7 @@ import {
   PropertySocialCard,
   parseOptions,
 } from "@/features/social/propertyCard";
+import { toRenderableImage } from "@/features/social/renderableImage";
 
 export const runtime = "nodejs";
 
@@ -47,8 +48,15 @@ export async function GET(
   const fontPrefix = options.font === "serif" ? "CrimsonText" : "IBMPlexMono";
   const fontFiles = options.font === "sans" ? null : await Promise.all(["Regular", "Bold"].map((weight) => readFile(join(process.cwd(), "public", "fonts", "social", `${fontPrefix}-${weight}.ttf`))));
 
+  // Solo la foto elegida, convertida a JPEG (Satori no dibuja WebP/AVIF).
+  // El índice pasa a 0 porque la lista queda con una sola foto.
+  const chosen = p.images[options.photo] ?? p.images[0] ?? p.image;
+  const longest = Math.max(width, height);
+  const photo = await toRenderableImage(chosen, longest, longest, "inside");
+  const card = { ...p, image: photo, images: photo ? [photo] : [] };
+
   const image = new ImageResponse(
-    <PropertySocialCard p={p} width={width} height={height} options={options} />,
+    <PropertySocialCard p={card} width={width} height={height} options={{ ...options, photo: 0 }} />,
     { width, height, ...(fontFiles ? { fonts: fontFiles.map((data, index) => ({ name: fontFamily, data: new Uint8Array(data).buffer, weight: (index === 0 ? 400 : 700) as 400 | 700, style: "normal" as const })) } : {}) }
   );
 

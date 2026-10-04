@@ -3,6 +3,7 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "@/shared/components/ui/sonner";
 import { ThemeProvider } from "next-themes";
+import { BRAND } from "@/lib/brand";
 
 // Tipografía del producto (panel + login). El sitio público carga la suya
 // en app/(public)/layout.tsx y la aplica con el scope `.site-public`.
@@ -13,7 +14,7 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || 'https://terranova-demo.vercel.app'),
+  metadataBase: new URL(BRAND.siteUrl),
   title: {
     default: 'TerraNova | Inmobiliaria Rural y Urbana',
     template: '%s | TerraNova', 

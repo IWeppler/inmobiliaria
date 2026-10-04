@@ -4,7 +4,8 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { motion, useReducedMotion } from "framer-motion";
-import { Menu, MessageCircle, X } from "lucide-react";
+import { Menu, X } from "lucide-react";
+import { FaWhatsapp } from "react-icons/fa";
 import { useHideOnScroll } from "@/hooks/use-hide-on-scroll";
 import { BRAND, whatsappLink } from "@/lib/brand";
 import { CONTACT_CTA_LABEL } from "@/features/public/v2/content";
@@ -83,7 +84,7 @@ export function SiteHeader() {
             rel="noopener noreferrer"
             className="hidden h-9 items-center gap-2 rounded-md bg-foreground px-4 text-sm font-semibold whitespace-nowrap text-background transition-[background-color,transform] hover:bg-main focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:scale-[0.98] lg:inline-flex"
           >
-            <MessageCircle className="h-4 w-4" aria-hidden="true" />
+            <FaWhatsapp className="h-4 w-4" aria-hidden="true" />
             {CONTACT_CTA_LABEL}
           </a>
 
@@ -149,7 +150,7 @@ export function SiteHeader() {
             rel="noopener noreferrer"
             className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-md bg-foreground text-base font-semibold text-background active:scale-[0.98]"
           >
-            <MessageCircle className="h-5 w-5" aria-hidden="true" />
+            <FaWhatsapp className="h-5 w-5" aria-hidden="true" />
             {CONTACT_CTA_LABEL}
           </a>
           <a href={`mailto:${BRAND.email}`} className="text-center text-sm text-muted-foreground">

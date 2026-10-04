@@ -78,10 +78,12 @@ export async function deleteMovementAction(id: string): Promise<ActionResult> {
   const supabase = await createClientServer();
   const { data: movement } = await supabase
     .from("cash_movements")
-    .select("settlement_id, sale_id")
+    .select("settlement_id, sale_id, maintenance_id")
     .eq("id", id)
     .single();
   if (!movement) return { success: false, message: "Movimiento no encontrado." };
+  if (movement.maintenance_id)
+    return { success: false, message: "Viene de un reclamo de mantenimiento: se corrige desde el contrato." };
   if (movement.settlement_id)
     return { success: false, message: "Viene de una liquidación de alquiler: se corrige desde el contrato." };
   if (movement.sale_id)

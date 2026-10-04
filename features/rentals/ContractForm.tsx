@@ -21,7 +21,9 @@ import {
   createContractAction,
   type ContractInput,
 } from "@/features/rentals/actions";
-import { ADJUSTMENT_LABELS, type AdjustmentIndex } from "@/features/rentals/logic";
+import { ADJUSTMENT_LABELS, COMMON_ADJUSTMENT_MONTHS, DEFAULT_INDEX_LAG, type AdjustmentIndex } from "@/features/rentals/logic";
+
+const CUSTOM = "custom";
 
 type Option = { id: string; label: string };
 
@@ -147,18 +149,23 @@ export function ContractForm({ properties, owners, tenants, initial }: Props) {
     adjustment_index: "ICL",
     adjustment_months: 3,
     adjustment_pct: 0,
+    index_lag_months: DEFAULT_INDEX_LAG.ICL,
     guarantee_type: "NINGUNA",
     guarantee_detail: "",
     deposit_amount: 0,
     commission_pct: 8,
     late_fee_pct_daily: 0.1,
     late_fee_fixed: 0,
+    late_fee_mode: "AUTO",
+    late_fee_grace_days: 0,
     payment_due_day: 10,
     notes: "",
     ...initial,
   });
   const set = <K extends keyof ContractInput>(k: K, val: ContractInput[K]) =>
     setV((p) => ({ ...p, [k]: val }));
+  // Personalizada si al renovar viene una frecuencia que no es de las habituales.
+  const [customFrequency, setCustomFrequency] = useState(!(v.adjustment_months in COMMON_ADJUSTMENT_MONTHS));
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -253,7 +260,7 @@ export function ContractForm({ properties, owners, tenants, initial }: Props) {
             <Label>Ajuste</Label>
             <Select
               value={v.adjustment_index}
-              onValueChange={(c) => set("adjustment_index", c as AdjustmentIndex)}
+              onValueChange={(c) => setV((p) => ({ ...p, adjustment_index: c as AdjustmentIndex, index_lag_months: DEFAULT_INDEX_LAG[c] ?? 0 }))}
             >
               <SelectTrigger>
                 <SelectValue />
@@ -267,7 +274,51 @@ export function ContractForm({ properties, owners, tenants, initial }: Props) {
               </SelectContent>
             </Select>
           </div>
-          <div className="space-y-2"><Label>Periodicidad</Label><Select value={String(v.adjustment_months)} onValueChange={(value) => set("adjustment_months", Number(value))} disabled={v.adjustment_index === "NINGUNO"}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="3">Trimestral</SelectItem><SelectItem value="4">Cuatrimestral</SelectItem><SelectItem value="6">Semestral</SelectItem><SelectItem value="12">Anual</SelectItem></SelectContent></Select></div>
+          <div className="space-y-2">
+            <Label>Periodicidad</Label>
+            <Select
+              value={customFrequency ? CUSTOM : String(v.adjustment_months)}
+              onValueChange={(value) => {
+                if (value === CUSTOM) { setCustomFrequency(true); return; }
+                setCustomFrequency(false);
+                set("adjustment_months", Number(value));
+              }}
+              disabled={v.adjustment_index === "NINGUNO"}
+            >
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {Object.entries(COMMON_ADJUSTMENT_MONTHS).map(([months, label]) => <SelectItem key={months} value={months}>{label}</SelectItem>)}
+                <SelectItem value={CUSTOM}>Personalizada</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          {customFrequency && v.adjustment_index !== "NINGUNO" && (
+            <div className="space-y-2">
+              <Label htmlFor="adjustment-months">Ajusta cada (meses)</Label>
+              <Input id="adjustment-months" type="number" min={1} max={36} step={1} value={v.adjustment_months || ""}
+                onChange={(e) => set("adjustment_months", Number(e.target.value))} />
+              {(v.adjustment_months < 1 || v.adjustment_months > 36) && <p className="text-xs text-danger">Entre 1 y 36 meses.</p>}
+            </div>
+          )}
+          {v.adjustment_index === "CASA_PROPIA" && (
+            <p className="col-span-2 self-end text-xs text-muted-foreground">
+              Casa Propia no tiene fuente automática: el coeficiente de cada mes se carga en Ajustes, tal como lo publica el Ministerio de Desarrollo Territorial y Hábitat. El ajuste se aplica cuando el coeficiente de ese mes está cargado.
+            </p>
+          )}
+          {(v.adjustment_index === "ICL" || v.adjustment_index === "IPC") && (
+            <div className="space-y-2">
+              <Label>Rezago del índice</Label>
+              <Select value={String(v.index_lag_months ?? DEFAULT_INDEX_LAG[v.adjustment_index])} onValueChange={(value) => set("index_lag_months", Number(value))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {[0, 1, 2, 3].map((n) => <SelectItem key={n} value={String(n)}>{n === 0 ? "Sin rezago" : `${n} ${n === 1 ? "mes" : "meses"}`}</SelectItem>)}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                {v.adjustment_index === "IPC" ? "El IPC se publica a mediados del mes siguiente: con 2 meses siempre está disponible al ajustar." : "El ICL se publica a diario: normalmente sin rezago."}
+              </p>
+            </div>
+          )}
           <div className="space-y-2">
             <Label>% fijo por ajuste</Label>
             <Input
@@ -312,6 +363,20 @@ export function ContractForm({ properties, owners, tenants, initial }: Props) {
             />
           </div>
           <div className="space-y-2"><Label>Punitorio fijo</Label><Input type="number" min={0} step="0.01" value={v.late_fee_fixed} onChange={(e) => set("late_fee_fixed", Number(e.target.value))} /></div>
+          <div className="space-y-2">
+            <Label>Cálculo del punitorio</Label>
+            <Select value={v.late_fee_mode} onValueChange={(value) => set("late_fee_mode", value as ContractInput["late_fee_mode"])}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="AUTO">Automático (se suma solo)</SelectItem>
+                <SelectItem value="MANUAL">Manual (lo carga el agente)</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="grace-days">Días de gracia</Label>
+            <Input id="grace-days" type="number" min={0} max={30} step={1} value={v.late_fee_grace_days} onChange={(e) => set("late_fee_grace_days", Number(e.target.value))} />
+          </div>
           <div className="space-y-2"><Label>Depósito ({v.currency})</Label><Input type="number" min={0} step="0.01" value={v.deposit_amount} onChange={(e) => set("deposit_amount", Number(e.target.value))} /></div>
           <div className="space-y-2"><Label>Garantía</Label><Select value={v.guarantee_type} onValueChange={(value) => set("guarantee_type", value as ContractInput["guarantee_type"])}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="NINGUNA">Sin garantía</SelectItem><SelectItem value="GARANTE">Garante</SelectItem><SelectItem value="CAUCION">Seguro de caución</SelectItem></SelectContent></Select></div>
           {v.guarantee_type !== "NINGUNA" && <div className="space-y-2"><Label>{v.guarantee_type === "GARANTE" ? "Nombre del garante" : "Aseguradora y póliza"}</Label><Input value={v.guarantee_detail ?? ""} onChange={(e) => set("guarantee_detail", e.target.value)} /></div>}
@@ -325,7 +390,8 @@ export function ContractForm({ properties, owners, tenants, initial }: Props) {
       <div className="flex justify-end">
         <Button
           type="submit"
-          disabled={saving || !v.property_id || !v.owner_id || !v.tenant_id || !v.end_date || !v.rent_amount}
+          disabled={saving || !v.property_id || !v.owner_id || !v.tenant_id || !v.end_date || !v.rent_amount
+            || !Number.isInteger(v.adjustment_months) || v.adjustment_months < 1 || v.adjustment_months > 36}
         >
           {saving ? <Loader2 className="mr-2 size-4 animate-spin" /> : null}
           Crear contrato

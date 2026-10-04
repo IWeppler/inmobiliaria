@@ -1,4 +1,6 @@
-import { Rss, MessageCircle, CalendarCheck, CalendarSync } from "lucide-react";
+import type { ComponentType } from "react";
+import { Rss, CalendarCheck, CalendarSync } from "lucide-react";
+import { FaWhatsapp } from "react-icons/fa";
 import {
   Card,
   CardContent,
@@ -26,7 +28,7 @@ export function Integrations({
   const connected = googleCalendar.agents.filter((a) => a.connected);
   const pending = googleCalendar.agents.filter((a) => !a.connected);
   const rows: {
-    icon: typeof Rss;
+    icon: ComponentType<{ className?: string }>;
     title: string;
     description: string;
     value: string;
@@ -52,7 +54,7 @@ export function Integrations({
       status: "Activo",
     },
     {
-      icon: MessageCircle,
+      icon: FaWhatsapp,
       title: "WhatsApp Business",
       description: whatsappEnabled
         ? "Conectado. Confirmaciones de visita por plantilla y mensajes entrantes como notas del lead."

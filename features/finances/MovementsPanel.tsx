@@ -26,6 +26,7 @@ export type MovementListRow = {
   currency: string;
   settlement_id: string | null;
   sale_id: string | null;
+  maintenance_id: string | null;
   recurring_expense_id: string | null;
   contract_id: string | null;
   properties: { id: string; title: string } | null;
@@ -121,7 +122,9 @@ export function MovementsPanel({
               const meta = CATEGORIES[m.category as Category];
               const isIncome = m.direction === "INGRESO";
               const auto = m.settlement_id
-                ? { href: `/dashboard/alquileres/${m.contract_id}`, title: "Generado desde una liquidación" }
+                ? { href: `/dashboard/alquileres/${m.contract_id}?tab=liquidaciones`, title: "Generado desde una liquidación" }
+                : m.maintenance_id
+                ? { href: `/dashboard/alquileres/${m.contract_id}?tab=mantenimiento`, title: "Generado desde un reclamo de mantenimiento" }
                 : m.sale_id
                   ? { href: `/dashboard/propiedades/${m.properties?.id}`, title: "Generado desde el cierre de venta" }
                   : null;

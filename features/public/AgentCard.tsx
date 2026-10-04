@@ -1,6 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
-import { CalendarCheck, ChevronRight, Mail, MessageCircle, Phone, ShieldCheck } from "lucide-react";
+import { CalendarCheck, ChevronRight, Mail, Phone, ShieldCheck } from "lucide-react";
+import { FaWhatsapp } from "react-icons/fa";
 import { BRAND } from "@/lib/brand";
 
 type Agent = {
@@ -105,7 +106,7 @@ export function AgentCard({
                 rel="noopener noreferrer"
                 className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 text-sm font-semibold text-emerald-800 transition hover:bg-emerald-100"
               >
-                <MessageCircle className="h-4 w-4" />
+                <FaWhatsapp className="h-4 w-4" aria-hidden />
                 WhatsApp
               </a>
             )}
@@ -192,7 +193,7 @@ export function MobileContactBar({
             aria-label="Consultar por WhatsApp"
             className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-800"
           >
-            <MessageCircle className="h-5 w-5" />
+            <FaWhatsapp className="h-5 w-5" aria-hidden />
           </a>
         )}
         {available ? (

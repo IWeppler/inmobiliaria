@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useSyncExternalStore } from "react";
-import { Check, Link as LinkIcon, Share2, MessageCircle } from "lucide-react";
+import { Check, Link as LinkIcon, Share2 } from "lucide-react";
+import { FaWhatsapp } from "react-icons/fa";
 import { toast } from "sonner";
 
 import { Button } from "@/shared/components/ui/button";
@@ -35,8 +36,10 @@ export function ShareButton({ title, price, location, url }: ShareButtonProps) {
     () => false
   );
 
+  // Sin query ni hash: WhatsApp cachea la vista previa por URL exacta, y
+  // con parámetros (utm, filtros) cada variante pide una tarjeta nueva.
   const shareUrl =
-    url || (typeof window !== "undefined" ? window.location.href : "");
+    url || (typeof window !== "undefined" ? `${window.location.origin}${window.location.pathname}` : "");
 
   const shareText = [
     `*${title}*`,
@@ -100,7 +103,7 @@ export function ShareButton({ title, price, location, url }: ShareButtonProps) {
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
         <DropdownMenuItem onClick={handleWhatsApp}>
-          <MessageCircle className="mr-2 h-4 w-4 text-green-600" />
+          <FaWhatsapp className="mr-2 h-4 w-4 text-green-600" aria-hidden />
           WhatsApp
         </DropdownMenuItem>
         <DropdownMenuItem onClick={handleCopyLink}>

@@ -1,4 +1,5 @@
-import { Mail, MessageCircle } from "lucide-react";
+import { Mail } from "lucide-react";
+import { FaWhatsapp } from "react-icons/fa";
 import { BRAND, whatsappLink } from "@/lib/brand";
 import { CONTACT_CTA_LABEL } from "@/features/public/v2/content";
 import { Reveal } from "@/features/public/v2/Reveal";
@@ -30,7 +31,7 @@ export function ContactClose() {
               rel="noopener noreferrer"
               className="inline-flex h-12 items-center gap-2 rounded-md bg-foreground px-6 text-base font-semibold whitespace-nowrap text-background transition-[background-color,transform] hover:bg-main focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:scale-[0.98]"
             >
-              <MessageCircle className="h-5 w-5" aria-hidden="true" />
+              <FaWhatsapp className="h-5 w-5" aria-hidden="true" />
               {CONTACT_CTA_LABEL}
             </a>
             <a

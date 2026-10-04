@@ -16,7 +16,8 @@ import { useRunAction } from "@/features/rentals/useRunAction";
 type Option = { id: string; label: string };
 type Terms = {
   owner_id: string; tenant_id: string; commission_pct: number; late_fee_pct_daily: number;
-  late_fee_fixed: number; guarantee_type: "NINGUNA" | "GARANTE" | "CAUCION";
+  late_fee_fixed: number; late_fee_mode: "AUTO" | "MANUAL"; late_fee_grace_days: number;
+  guarantee_type: "NINGUNA" | "GARANTE" | "CAUCION";
   guarantee_detail: string; notes: string;
 };
 
@@ -48,6 +49,15 @@ export function EditContractDialog({
           <div className="grid gap-1.5"><Label>Comisión (% del canon)</Label><Input type="number" min={0} max={100} step="0.01" value={v.commission_pct} onChange={(e) => set("commission_pct", Number(e.target.value))} /></div>
           <div className="grid gap-1.5"><Label>Punitorio (% diario)</Label><Input type="number" min={0} step="0.001" value={v.late_fee_pct_daily} onChange={(e) => set("late_fee_pct_daily", Number(e.target.value))} /></div>
           <div className="grid gap-1.5"><Label>Punitorio fijo</Label><Input type="number" min={0} step="0.01" value={v.late_fee_fixed} onChange={(e) => set("late_fee_fixed", Number(e.target.value))} /></div>
+          <div className="grid gap-1.5"><Label>Cálculo del punitorio</Label>
+            <Select value={v.late_fee_mode} onValueChange={(value) => set("late_fee_mode", value as Terms["late_fee_mode"])}><SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent><SelectItem value="AUTO">Automático</SelectItem><SelectItem value="MANUAL">Manual</SelectItem></SelectContent></Select></div>
+          <div className="grid gap-1.5"><Label htmlFor="edit-grace">Días de gracia</Label><Input id="edit-grace" type="number" min={0} max={30} step={1} value={v.late_fee_grace_days} onChange={(e) => set("late_fee_grace_days", Number(e.target.value))} /></div>
+          {initial.late_fee_mode === "MANUAL" && v.late_fee_mode === "AUTO" && (
+            <p className="rounded-md bg-warning/10 p-2.5 text-xs text-warning sm:col-span-2">
+              Al pasar a automático se calculan punitorios sobre todas las cuotas atrasadas de meses sin liquidar, incluidas las de antes de hoy. Revisá la cuenta corriente después de guardar.
+            </p>
+          )}
           <div className="grid gap-1.5"><Label>Garantía</Label>
             <Select value={v.guarantee_type} onValueChange={(value) => set("guarantee_type", value as Terms["guarantee_type"])}><SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent><SelectItem value="NINGUNA">Sin garantía</SelectItem><SelectItem value="GARANTE">Garante</SelectItem><SelectItem value="CAUCION">Seguro de caución</SelectItem></SelectContent></Select></div>
@@ -72,7 +82,7 @@ export type ContactData = {
   email: string | null; address: string | null; notes: string | null;
 };
 
-export function EditContactDialog({ contact, contractId }: { contact: ContactData; contractId: string }) {
+export function EditContactDialog({ contact, contractId }: { contact: ContactData; contractId?: string }) {
   const { busy, run } = useRunAction();
   const [open, setOpen] = useState(false);
   const blank = () => ({

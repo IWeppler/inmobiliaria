@@ -10,8 +10,15 @@ export const BRAND = {
   logoUrl: process.env.NEXT_PUBLIC_BRAND_LOGO_URL ?? null,
   // Handle de Instagram sin "@", para el copy de las piezas.
   instagram: process.env.NEXT_PUBLIC_BRAND_INSTAGRAM ?? null,
+  // URL pública absoluta: OG de WhatsApp, feeds para portales, links de
+  // calendario. Si falta NEXT_PUBLIC_SITE_URL se usa el dominio de
+  // producción que Vercel inyecta solo; el fallback anterior
+  // (terranova-demo.vercel.app) no existe y dejaba links rotos.
   siteUrl:
-    process.env.NEXT_PUBLIC_SITE_URL ?? "https://terranova-demo.vercel.app",
+    process.env.NEXT_PUBLIC_SITE_URL ??
+    (process.env.NEXT_PUBLIC_VERCEL_PROJECT_PRODUCTION_URL
+      ? `https://${process.env.NEXT_PUBLIC_VERCEL_PROJECT_PRODUCTION_URL}`
+      : "http://localhost:3000"),
   // Contacto de la inmobiliaria para el sitio público. WhatsApp en
   // formato internacional, solo dígitos (ej. 5491154702118).
   whatsapp: process.env.NEXT_PUBLIC_BRAND_WHATSAPP ?? "541154702118",

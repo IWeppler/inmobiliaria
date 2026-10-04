@@ -3,7 +3,8 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { ChevronDown, MessageCircle } from "lucide-react";
+import { ChevronDown } from "lucide-react";
+import { FaWhatsapp } from "react-icons/fa";
 import { createClientBrowser } from "@/lib/supabase-browser";
 import { Button } from "@/shared/components/ui/button";
 import {
@@ -66,7 +67,7 @@ export function BuyerContactControls({
           disabled={busy}
           aria-label={`WhatsApp a ${leadName}`}
         >
-          <MessageCircle />
+          <FaWhatsapp className="size-4" aria-hidden />
         </Button>
       )}
       <DropdownMenu>

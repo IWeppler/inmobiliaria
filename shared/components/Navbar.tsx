@@ -4,7 +4,8 @@ import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { motion, useReducedMotion } from "framer-motion";
-import { Menu, X, Instagram, MessageCircle } from "lucide-react";
+import { Menu, X, Instagram } from "lucide-react";
+import { FaWhatsapp } from "react-icons/fa";
 import { useHideOnScroll } from "@/hooks/use-hide-on-scroll";
 import { BRAND, whatsappLink } from "@/lib/brand";
 
@@ -130,7 +131,7 @@ export function Navbar() {
               target="_blank"
               rel="noopener noreferrer"
             >
-              <MessageCircle size={20} />
+              <FaWhatsapp size={20} aria-hidden />
               WhatsApp
             </a>
 

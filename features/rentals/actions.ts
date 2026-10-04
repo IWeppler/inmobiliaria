@@ -2,11 +2,16 @@
 
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
+import { notifyReceipt } from "@/features/rentals/notifications";
 import { createClientServer } from "@/lib/supabase";
 import { ymdInAppTz } from "@/lib/dates";
+import { syncIndexValues, type IndexSyncResult } from "@/features/rentals/indexSync";
 import {
+  ADJUSTMENT_INDEXES,
   addMonths,
   computeSettlement,
+  DEFAULT_INDEX_LAG,
   contractPeriods,
   dueDateFor,
   MANUAL_CHARGE_KINDS,
@@ -32,7 +37,7 @@ async function currentUser() {
 
 // === Contactos ===
 const contactSchema = z.object({
-  kind: z.enum(["owner", "tenant"]),
+  kind: z.enum(["owner", "tenant", "guarantor"]),
   full_name: z.string().min(3).max(120),
   document: z.string().max(40).optional().or(z.literal("")),
   phone: z.string().max(40).optional().or(z.literal("")),
@@ -62,6 +67,7 @@ export async function createContactAction(
     .select("id, full_name")
     .single();
   if (error || !data) return { success: false, message: error?.message ?? "Error" };
+  revalidatePath("/dashboard/alquileres/contactos");
   return { success: true, message: "Contacto creado.", data };
 }
 
@@ -75,15 +81,19 @@ const contractSchema = z
     end_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
     rent_amount: z.coerce.number().positive(),
     currency: z.enum(["ARS", "USD"]),
-    adjustment_index: z.enum(["ICL", "IPC", "FIJO", "MANUAL", "NINGUNO"]),
-    adjustment_months: z.coerce.number().int().refine((value) => [3, 4, 6, 12].includes(value)),
+    adjustment_index: z.enum(ADJUSTMENT_INDEXES),
+    adjustment_months: z.coerce.number().int().min(1, "La frecuencia va de 1 a 36 meses").max(36, "La frecuencia va de 1 a 36 meses"),
     adjustment_pct: z.coerce.number().min(0).max(500).optional(),
+    // Meses de rezago del índice (ICL / IPC). Sin valor: IPC 2, ICL 0.
+    index_lag_months: z.coerce.number().int().min(0).max(6).optional(),
     guarantee_type: z.enum(["NINGUNA", "GARANTE", "CAUCION"]),
     guarantee_detail: z.string().max(200).optional(),
     deposit_amount: z.coerce.number().min(0),
     commission_pct: z.coerce.number().min(0).max(100),
     late_fee_pct_daily: z.coerce.number().min(0).max(10),
     late_fee_fixed: z.coerce.number().min(0),
+    late_fee_mode: z.enum(["AUTO", "MANUAL"]).default("AUTO"),
+    late_fee_grace_days: z.coerce.number().int().min(0).max(30).default(0),
     payment_due_day: z.coerce.number().int().min(1).max(28),
     renewed_from_id: z.string().uuid().optional(),
     notes: z.string().max(2000).optional().or(z.literal("")),
@@ -134,6 +144,9 @@ export async function createContractAction(
       adjustment_index: v.adjustment_index,
       adjustment_months: v.adjustment_months,
       adjustment_pct: v.adjustment_index === "FIJO" ? v.adjustment_pct ?? 0 : null,
+      ...(v.adjustment_index === "ICL" || v.adjustment_index === "IPC"
+        ? { index_lag_months: v.index_lag_months ?? DEFAULT_INDEX_LAG[v.adjustment_index] }
+        : { index_lag_months: 0 }), // Casa Propia: el coeficiente ya es del mes del ajuste.
       guarantee_type: v.guarantee_type,
       guarantee_detail: v.guarantee_detail || null,
       deposit_amount: v.deposit_amount,
@@ -143,6 +156,8 @@ export async function createContractAction(
       commission_pct: v.commission_pct,
       late_fee_pct_daily: v.late_fee_pct_daily,
       late_fee_fixed: v.late_fee_fixed,
+      late_fee_mode: v.late_fee_mode,
+      late_fee_grace_days: v.late_fee_grace_days,
       payment_due_day: v.payment_due_day,
       renewed_from_id: v.renewed_from_id ?? null,
       notes: v.notes || null,
@@ -249,6 +264,9 @@ export async function recordRentalPaymentAction(
   if (error || !data) return { success: false, message: error?.message ?? "No se pudo registrar el cobro." };
   revalidatePath(`/dashboard/alquileres/${charge.contract_id}`);
   revalidatePath("/dashboard/alquileres");
+  // Recibo por WhatsApp (si está activado) después de responder: el cobro
+  // ya quedó registrado y un fallo de envío no lo afecta.
+  after(() => notifyReceipt(data.id).catch(() => {}));
   return { success: true, message: `Cobro registrado. Recibo N.º ${data.receipt_number}.`, data };
 }
 
@@ -306,7 +324,11 @@ const settlementSchema = z.object({
   contract_id: z.string().uuid(),
   period: z.string().regex(/^\d{4}-\d{2}-01$/),
   expenses: z
-    .array(z.object({ description: z.string().min(1).max(120), amount: z.coerce.number().min(0) }))
+    .array(z.object({
+      description: z.string().min(1).max(120),
+      amount: z.coerce.number().min(0),
+      maintenance_id: z.string().uuid().optional(),
+    }))
     .max(30),
   notes: z.string().max(1000).optional().or(z.literal("")),
 });
@@ -373,27 +395,108 @@ export async function createSettlementAction(
 
 // === E4.2 — Índices (admin) ===
 const indexSchema = z.object({
-  index_code: z.enum(["ICL", "IPC"]),
+  index_code: z.enum(["ICL", "IPC", "CASA_PROPIA"]),
   period: z.string().regex(/^\d{4}-\d{2}$/),
   value: z.coerce.number().positive(),
+}).refine((v) => v.index_code !== "CASA_PROPIA" || (v.value >= 0.5 && v.value <= 5), {
+  // Un coeficiente fuera de este rango casi siempre es un error de tipeo (ej. 13817 en vez de 1,3817).
+  message: "El coeficiente Casa Propia es un factor como 1,0521: revisá el valor.",
 });
 
 export async function upsertIndexValueAction(
   input: z.input<typeof indexSchema>
 ): Promise<ActionResult> {
   const parsed = indexSchema.safeParse(input);
+  if (!parsed.success && parsed.error.issues[0]?.message.startsWith("El coeficiente")) {
+    return { success: false, message: parsed.error.issues[0].message };
+  }
   if (!parsed.success) return { success: false, message: "Valor inválido." };
   const { supabase, user } = await currentUser();
   if (!user) return { success: false, message: "No autenticado" };
   const { error } = await supabase
     .from("index_values")
     .upsert(
-      { index_code: parsed.data.index_code, period: `${parsed.data.period}-01`, value: parsed.data.value },
+      {
+        index_code: parsed.data.index_code,
+        period: `${parsed.data.period}-01`,
+        value: parsed.data.value,
+        source: "MANUAL",
+        updated_at: new Date().toISOString(),
+      },
       { onConflict: "index_code,period" }
     );
   if (error) return { success: false, message: error.message };
   revalidatePath("/dashboard/ajustes");
   return { success: true, message: "Índice guardado." };
+}
+
+// Anticipación de las alertas de vencimiento y ajuste (fila única).
+const alertSettingsSchema = z.object({
+  expiry_alert_days: z.coerce.number().int().min(15).max(365),
+  adjustment_alert_days: z.coerce.number().int().min(1).max(90),
+});
+
+export async function updateRentalAlertSettingsAction(input: z.input<typeof alertSettingsSchema>): Promise<ActionResult> {
+  const parsed = alertSettingsSchema.safeParse(input);
+  if (!parsed.success) return { success: false, message: "Vencimientos: de 15 a 365 días. Ajustes: de 1 a 90 días." };
+  const { supabase, user } = await currentUser();
+  if (!user) return { success: false, message: "No autenticado" };
+  const { data, error } = await supabase.from("rental_settings")
+    .update({ ...parsed.data, updated_at: new Date().toISOString() }).eq("id", 1).select("id");
+  if (error) return { success: false, message: error.message };
+  // Sin filas actualizadas = RLS lo bloqueó (no es admin).
+  if (!data?.length) return { success: false, message: "Solo un administrador puede cambiar las alertas." };
+  revalidatePath("/dashboard/ajustes");
+  revalidatePath("/dashboard/alquileres");
+  return { success: true, message: "Alertas actualizadas." };
+}
+
+// Avisos automáticos por WhatsApp: qué se envía y con cuánta anticipación.
+const noticeSettingsSchema = z.object({
+  notify_receipts: z.boolean(),
+  notify_adjustments: z.boolean(),
+  notify_due: z.boolean(),
+  notify_overdue: z.boolean(),
+  adjustment_notice_days: z.coerce.number().int().min(1).max(60),
+  due_reminder_days: z.coerce.number().int().min(1).max(15),
+  overdue_reminder_days: z.coerce.number().int().min(1).max(30),
+});
+
+export async function updateRentalNoticeSettingsAction(input: z.input<typeof noticeSettingsSchema>): Promise<ActionResult> {
+  const parsed = noticeSettingsSchema.safeParse(input);
+  if (!parsed.success) return { success: false, message: "Revisá los días: aumento 1 a 60, vencimiento 1 a 15, deuda 1 a 30." };
+  const { supabase, user } = await currentUser();
+  if (!user) return { success: false, message: "No autenticado" };
+  const { data, error } = await supabase.from("rental_settings")
+    .update({ ...parsed.data, updated_at: new Date().toISOString() }).eq("id", 1).select("id");
+  if (error) return { success: false, message: error.message };
+  if (!data?.length) return { success: false, message: "Solo un administrador puede cambiar los avisos." };
+  revalidatePath("/dashboard/ajustes");
+  return { success: true, message: "Avisos actualizados." };
+}
+
+// Trae ICL (BCRA) e IPC (INDEC) en el momento, sin esperar al cron, y
+// aplica los ajustes que quedaron destrabados. Solo admin: escribe con
+// service_role.
+export async function syncIndexValuesAction(): Promise<ActionResult<IndexSyncResult>> {
+  const { supabase, user } = await currentUser();
+  if (!user) return { success: false, message: "No autenticado" };
+  const { data: isAdmin } = await supabase.rpc("is_admin");
+  if (!isAdmin) return { success: false, message: "Solo un administrador puede actualizar los índices." };
+
+  const result = await syncIndexValues();
+  await supabase.rpc("rental_apply_due_adjustments");
+  revalidatePath("/dashboard/ajustes");
+  revalidatePath("/dashboard/alquileres");
+
+  const errors = [result.icl.error && `ICL: ${result.icl.error}`, result.ipc.error && `IPC: ${result.ipc.error}`].filter(Boolean);
+  const summary = `ICL hasta ${result.icl.latest?.slice(0, 7) ?? "sin datos"}, IPC hasta ${result.ipc.latest?.slice(0, 7) ?? "sin datos"}.`;
+  if (errors.length === 2) return { success: false, message: `No se pudo actualizar. ${errors.join(" · ")}` };
+  return {
+    success: true,
+    message: errors.length ? `Actualización parcial. ${summary} ${errors.join(" · ")}` : `Índices actualizados. ${summary}`,
+    data: result,
+  };
 }
 
 export async function deleteIndexValueAction(id: string): Promise<ActionResult> {

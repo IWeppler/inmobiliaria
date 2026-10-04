@@ -33,6 +33,7 @@ type Settlement = {
   currency: string;
   issued_at: string;
   notes: string | null;
+  shares: { share_pct: number; amount: number; is_primary: boolean; contact: { full_name: string; document: string | null } | null }[];
   rental_contracts: {
     commission_pct: number;
     properties: { title: string; street_address: string | null; city: string | null } | null;
@@ -59,6 +60,9 @@ const s = StyleSheet.create({
 // E4.4 — Comprobante de liquidación al propietario.
 function SettlementPdf({ d }: { d: Settlement }) {
   const c = d.rental_contracts;
+  // Titulares según el reparto congelado al emitir (principal primero).
+  const shares = [...d.shares].sort((a, b) => Number(b.is_primary) - Number(a.is_primary) || b.share_pct - a.share_pct);
+  const multiple = shares.length > 1;
   return (
     <Document title={`Liquidación ${formatPeriod(d.period)}`}>
       <Page size="A4" style={s.page}>
@@ -77,9 +81,13 @@ function SettlementPdf({ d }: { d: Settlement }) {
 
         <View style={[s.section, s.grid]}>
           <View style={s.col}>
-            <Text style={s.label}>Propietario</Text>
-            <Text style={s.bold}>{c?.owner?.full_name ?? "—"}</Text>
-            {c?.owner?.document ? <Text style={s.muted}>{c.owner.document}</Text> : null}
+            <Text style={s.label}>{multiple ? "Propietarios" : "Propietario"}</Text>
+            {multiple ? shares.map((sh, i) => (
+              <Text key={i} style={s.bold}>{sh.contact?.full_name ?? "—"} ({sh.share_pct} %)</Text>
+            )) : <>
+              <Text style={s.bold}>{shares[0]?.contact?.full_name ?? c?.owner?.full_name ?? "—"}</Text>
+              {(shares[0]?.contact?.document ?? c?.owner?.document) ? <Text style={s.muted}>{shares[0]?.contact?.document ?? c?.owner?.document}</Text> : null}
+            </>}
           </View>
           <View style={s.col}>
             <Text style={s.label}>Inmueble</Text>
@@ -114,10 +122,22 @@ function SettlementPdf({ d }: { d: Settlement }) {
             </View>
           ))}
           <View style={s.total}>
-            <Text style={[s.bold, { fontSize: 12 }]}>Neto a transferir al propietario</Text>
+            <Text style={[s.bold, { fontSize: 12 }]}>{multiple ? "Neto a distribuir" : "Neto a transferir al propietario"}</Text>
             <Text style={[s.bold, { fontSize: 12 }]}>{money(d.net_amount, d.currency)}</Text>
           </View>
         </View>
+
+        {multiple ? (
+          <View style={s.section}>
+            <Text style={s.label}>Distribución entre propietarios</Text>
+            {shares.map((sh, i) => (
+              <View key={i} style={s.row}>
+                <Text>{sh.contact?.full_name ?? "—"}{sh.contact?.document ? ` (${sh.contact.document})` : ""} · {sh.share_pct} %</Text>
+                <Text style={s.bold}>{money(sh.amount, d.currency)}</Text>
+              </View>
+            ))}
+          </View>
+        ) : null}
 
         {d.notes ? (
           <View style={s.section}>
@@ -145,6 +165,7 @@ export default function LiquidacionPdfPage() {
       .from("rental_settlements")
       .select(
         `id, period, rent_amount, other_collected_amount, commission_amount, expenses, expenses_amount, net_amount, currency, issued_at, notes,
+         shares:rental_settlement_shares(share_pct, amount, is_primary, contact:rental_contacts(full_name, document)),
          rental_contracts(commission_pct, properties(title, street_address, city),
            owner:rental_contacts!rental_contracts_owner_id_fkey(full_name, document),
            tenant:rental_contacts!rental_contracts_tenant_id_fkey(full_name))`

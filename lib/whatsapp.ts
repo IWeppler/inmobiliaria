@@ -71,9 +71,14 @@ export function sendText(to: string, text: string) {
 // en orden. Las plantillas que usa la app (crearlas con estos nombres):
 //   visita_confirmada  {{1}} nombre, {{2}} propiedad, {{3}} fecha, {{4}} hora
 //   nueva_propiedad    {{1}} nombre, {{2}} título, {{3}} precio, {{4}} link
+//   alquiler_*         ver RENTAL_TEMPLATES en features/rentals/notifications.ts
+export type WhatsappTemplate =
+  | "visita_confirmada" | "nueva_propiedad"
+  | "alquiler_recibo" | "alquiler_aumento" | "alquiler_vencimiento" | "alquiler_deuda";
+
 export function sendTemplate(
   to: string,
-  template: "visita_confirmada" | "nueva_propiedad",
+  template: WhatsappTemplate,
   params: string[],
   language = "es_AR"
 ) {

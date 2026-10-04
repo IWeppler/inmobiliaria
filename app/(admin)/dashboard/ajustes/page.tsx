@@ -8,6 +8,9 @@ import {
 } from "@/features/dashboard/settings/AssignmentRules";
 import { Integrations } from "@/features/dashboard/settings/Integrations";
 import { IndexValues, type IndexValueRow } from "@/features/dashboard/settings/IndexValues";
+import { RentalAlertSettings } from "@/features/dashboard/settings/RentalAlertSettings";
+import { RentalNoticeSettings } from "@/features/dashboard/settings/RentalNoticeSettings";
+import { getRentalAlertSettings } from "@/features/rentals/settings";
 import { whatsappEnabled } from "@/lib/whatsapp";
 import { googleCalendarEnabled } from "@/lib/google-calendar";
 import { supabaseAdmin } from "@/lib/supabase-admin";
@@ -34,7 +37,7 @@ export default async function DashboardPage() {
     supabase.from("agents").select("id, full_name").order("full_name"),
     supabase.from("properties").select("city").not("city", "is", null),
     supabase.from("property_types").select("name").order("name"),
-    supabase.from("index_values").select("id, index_code, period, value").order("period", { ascending: false }),
+    supabase.from("index_values").select("id, index_code, period, value, source, updated_at").order("period", { ascending: false }),
   ]);
 
   // Quién del equipo conectó Google Calendar. La tabla es solo
@@ -50,6 +53,9 @@ export default async function DashboardPage() {
       ? await supabaseAdmin.from("google_calendar_connections").select("agent_id")
       : { data: null };
   const googleConnected = new Set((googleRows ?? []).map((r) => r.agent_id));
+  const { data: noticeSettings } = await supabase.from("rental_settings")
+    .select("notify_receipts, notify_adjustments, notify_due, notify_overdue, adjustment_notice_days, due_reminder_days, overdue_reminder_days")
+    .eq("id", 1).maybeSingle();
 
   const currentRate = rate?.usd_to_ars || 1500;
   const cities = Array.from(
@@ -77,6 +83,8 @@ export default async function DashboardPage() {
         propertyTypes={propertyTypes}
       />
       <IndexValues initial={(indexRows ?? []) as IndexValueRow[]} />
+      <RentalAlertSettings initial={await getRentalAlertSettings(supabase)} />
+      {noticeSettings && <RentalNoticeSettings initial={noticeSettings} whatsappConfigured={whatsappEnabled} />}
       <Integrations
         whatsappEnabled={whatsappEnabled}
         googleCalendar={{

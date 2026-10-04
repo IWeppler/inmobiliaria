@@ -73,6 +73,8 @@ const termsSchema = z.object({
   commission_pct: z.coerce.number().min(0).max(100),
   late_fee_pct_daily: z.coerce.number().min(0).max(10),
   late_fee_fixed: z.coerce.number().min(0),
+  late_fee_mode: z.enum(["AUTO", "MANUAL"]),
+  late_fee_grace_days: z.coerce.number().int().min(0).max(30),
   guarantee_type: z.enum(["NINGUNA", "GARANTE", "CAUCION"]),
   guarantee_detail: z.string().max(200).optional(),
   notes: z.string().max(2000).optional(),
@@ -124,6 +126,7 @@ export async function updateContactAction(
   }).eq("id", id);
   if (error) return { success: false, message: error.message };
   if (contractId) revalidateContract(contractId);
+  revalidatePath("/dashboard/alquileres/contactos");
   return { success: true, message: "Contacto actualizado." };
 }
 
@@ -139,18 +142,32 @@ const partySchema = z.object({
     phone: z.string().max(40).optional(),
   }).optional(),
   share_pct: z.coerce.number().min(0).max(100).optional(),
+}).refine((v) => v.role !== "CO_PROPIETARIO" || (v.share_pct !== undefined && v.share_pct > 0 && v.share_pct < 100), {
+  message: "Indicá el porcentaje del co-propietario (mayor a 0 y menor a 100).",
 });
 
 const ROLE_KIND = { CO_INQUILINO: "tenant", CO_PROPIETARIO: "owner", GARANTE: "guarantor" } as const;
 
 export async function addContractPartyAction(input: z.input<typeof partySchema>): Promise<ActionResult> {
   const parsed = partySchema.safeParse(input);
-  if (!parsed.success || (!parsed.data.contact_id && !parsed.data.new_contact)) {
+  if (!parsed.success) return { success: false, message: parsed.error.issues[0]?.message ?? "Datos inválidos." };
+  if (!parsed.data.contact_id && !parsed.data.new_contact) {
     return { success: false, message: "Elegí o cargá un contacto." };
   }
   const { supabase, user } = await currentUser();
   if (!user) return { success: false, message: "No autenticado" };
   const v = parsed.data;
+
+  // Se valida la suma antes de crear el contacto, para no dejar uno huérfano.
+  // (El trigger rental_validate_owner_shares es la garantía final.)
+  if (v.role === "CO_PROPIETARIO") {
+    const { data: current } = await supabase.from("rental_contract_parties")
+      .select("share_pct").eq("contract_id", v.contract_id).eq("role", "CO_PROPIETARIO");
+    const total = (current ?? []).reduce((sum, p) => sum + (p.share_pct ?? 0), 0) + (v.share_pct ?? 0);
+    if (total >= 100) {
+      return { success: false, message: `Los co-propietarios sumarían ${total} %: el propietario principal tiene que conservar una parte.` };
+    }
+  }
 
   let contactId = v.contact_id;
   if (!contactId && v.new_contact) {
@@ -225,29 +242,33 @@ export async function updateDepositAction(input: z.input<typeof depositSchema>):
   return { success: true, message: "Depósito actualizado." };
 }
 
-// === Pago de la liquidación al propietario ===
+// === Pago de una parte de la liquidación a su propietario ===
+// Cada titular cobra su parte por separado. La liquidación figura
+// transferida cuando se pagaron todas (trigger rental_sync_settlement_paid).
 const payoutSchema = z.object({
-  settlement_id: uuidSchema,
+  share_id: uuidSchema,
   paid_to_owner_at: ymdSchema.nullable(),
   payout_method: z.enum(["TRANSFERENCIA", "EFECTIVO", "OTRO"]).nullable(),
   payout_reference: z.string().max(120).optional(),
 });
 
-export async function markSettlementPaidAction(input: z.input<typeof payoutSchema>): Promise<ActionResult> {
+export async function markSharePaidAction(input: z.input<typeof payoutSchema>): Promise<ActionResult> {
   const parsed = payoutSchema.safeParse(input);
   if (!parsed.success) return { success: false, message: "Datos del pago inválidos." };
   const { supabase, user } = await currentUser();
   if (!user) return { success: false, message: "No autenticado" };
   const v = parsed.data;
-  const { data, error } = await supabase.from("rental_settlements").update({
+  const { data, error } = await supabase.from("rental_settlement_shares").update({
     paid_to_owner_at: v.paid_to_owner_at,
     payout_method: v.paid_to_owner_at ? v.payout_method : null,
     payout_reference: v.paid_to_owner_at ? v.payout_reference || null : null,
-  }).eq("id", v.settlement_id).select("contract_id").single();
-  if (error || !data) return { success: false, message: error?.message ?? "Liquidación no encontrada." };
-  revalidateContract(data.contract_id);
+  }).eq("id", v.share_id).select("settlement_id").single();
+  if (error || !data) return { success: false, message: error?.message ?? "Parte de la liquidación no encontrada." };
+  const { data: settlement } = await supabase.from("rental_settlements")
+    .select("contract_id").eq("id", data.settlement_id).single();
+  if (settlement) revalidateContract(settlement.contract_id);
   revalidatePath("/dashboard/alquileres/propietarios");
-  return { success: true, message: v.paid_to_owner_at ? "Pago al propietario registrado." : "Pago al propietario anulado." };
+  return { success: true, message: v.paid_to_owner_at ? "Transferencia registrada." : "Transferencia anulada." };
 }
 
 // === Mantenimiento ===

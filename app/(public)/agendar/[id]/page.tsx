@@ -2,7 +2,8 @@ import Link from "next/link";
 import Image from "next/image";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
-import { ArrowLeft, Clock, MapPin, MessageCircle, ShieldCheck } from "lucide-react";
+import { ArrowLeft, Clock, MapPin, ShieldCheck } from "lucide-react";
+import { FaWhatsapp } from "react-icons/fa";
 import { createClientServer } from "@/lib/supabase";
 import { nextAgentForLead } from "@/lib/supabase-admin";
 import { getAvailability } from "@/features/booking/availability";
@@ -221,7 +222,7 @@ export default async function AgendarPage({
               <p className="text-sm font-semibold text-zinc-900">Qué esperar</p>
               <ul className="mt-3 space-y-3 text-sm text-zinc-600">
                 <li className="flex gap-3">
-                  <MessageCircle className="mt-0.5 h-4 w-4 shrink-0 text-zinc-400" />
+                  <FaWhatsapp className="mt-0.5 h-4 w-4 shrink-0 text-zinc-400" aria-hidden />
                   Te confirmamos el turno por WhatsApp o teléfono.
                 </li>
                 <li className="flex gap-3">

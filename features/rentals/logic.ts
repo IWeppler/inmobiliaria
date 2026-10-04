@@ -2,11 +2,13 @@
 // actions, páginas y PDF. Fechas como "YYYY-MM-DD"; períodos como el
 // primer día del mes "YYYY-MM-01".
 
-export type AdjustmentIndex = "ICL" | "IPC" | "FIJO" | "MANUAL" | "NINGUNO";
+export type AdjustmentIndex = "ICL" | "IPC" | "CASA_PROPIA" | "FIJO" | "MANUAL" | "NINGUNO";
+export const ADJUSTMENT_INDEXES = ["ICL", "IPC", "CASA_PROPIA", "FIJO", "MANUAL", "NINGUNO"] as const;
 
 export const ADJUSTMENT_LABELS: Record<AdjustmentIndex, string> = {
   ICL: "ICL (BCRA)",
   IPC: "IPC (INDEC)",
+  CASA_PROPIA: "Casa Propia",
   FIJO: "Porcentaje fijo",
   MANUAL: "Manual",
   NINGUNO: "Sin ajuste",
@@ -29,6 +31,10 @@ export const CHARGE_LABELS: Record<string, string> = {
   ALQUILER: "Alquiler", EXPENSAS: "Expensas", SERVICIOS: "Servicios",
   PUNITORIOS: "Punitorios", REPARACIONES: "Reparaciones", PENALIDAD: "Penalidad",
 };
+
+// Pestañas del detalle de contrato (?tab= en la URL).
+export const CONTRACT_TABS = ["resumen", "cuenta", "liquidaciones", "mantenimiento", "documentos"] as const;
+export type ContractTab = (typeof CONTRACT_TABS)[number];
 
 // Conceptos que se cargan a mano (ALQUILER lo generan las cuotas).
 export const MANUAL_CHARGE_KINDS = ["EXPENSAS", "SERVICIOS", "PUNITORIOS", "REPARACIONES", "PENALIDAD"] as const;
@@ -68,6 +74,13 @@ export function formatPeriod(period: string) {
     year: "numeric",
     timeZone: "UTC",
   }).format(d);
+}
+
+// "Octubre de 2026" para títulos. CSS `capitalize` sube cada palabra
+// ("Octubre De 2026"), por eso se capitaliza solo la primera letra acá.
+export function formatPeriodTitle(period: string) {
+  const text = formatPeriod(period);
+  return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
 export function formatDate(s: string | null | undefined) {
@@ -127,32 +140,49 @@ export const PAYMENT_STATUS_LABELS: Record<PaymentStatus, string> = {
   pendiente: "Pendiente",
 };
 
-// Punitorio simple: % diario sobre el canon por cada día de atraso
-// (desde el vencimiento hasta hoy o hasta la fecha de pago).
+// Punitorio simple: % diario sobre el saldo por cada día de atraso (desde
+// el vencimiento hasta hoy o hasta la fecha de pago) + fijo. Dentro de los
+// días de gracia no corre. Mismo cálculo que rental_accrue_late_fees().
 export function lateFee(
   p: { amount: number; due_date: string; paid_at: string | null; paid_amount?: number | null },
   lateFeePctDaily: number,
   today: string,
   lateFeeFixed = 0,
+  graceDays = 0,
 ) {
   const balance = Math.max(0, p.amount - (p.paid_amount ?? 0));
   const until = balance > 0 ? today : p.paid_at ?? today;
   const days = daysBetween(p.due_date, until);
-  if (days <= 0) return 0;
+  if (days <= 0 || days <= graceDays) return 0;
   const basis = balance > 0 ? balance : p.amount;
   return round2(basis * (lateFeePctDaily / 100) * days + lateFeeFixed);
 }
 
 // === E4.2 — Ajuste por índice ===
-// Nuevo canon = canon base × (índice del período de ajuste / índice del
-// período base). Con FIJO: canon × (1 + pct). Devuelve null y el motivo
-// si falta algún valor de índice.
+// Nuevo canon = canon base × (índice[ajuste - rezago] / índice[base - rezago]).
+// El rezago existe porque el IPC de un mes se publica el mes siguiente.
+// Con FIJO: canon × (1 + pct). Misma fórmula que rental_apply_adjustment.
+export function indexPeriods(basePeriod: string, adjustmentPeriod: string, lagMonths: number) {
+  return { base: addMonths(basePeriod, -lagMonths), target: addMonths(adjustmentPeriod, -lagMonths) };
+}
+
+export const DEFAULT_INDEX_LAG: Record<string, number> = { IPC: 2, ICL: 0, CASA_PROPIA: 0 };
+
+// Índices que se leen de index_values (los demás no dependen de datos externos).
+export function usesIndexValues(index: string) {
+  return index === "ICL" || index === "IPC" || index === "CASA_PROPIA";
+}
+
+// Frecuencias habituales; cualquier otra de 1 a 36 meses se carga como personalizada.
+export const COMMON_ADJUSTMENT_MONTHS: Record<number, string> = { 3: "Trimestral", 4: "Cuatrimestral", 6: "Semestral", 12: "Anual" };
+
 export function computeAdjustment(
   contract: {
     adjustment_index: string;
     adjustment_pct: number | null;
     base_rent_amount: number;
     base_period: string;
+    index_lag_months?: number;
   },
   targetPeriod: string,
   indexValues: { index_code: string; period: string; value: number }[]
@@ -165,14 +195,21 @@ export function computeAdjustment(
     const factor = 1 + pct / 100;
     return { amount: round2(contract.base_rent_amount * factor), factor };
   }
+  const periods = indexPeriods(contract.base_period, targetPeriod, contract.index_lag_months ?? 0);
   const find = (period: string) =>
     indexValues.find((v) => v.index_code === idx && v.period === period)?.value;
-  const base = find(contract.base_period);
-  const target = find(targetPeriod);
+  // Casa Propia publica directamente el coeficiente a aplicar en el mes.
+  if (idx === "CASA_PROPIA") {
+    const coefficient = find(periods.target);
+    if (!coefficient) return { error: `Falta cargar el coeficiente Casa Propia de ${formatPeriod(periods.target)}.` };
+    return { amount: round2(contract.base_rent_amount * coefficient), factor: coefficient };
+  }
+  const base = find(periods.base);
+  const target = find(periods.target);
   if (!base)
-    return { error: `Falta el valor ${idx} de ${formatPeriod(contract.base_period)}.` };
+    return { error: `Falta el valor ${idx} de ${formatPeriod(periods.base)}.` };
   if (!target)
-    return { error: `Falta el valor ${idx} de ${formatPeriod(targetPeriod)}.` };
+    return { error: `Todavía no se publicó el ${idx} de ${formatPeriod(periods.target)}.` };
   const factor = target / base;
   return { amount: round2(contract.base_rent_amount * factor), factor };
 }
@@ -182,7 +219,9 @@ export function round2(n: number) {
 }
 
 // === E4.4 — Liquidación ===
-export type SettlementExpense = { description: string; amount: number };
+// maintenance_id: el gasto viene de un reclamo a cargo del propietario; al
+// emitir la liquidación el reclamo queda enlazado (no se descuenta dos veces).
+export type SettlementExpense = { description: string; amount: number; maintenance_id?: string };
 
 export function computeSettlement(
   collectedAmount: number,
@@ -199,6 +238,40 @@ export function computeSettlement(
   };
 }
 
+// === Reparto del neto entre titulares ===
+// Misma regla que rental_create_settlement_shares: cada parte se redondea
+// a centavos y la diferencia va al principal, así la suma da el neto exacto.
+export type OwnerShare = { name: string; pct: number; isPrimary: boolean };
+
+export function splitNet(net: number, owners: OwnerShare[]) {
+  const parts = owners.filter((o) => o.pct > 0).map((o) => ({ ...o, amount: round2((net * o.pct) / 100) }));
+  const diff = round2(net - parts.reduce((sum, p) => sum + p.amount, 0));
+  const primary = parts.find((p) => p.isPrimary);
+  if (primary) primary.amount = round2(primary.amount + diff);
+  return parts;
+}
+
 // === E4.1 — Alertas ===
+// Valores por defecto; los vigentes se configuran en Ajustes (rental_settings).
 export const EXPIRY_ALERT_DAYS = 90;
 export const ADJUSTMENT_ALERT_DAYS = 30;
+export type RentalAlertSettings = { expiryAlertDays: number; adjustmentAlertDays: number };
+export const DEFAULT_ALERT_SETTINGS: RentalAlertSettings = {
+  expiryAlertDays: EXPIRY_ALERT_DAYS,
+  adjustmentAlertDays: ADJUSTMENT_ALERT_DAYS,
+};
+
+// === Rescisión anticipada: penalidades de referencia ===
+// Sugerencias para el diálogo de cierre. Lo que vale es lo pactado en el
+// contrato; estas son las reglas más usadas cuando no hay cláusula propia.
+export function rescissionPenalties(rent: number, startDate: string, exitDate: string, endDate: string) {
+  const firstYear = exitDate < addMonths(startDate, 12);
+  // Meses de alquiler que faltaban (fracción incluida) entre la salida y el fin pactado.
+  const remainingMonths = Math.max(0, daysBetween(exitDate, endDate) / 30.4375);
+  return {
+    lawMonths: firstYear ? 1.5 : 1,
+    law: round2(rent * (firstYear ? 1.5 : 1)),
+    tenPercentRemaining: round2(rent * remainingMonths * 0.1),
+    remainingMonths: Math.round(remainingMonths * 10) / 10,
+  };
+}

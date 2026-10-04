@@ -41,7 +41,7 @@ export default async function FinanzasPage() {
     supabase
       .from("cash_movements")
       .select(
-        "id, occurred_on, direction, category, nature, description, amount, currency, settlement_id, sale_id, recurring_expense_id, contract_id, properties(id, title)",
+        "id, occurred_on, direction, category, nature, description, amount, currency, settlement_id, sale_id, maintenance_id, recurring_expense_id, contract_id, properties(id, title)",
       )
       .gte("occurred_on", periods[0])
       .order("occurred_on", { ascending: false })

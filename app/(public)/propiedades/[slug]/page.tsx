@@ -30,6 +30,7 @@ import { ViewCounter } from "@/features/public/ViewCounter";
 import { PropertyJsonLd } from "@/features/public/seo/PropertyJsonLd";
 import { PropertyFullDetails } from "@/features/properties/types/index";
 import { ShareButton } from "@/features/properties/ShareButton";
+import { formatArea } from "@/features/social/propertyCard";
 import { FactChip, KeyFacts, type Fact } from "@/features/properties/KeyFacts";
 
 // --- Carga de Datos Principal ---
@@ -126,7 +127,7 @@ export async function generateMetadata({
   const location = formatLocation(property);
   const specs = [
     property.bedrooms ? `${property.bedrooms} dorm.` : null,
-    property.total_area ? `${property.total_area} m²` : null,
+    property.total_area ? formatArea(Number(property.total_area)) : null,
   ]
     .filter(Boolean)
     .join(" · ");
@@ -135,13 +136,18 @@ export async function generateMetadata({
       ? "En alquiler"
       : "En venta";
 
+  // Corte en palabra completa: WhatsApp muestra ~2 líneas de descripción.
+  const excerpt = property.description?.replace(/\s+/g, " ").trim();
+  const shortExcerpt = excerpt && excerpt.length > 120
+    ? `${excerpt.slice(0, 120).replace(/\s+\S*$/, "")}…`
+    : excerpt;
   const shortDescription = [
     [operation, price, specs].filter(Boolean).join(" · "),
     location,
-    property.description?.replace(/\s+/g, " ").substring(0, 120),
+    shortExcerpt,
   ]
     .filter(Boolean)
-    .join(" — ");
+    .join(". ");
 
   return {
     title: `${property.title} | ${price}`,

@@ -56,7 +56,11 @@ export function PartiesCard({ contractId, owner, tenant, parties, contacts, edit
   const taken = new Set([owner?.id, tenant?.id, ...parties.filter((p) => p.role === role).map((p) => p.contact.id)]);
   const options = contacts.filter((c) => c.kind === ROLE_KIND[role] && !taken.has(c.id));
   const creating = contactId === NEW;
-  const canSave = creating ? draft.full_name.trim().length >= 3 : !!contactId;
+  // El principal se queda con el resto hasta 100 % (mismo criterio que la base).
+  const coOwnersPct = parties.filter((p) => p.role === "CO_PROPIETARIO").reduce((sum, p) => sum + (p.share_pct ?? 0), 0);
+  const primaryPct = 100 - coOwnersPct;
+  const shareInvalid = role === "CO_PROPIETARIO" && (share <= 0 || coOwnersPct + share >= 100);
+  const canSave = (creating ? draft.full_name.trim().length >= 3 : !!contactId) && !shareInvalid;
 
   const reset = () => { setAdding(false); setContactId(""); setDraft({ full_name: "", document: "", phone: "" }); setShare(0); };
 
@@ -64,7 +68,7 @@ export function PartiesCard({ contractId, owner, tenant, parties, contacts, edit
     <Card>
       <CardHeader><CardTitle>Partes</CardTitle></CardHeader>
       <CardContent className="space-y-3 text-sm">
-        <ContactRow label="Propietario" contact={owner} contractId={contractId} />
+        <ContactRow label="Propietario" extra={coOwnersPct > 0 ? `${primaryPct} %` : undefined} contact={owner} contractId={contractId} />
         <ContactRow label="Inquilino" contact={tenant} contractId={contractId} />
         {parties.map((party) => (
           <ContactRow
@@ -96,7 +100,17 @@ export function PartiesCard({ contractId, owner, tenant, parties, contacts, edit
               <Input placeholder="DNI / CUIT" value={draft.document} onChange={(e) => setDraft({ ...draft, document: e.target.value })} />
               <Input placeholder="Teléfono" value={draft.phone} onChange={(e) => setDraft({ ...draft, phone: e.target.value })} />
             </div>}
-            {role === "CO_PROPIETARIO" && <div className="grid gap-1.5"><Label>Participación (% del neto)</Label><Input type="number" min={0} max={100} step="0.01" value={share || ""} onChange={(e) => setShare(Number(e.target.value))} /></div>}
+            {role === "CO_PROPIETARIO" && (
+              <div className="grid gap-1.5">
+                <Label htmlFor="co-owner-share">Participación (% del neto)</Label>
+                <Input id="co-owner-share" type="number" min={0.01} max={99.99} step="0.01" value={share || ""} onChange={(e) => setShare(Number(e.target.value))} />
+                <p className={`text-xs ${share > 0 && shareInvalid ? "text-danger" : "text-muted-foreground"}`}>
+                  {share > 0 && shareInvalid
+                    ? `Los co-propietarios sumarían ${coOwnersPct + share} %: el principal tiene que conservar una parte.`
+                    : `${owner?.full_name ?? "El propietario principal"} quedaría con ${Math.max(0, primaryPct - share)} %. Se aplica a las liquidaciones que se emitan desde ahora.`}
+                </p>
+              </div>
+            )}
             <div className="flex gap-2">
               <Button size="sm" disabled={!!busy || !canSave} onClick={async () => {
                 const ok = await run("party", () => addContractPartyAction({
