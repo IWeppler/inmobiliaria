@@ -7,6 +7,7 @@ import { notifyReceipt } from "@/features/rentals/notifications";
 import { createClientServer } from "@/lib/supabase";
 import { ymdInAppTz } from "@/lib/dates";
 import { syncIndexValues, type IndexSyncResult } from "@/features/rentals/indexSync";
+import { attachDraftPdf } from "@/features/rentals/contractDrafts";
 import {
   ADJUSTMENT_INDEXES,
   addMonths,
@@ -97,6 +98,9 @@ const contractSchema = z
     payment_due_day: z.coerce.number().int().min(1).max(28),
     renewed_from_id: z.string().uuid().optional(),
     notes: z.string().max(2000).optional().or(z.literal("")),
+    // Carga desde PDF: el borrador subido se adjunta como contrato firmado.
+    source_pdf_path: z.string().max(300).optional(),
+    source_pdf_name: z.string().max(200).optional(),
   })
   .refine((v) => v.end_date > v.start_date, { message: "Fin debe ser posterior al inicio" });
 
@@ -125,6 +129,16 @@ export async function createContractAction(
       return { success: false, message: "El contrato a renovar no corresponde a esta propiedad." };
     }
   }
+
+  // Los titulares salen de la propiedad. El contrato guarda la foto (owner_id
+  // + co-propietarios) para que no cambie si después se vende. Si la
+  // propiedad todavía no tiene dueños, el elegido en el formulario queda
+  // registrado como dueño (trigger rental_contracts_property_owners).
+  const { data: propertyOwners } = await supabase.from("property_owners")
+    .select("contact_id, share_pct, is_primary").eq("property_id", v.property_id);
+  const primary = propertyOwners?.find((o) => o.is_primary);
+  const coOwners = (propertyOwners ?? []).filter((o) => !o.is_primary);
+  if (primary) v.owner_id = primary.contact_id;
 
   const basePeriod = periodOf(v.start_date);
   const firstAdjustment = addMonths(v.start_date, v.adjustment_months);
@@ -166,6 +180,16 @@ export async function createContractAction(
     .single();
   if (error || !contract) return { success: false, message: error?.message ?? "Error" };
 
+  if (coOwners.length) {
+    const { error: partiesError } = await supabase.from("rental_contract_parties").insert(coOwners.map((o) => ({
+      contract_id: contract.id, contact_id: o.contact_id, role: "CO_PROPIETARIO", share_pct: o.share_pct,
+    })));
+    if (partiesError) {
+      await supabase.from("rental_contracts").delete().eq("id", contract.id);
+      return { success: false, message: partiesError.message };
+    }
+  }
+
   // E4.3: una fila de pago por período, con el canon vigente. Los
   // ajustes futuros actualizan las cuotas no pagadas.
   const rows = contractPeriods(v.start_date, v.end_date).map((period) => ({
@@ -199,8 +223,17 @@ export async function createContractAction(
   // La propiedad pasa a ALQUILADO (queda en status_history por trigger).
   await supabase.from("properties").update({ status: "ALQUILADO" }).eq("id", v.property_id);
 
+  // Si vino de un PDF, queda adjunto. Un fallo acá no invalida el contrato.
+  const attached = v.source_pdf_path
+    ? await attachDraftPdf(supabase, user.id, contract.id, v.source_pdf_path, v.source_pdf_name ?? "Contrato.pdf")
+    : null;
+
   revalidatePath("/dashboard/alquileres");
-  return { success: true, message: "Contrato creado.", data: { id: contract.id } };
+  return {
+    success: true,
+    message: attached === false ? "Contrato creado. No se pudo adjuntar el PDF: subilo desde Documentos." : "Contrato creado.",
+    data: { id: contract.id },
+  };
 }
 
 // El cierre de contrato vive en lifecycleActions.closeContractAction

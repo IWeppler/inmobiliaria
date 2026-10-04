@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Loader2, PlusCircle } from "lucide-react";
@@ -22,37 +23,51 @@ import {
   type ContractInput,
 } from "@/features/rentals/actions";
 import { ADJUSTMENT_LABELS, COMMON_ADJUSTMENT_MONTHS, DEFAULT_INDEX_LAG, type AdjustmentIndex } from "@/features/rentals/logic";
+import { ownersLabel, type PropertyOwner } from "@/features/rentals/propertyOwners";
 
 const CUSTOM = "custom";
 
 type Option = { id: string; label: string };
+
+export type ContactDraft = { full_name: string; document: string | null; phone: string | null; email: string | null };
 
 type Props = {
   properties: Option[];
   owners: Option[];
   tenants: Option[];
   initial?: Partial<ContractInput>;
+  contactDrafts?: { owner?: ContactDraft; tenant?: ContactDraft };
+  // Dueños registrados por propiedad: el contrato los toma de ahí.
+  propertyOwners?: Record<string, PropertyOwner[]>;
 };
+
+const primaryOwner = (owners?: PropertyOwner[]) => owners?.find((o) => o.is_primary)?.contact_id;
 
 // Selector de contacto con alta inline ("+ Nuevo") para no salir del
 // formulario del contrato a cargar propietario/inquilino.
-function ContactPicker({
+export function ContactPicker({
   kind,
   label,
   options,
   value,
   onChange,
+  draft,
 }: {
   kind: "owner" | "tenant";
   label: string;
   options: Option[];
   value: string;
   onChange: (id: string, opt: Option) => void;
+  draft?: ContactDraft;
 }) {
   const [list, setList] = useState(options);
-  const [creating, setCreating] = useState(false);
+  // Con un borrador (contrato leído del PDF) y sin contacto existente, el
+  // alta arranca abierta y prellenada.
+  const [creating, setCreating] = useState(!!draft && !value);
   const [saving, setSaving] = useState(false);
-  const [form, setForm] = useState({ full_name: "", document: "", phone: "", email: "" });
+  const [form, setForm] = useState({
+    full_name: draft?.full_name ?? "", document: draft?.document ?? "", phone: draft?.phone ?? "", email: draft?.email ?? "",
+  });
 
   const save = async () => {
     setSaving(true);
@@ -135,7 +150,7 @@ function ContactPicker({
 
 const today = new Date().toISOString().slice(0, 10);
 
-export function ContractForm({ properties, owners, tenants, initial }: Props) {
+export function ContractForm({ properties, owners, tenants, initial, contactDrafts, propertyOwners }: Props) {
   const router = useRouter();
   const [saving, setSaving] = useState(false);
   const [v, setV] = useState<ContractInput>({
@@ -161,7 +176,11 @@ export function ContractForm({ properties, owners, tenants, initial }: Props) {
     payment_due_day: 10,
     notes: "",
     ...initial,
+    ...(initial?.property_id && primaryOwner(propertyOwners?.[initial.property_id])
+      ? { owner_id: primaryOwner(propertyOwners?.[initial.property_id]) }
+      : {}),
   });
+  const registeredOwners = v.property_id ? propertyOwners?.[v.property_id] : undefined;
   const set = <K extends keyof ContractInput>(k: K, val: ContractInput[K]) =>
     setV((p) => ({ ...p, [k]: val }));
   // Personalizada si al renovar viene una frecuencia que no es de las habituales.
@@ -189,8 +208,11 @@ export function ContractForm({ properties, owners, tenants, initial }: Props) {
         <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="space-y-2">
             <Label>Propiedad</Label>
-            <Select value={v.property_id} onValueChange={(id) => set("property_id", id)}>
-              <SelectTrigger>
+            <Select
+              value={v.property_id}
+              onValueChange={(id) => setV((p) => ({ ...p, property_id: id, owner_id: primaryOwner(propertyOwners?.[id]) ?? "" }))}
+            >
+              <SelectTrigger className="w-full min-w-0 [&>span]:truncate">
                 <SelectValue placeholder="Seleccionar..." />
               </SelectTrigger>
               <SelectContent>
@@ -202,19 +224,36 @@ export function ContractForm({ properties, owners, tenants, initial }: Props) {
               </SelectContent>
             </Select>
           </div>
-          <ContactPicker
-            kind="owner"
-            label="Propietario"
-            options={owners}
-            value={v.owner_id}
-            onChange={(id) => set("owner_id", id)}
-          />
+          {registeredOwners?.length ? (
+            <div className="space-y-2">
+              <Label>{registeredOwners.length > 1 ? "Propietarios" : "Propietario"}</Label>
+              <p className="flex min-h-9 items-center rounded-md border border-border bg-muted/40 px-3 py-1.5 text-sm">
+                {ownersLabel(registeredOwners)}
+              </p>
+              <Link href={`/dashboard/propiedades/${v.property_id}`} target="_blank" className="text-xs text-muted-foreground underline-offset-4 hover:underline">
+                Los dueños se cambian en la propiedad
+              </Link>
+            </div>
+          ) : (
+            <div className="space-y-1.5">
+              <ContactPicker
+                kind="owner"
+                label="Propietario"
+                options={owners}
+                value={v.owner_id}
+                onChange={(id) => set("owner_id", id)}
+                draft={contactDrafts?.owner}
+              />
+              {v.property_id && <p className="text-xs text-muted-foreground">La propiedad no tiene dueño cargado: queda registrado como su dueño.</p>}
+            </div>
+          )}
           <ContactPicker
             kind="tenant"
             label="Inquilino"
             options={tenants}
             value={v.tenant_id}
             onChange={(id) => set("tenant_id", id)}
+            draft={contactDrafts?.tenant}
           />
         </CardContent>
       </Card>

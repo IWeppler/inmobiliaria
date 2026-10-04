@@ -31,6 +31,8 @@ import { PROPERTY_STATUSES } from "@/features/dashboard/property/propertyStatus"
 import { PropertyBuyersCard } from "@/features/dashboard/buyers/PropertyBuyersCard";
 import { PropertyFunnelCard } from "@/features/dashboard/property/PropertyFunnelCard";
 import type { Period } from "@/features/dashboard/property/performance";
+import { getPropertyOwners } from "@/features/rentals/propertyOwners";
+import { PropertyOwnersCard } from "@/features/rentals/PropertyOwnersCard";
 
 export const metadata: Metadata = { title: "Propiedad" };
 
@@ -63,7 +65,7 @@ export default async function PropertyDetailPage({
     .single();
   if (!property) notFound();
 
-  const [{ data: leads }, { data: events }, { data: history }, { data: contracts }] =
+  const [{ data: leads }, { data: events }, { data: history }, { data: contracts }, ownersByProperty, { data: ownerContacts }] =
     await Promise.all([
       supabase
         .from("leads")
@@ -86,6 +88,8 @@ export default async function PropertyDetailPage({
         .select("id, status, start_date, end_date, rent_amount, currency, tenant:rental_contacts!rental_contracts_tenant_id_fkey(full_name)")
         .eq("property_id", id)
         .order("start_date", { ascending: false }),
+      getPropertyOwners(supabase, [id]),
+      supabase.from("rental_contacts").select("id, full_name").eq("kind", "owner").order("full_name"),
     ]);
 
   const meta = propertyStatusMeta(property.status);
@@ -264,6 +268,12 @@ export default async function PropertyDetailPage({
 
         {/* Columna lateral: relaciones */}
         <div className="flex flex-col gap-6">
+          <PropertyOwnersCard
+            propertyId={property.id}
+            owners={ownersByProperty[property.id] ?? []}
+            contacts={(ownerContacts ?? []).map((c) => ({ id: c.id, label: c.full_name }))}
+          />
+
           {property.status !== "VENDIDO" && property.status !== "ALQUILADO" && (
             <PropertyBuyersCard supabase={supabase} property={property} />
           )}
@@ -308,7 +318,7 @@ export default async function PropertyDetailPage({
                 <p className="text-sm text-muted-foreground">
                   Sin contrato.{" "}
                   {property.operation_type?.toLowerCase() === "alquiler" && (
-                    <Link href="/dashboard/alquileres/nuevo" className="text-primary underline-offset-4 hover:underline">
+                    <Link href={`/dashboard/alquileres/nuevo?propiedad=${property.id}`} className="text-primary underline-offset-4 hover:underline">
                       Crear uno
                     </Link>
                   )}

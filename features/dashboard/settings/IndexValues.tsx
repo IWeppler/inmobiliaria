@@ -28,6 +28,16 @@ import { formatPeriodTitle } from "@/features/rentals/logic";
 export type IndexValueRow = { id: string; index_code: string; period: string; value: number; source: string; updated_at: string };
 
 const SOURCE_LABELS: Record<string, string> = { BCRA: "BCRA", INDEC: "INDEC", MANUAL: "Manual" };
+
+// Fecha y hora en hora argentina, igual en servidor y navegador (el formato
+// por defecto difiere en zona horaria y espacios y rompía la hidratación).
+function syncLabel(iso: string) {
+  const p = Object.fromEntries(new Intl.DateTimeFormat("es-AR", {
+    timeZone: "America/Argentina/Buenos_Aires", day: "numeric", month: "numeric", year: "2-digit",
+    hour: "2-digit", minute: "2-digit", hourCycle: "h23",
+  }).formatToParts(new Date(iso)).map((part) => [part.type, part.value]));
+  return `${p.day}/${p.month}/${p.year} ${p.hour}:${p.minute} hs`;
+}
 type IndexCode = "ICL" | "IPC" | "CASA_PROPIA";
 const CODE_LABELS: Record<IndexCode, string> = { ICL: "ICL", IPC: "IPC", CASA_PROPIA: "Casa Propia" };
 
@@ -87,7 +97,7 @@ export function IndexValues({ initial }: { initial: IndexValueRow[] }) {
             Se actualizan solos todos los días: ICL del BCRA (valor del día 1 de cada mes) e IPC nivel
             general del INDEC. Casa Propia no tiene fuente automática: cargá el coeficiente de cada mes tal como lo publica el
             Ministerio de Desarrollo Territorial y Hábitat. Para ICL e IPC, la carga manual vale hasta la próxima actualización oficial.
-            {lastSync && ` Última actualización: ${new Date(lastSync).toLocaleString("es-AR", { dateStyle: "short", timeStyle: "short" })}.`}
+            {lastSync && ` Última actualización: ${syncLabel(lastSync)}.`}
           </CardDescription>
         </div>
         <Button variant="outline" onClick={sync} disabled={!!busy}>

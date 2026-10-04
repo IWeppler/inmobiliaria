@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { syncIndexValues } from "@/features/rentals/indexSync";
 import { runScheduledNotices } from "@/features/rentals/notifications";
+import { purgeStaleDrafts } from "@/features/rentals/contractDrafts";
 
 export const dynamic = "force-dynamic";
 
@@ -21,5 +22,7 @@ export async function GET(request: Request) {
   if (lateFeeError) return NextResponse.json({ indexes, applied: data, error: lateFeeError.message }, { status: 500 });
   // Al final: los avisos usan los montos ya ajustados y los punitorios al día.
   const notices = await runScheduledNotices();
-  return NextResponse.json({ indexes, applied: data, lateFees, notices });
+  // PDFs de contratos cargados con IA que nunca se guardaron.
+  const purgedDrafts = await purgeStaleDrafts();
+  return NextResponse.json({ indexes, applied: data, lateFees, notices, purgedDrafts });
 }

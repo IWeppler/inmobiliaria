@@ -43,8 +43,10 @@ function getCrumbs(pathname: string): Crumb[] {
       importar: "Importar contratos",
       propietarios: "Liquidaciones",
       cobranzas: "Cobranzas",
+      conciliacion: "Conciliación bancaria",
       mantenimiento: "Mantenimiento",
       contactos: "Contactos",
+      hoy: "Hoy",
     };
 
     if (rest[0] === "contactos" && rest[1]) {
@@ -59,6 +61,7 @@ function getCrumbs(pathname: string): Crumb[] {
       });
       if (rest[1] === "liquidacion") crumbs.push({ label: "Liquidación" });
       if (rest[1] === "recibo") crumbs.push({ label: "Recibo" });
+      if (rest[1] === "contrato") crumbs.push({ label: "Contrato para firmar" });
     }
   }
 

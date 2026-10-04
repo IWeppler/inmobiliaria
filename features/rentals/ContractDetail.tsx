@@ -107,6 +107,7 @@ export function ContractDetail({ c, initialTab }: { c: ContractDetailData; initi
               guarantee_detail: c.guarantee_detail ?? "", notes: c.notes ?? "",
             }}
           />
+          <Button asChild variant="outline"><Link href={`/dashboard/alquileres/${c.id}/contrato`}>Contrato para firmar</Link></Button>
           <Button asChild variant="outline"><Link href={`/dashboard/alquileres/nuevo?renovar=${c.id}`}>Renovar</Link></Button>
           {active && <CloseContractDialog contractId={c.id} startDate={c.start_date} endDate={c.end_date} today={c.today} currency={c.currency} rentAmount={c.rent_amount} />}
         </div>}

@@ -17,7 +17,7 @@ export function Page({ width = "full", className, ...props }: PageProps) {
     <div
       data-slot="page"
       className={cn(
-        "mx-auto flex w-full min-w-0 flex-col gap-6 px-4 py-5 md:px-6",
+        "mx-auto flex w-full min-w-0 flex-col gap-6 px-4 py-3 md:px-6",
         width === "full" ? "max-w-[1600px]" : "max-w-5xl",
         className,
       )}
@@ -38,7 +38,6 @@ type PageHeaderProps = {
   aside?: React.ReactNode;
   className?: string;
 };
-
 
 export function PageHeader({
   title,
@@ -76,7 +75,9 @@ export function PageHeader({
             </h1>
             {aside}
           </div>
-          {description && <p className="text-[13px] text-muted-foreground">{description}</p>}
+          {description && (
+            <p className="text-[13px] text-muted-foreground">{description}</p>
+          )}
         </div>
       </div>
       {actions && (

@@ -3,26 +3,18 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
+import { isRentalSectionActive, RENTAL_SECTIONS } from "@/features/rentals/sections";
 
-// Navegación del módulo de alquileres. Mismo lenguaje visual que TabsList,
-// pero con links: cada sección es una ruta propia (se puede compartir y
-// volver con el botón atrás).
-const ITEMS = [
-  { href: "/dashboard/alquileres", label: "Contratos", exact: true },
-  { href: "/dashboard/alquileres/cobranzas", label: "Cobranzas" },
-  { href: "/dashboard/alquileres/propietarios", label: "Liquidaciones" },
-  { href: "/dashboard/alquileres/mantenimiento", label: "Mantenimiento" },
-  { href: "/dashboard/alquileres/contactos", label: "Contactos" },
-];
-
+// Pestañas del módulo de alquileres para pantallas chicas. En desktop las
+// secciones viven en el panel lateral (SectionSidebar), así que se ocultan.
 export function RentalsNav() {
   const pathname = usePathname();
 
   return (
-    <nav aria-label="Secciones de alquileres" className="-mx-4 overflow-x-auto px-4 md:mx-0 md:px-0 print:hidden">
+    <nav aria-label="Secciones de alquileres" className="-mx-4 overflow-x-auto px-4 md:mx-0 md:px-0 lg:hidden print:hidden">
       <ul className="inline-flex h-9 items-center rounded-lg bg-muted p-[3px] text-muted-foreground">
-        {ITEMS.map((item) => {
-          const active = item.exact ? pathname === item.href : pathname.startsWith(item.href);
+        {RENTAL_SECTIONS.map((item) => {
+          const active = isRentalSectionActive(pathname, item);
           return (
             <li key={item.href} className="h-full">
               <Link

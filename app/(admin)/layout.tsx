@@ -1,31 +1,31 @@
-import {
-  SidebarProvider,
-  SidebarTrigger,
-} from "@/shared/components/ui/sidebar";
+import { SidebarProvider } from "@/shared/components/ui/sidebar";
 import { AppSidebar } from "@/shared/components/app-sidebar";
+import { SectionSidebar } from "@/shared/components/SectionSidebar";
+import { MenuTrigger } from "@/shared/components/MenuTrigger";
+import { getNavCounts } from "@/shared/components/navCounts";
 import { AppBreadcrumbs } from "@/shared/components/AppBreadcrumbs";
 import { NotificationsMenu } from "@/shared/components/NotificationsMenu";
-import { UserMenu } from "@/shared/components/UserMenu";
 import { ThemeToggle } from "@/shared/components/ThemeToggle";
 import { GoogleCalendarBanner } from "@/features/dashboard/google-calendar/GoogleCalendarBanner";
 
-// Shell del panel: sidebar + topbar de 48px con ruta y acciones + contenido.
+// Shell del panel: sidebar principal + panel de sección (si el módulo lo
+// tiene) + topbar de 48px con ruta y acciones + contenido. El usuario vive
+// al pie del sidebar.
 export default function Layout({ children }: { children: React.ReactNode }) {
+  // Sin await: los contadores llegan por streaming y no frenan el panel.
+  const counts = getNavCounts();
   return (
     <SidebarProvider>
-      <AppSidebar />
+      <AppSidebar counts={counts} />
+      <SectionSidebar counts={counts} />
       <div className="flex min-w-0 flex-1 flex-col bg-background">
         <header className="sticky top-0 z-20 flex h-12 shrink-0 items-center gap-2 border-b border-border bg-background px-3">
-          <SidebarTrigger
-            className="text-muted-foreground hover:text-foreground"
-            aria-label="Mostrar u ocultar menú"
-          />
-          <span className="h-4 w-px shrink-0 bg-border" aria-hidden="true" />
+          <MenuTrigger />
+          <span className="hidden h-4 w-px shrink-0 bg-border md:block" aria-hidden="true" />
           <AppBreadcrumbs />
-          <div className="ml-auto flex items-center gap-2">
+          <div className="ml-auto flex items-center gap-1">
             <ThemeToggle />
             <NotificationsMenu />
-            <UserMenu />
           </div>
         </header>
         <GoogleCalendarBanner />

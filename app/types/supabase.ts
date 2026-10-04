@@ -553,6 +553,48 @@ export type Database = {
         }
         Relationships: []
       }
+      property_owners: {
+        Row: {
+          contact_id: string
+          created_at: string
+          id: string
+          is_primary: boolean
+          property_id: string
+          share_pct: number
+        }
+        Insert: {
+          contact_id: string
+          created_at?: string
+          id?: string
+          is_primary?: boolean
+          property_id: string
+          share_pct: number
+        }
+        Update: {
+          contact_id?: string
+          created_at?: string
+          id?: string
+          is_primary?: boolean
+          property_id?: string
+          share_pct?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "property_owners_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "rental_contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "property_owners_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       properties: {
         Row: {
           agent_id: string | null
@@ -1111,10 +1153,31 @@ export type Database = {
         ]
       }
       rental_payment_entries: {
-        Row: { id: string; charge_id: string; paid_at: string; amount: number; method: string; account: string | null; notes: string | null; receipt_number: number; created_at: string }
-        Insert: { id?: string; charge_id: string; paid_at: string; amount: number; method: string; account?: string | null; notes?: string | null; created_at?: string }
-        Update: { id?: string; charge_id?: string; paid_at?: string; amount?: number; method?: string; account?: string | null; notes?: string | null; created_at?: string }
+        Row: { id: string; charge_id: string; paid_at: string; amount: number; method: string; account: string | null; notes: string | null; receipt_number: number; created_at: string; bank_movement_id: string | null }
+        Insert: { id?: string; charge_id: string; paid_at: string; amount: number; method: string; account?: string | null; notes?: string | null; created_at?: string; bank_movement_id?: string | null }
+        Update: { id?: string; charge_id?: string; paid_at?: string; amount?: number; method?: string; account?: string | null; notes?: string | null; created_at?: string; bank_movement_id?: string | null }
         Relationships: [{ foreignKeyName: "rental_payment_entries_charge_id_fkey"; columns: ["charge_id"]; isOneToOne: false; referencedRelation: "rental_charges"; referencedColumns: ["id"] }]
+      }
+      rental_contract_templates: {
+        Row: { id: string; name: string; body: string; is_default: boolean; updated_by: string | null; created_at: string; updated_at: string }
+        Insert: { id?: string; name: string; body: string; is_default?: boolean; updated_by?: string | null; created_at?: string; updated_at?: string }
+        Update: { id?: string; name?: string; body?: string; is_default?: boolean; updated_by?: string | null; created_at?: string; updated_at?: string }
+        Relationships: []
+      }
+      rental_bank_movements: {
+        Row: {
+          id: string; hash: string; movement_date: string; description: string; amount: number; currency: string
+          account: string; status: string; contract_id: string | null; created_by: string; created_at: string
+        }
+        Insert: {
+          id?: string; hash: string; movement_date: string; description: string; amount: number; currency: string
+          account: string; status: string; contract_id?: string | null; created_by?: string; created_at?: string
+        }
+        Update: {
+          id?: string; hash?: string; movement_date?: string; description?: string; amount?: number; currency?: string
+          account?: string; status?: string; contract_id?: string | null; created_by?: string; created_at?: string
+        }
+        Relationships: [{ foreignKeyName: "rental_bank_movements_contract_id_fkey"; columns: ["contract_id"]; isOneToOne: false; referencedRelation: "rental_contracts"; referencedColumns: ["id"] }]
       }
       rental_payments: {
         Row: {
@@ -1182,6 +1245,12 @@ export type Database = {
           notify_receipts?: boolean; notify_adjustments?: boolean; notify_due?: boolean; notify_overdue?: boolean
           adjustment_notice_days?: number; due_reminder_days?: number; overdue_reminder_days?: number
         }
+        Relationships: []
+      }
+      rental_task_snoozes: {
+        Row: { task_key: string; snoozed_until: string; reason: string | null; created_by: string | null; created_at: string }
+        Insert: { task_key: string; snoozed_until: string; reason?: string | null; created_by?: string | null; created_at?: string }
+        Update: { task_key?: string; snoozed_until?: string; reason?: string | null; created_by?: string | null; created_at?: string }
         Relationships: []
       }
       rental_portal_links: {
@@ -1379,6 +1448,7 @@ export type Database = {
         Args: { p_contract_id: string; p_end_date?: string; p_penalty?: number; p_status: string }
         Returns: Json
       }
+      set_property_owners: { Args: { p_property_id: string; p_owners: Json }; Returns: undefined }
       rental_import_contracts: { Args: { p_rows: Json }; Returns: number }
       next_agent_for_lead: {
         Args: { p_city?: string | null; p_property_type?: string | null }

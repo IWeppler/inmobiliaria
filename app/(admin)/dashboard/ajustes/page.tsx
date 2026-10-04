@@ -11,6 +11,7 @@ import { IndexValues, type IndexValueRow } from "@/features/dashboard/settings/I
 import { RentalAlertSettings } from "@/features/dashboard/settings/RentalAlertSettings";
 import { RentalNoticeSettings } from "@/features/dashboard/settings/RentalNoticeSettings";
 import { getRentalAlertSettings } from "@/features/rentals/settings";
+import { ContractTemplates, type ContractTemplateRow } from "@/features/dashboard/settings/ContractTemplates";
 import { whatsappEnabled } from "@/lib/whatsapp";
 import { googleCalendarEnabled } from "@/lib/google-calendar";
 import { supabaseAdmin } from "@/lib/supabase-admin";
@@ -53,6 +54,9 @@ export default async function DashboardPage() {
       ? await supabaseAdmin.from("google_calendar_connections").select("agent_id")
       : { data: null };
   const googleConnected = new Set((googleRows ?? []).map((r) => r.agent_id));
+  const { data: templates } = me?.role === "admin"
+    ? await supabase.from("rental_contract_templates").select("id, name, body, is_default").order("name")
+    : { data: null };
   const { data: noticeSettings } = await supabase.from("rental_settings")
     .select("notify_receipts, notify_adjustments, notify_due, notify_overdue, adjustment_notice_days, due_reminder_days, overdue_reminder_days")
     .eq("id", 1).maybeSingle();
@@ -85,6 +89,7 @@ export default async function DashboardPage() {
       <IndexValues initial={(indexRows ?? []) as IndexValueRow[]} />
       <RentalAlertSettings initial={await getRentalAlertSettings(supabase)} />
       {noticeSettings && <RentalNoticeSettings initial={noticeSettings} whatsappConfigured={whatsappEnabled} />}
+      {templates && <ContractTemplates initial={templates as ContractTemplateRow[]} />}
       <Integrations
         whatsappEnabled={whatsappEnabled}
         googleCalendar={{
