@@ -42,7 +42,7 @@ async function getPropertyDetails(
     .from("properties")
     .select(
       `
-      id, title, street_address, neighborhood, city, province, status, operation_type,
+      id, title, street_address, neighborhood, city, province, status, available_from, operation_type,
       price, currency, bedrooms, bathrooms, total_area, covered_area, rooms,
       description, latitude, longitude, expensas, antiguedad, cocheras,
       property_types ( name ),
@@ -298,6 +298,12 @@ export default async function PropertyPage({
             <span className="rounded-full border border-zinc-200 bg-zinc-100 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-zinc-700">
               {statusDisplay}
             </span>
+            {/* Publicada antes de desocuparse (vacancia): desde cuándo se puede alquilar. */}
+            {status === "EN_ALQUILER" && property.available_from && property.available_from > new Date().toISOString().slice(0, 10) && (
+              <span className="text-sm text-zinc-600">
+                Disponible desde el {property.available_from.split("-").reverse().join("/")}
+              </span>
+            )}
             {property.property_types?.name && (
               <span className="text-sm text-zinc-500">
                 {property.property_types.name}

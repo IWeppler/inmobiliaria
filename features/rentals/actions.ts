@@ -14,6 +14,7 @@ import {
   computeSettlement,
   DEFAULT_INDEX_LAG,
   contractPeriods,
+  formatDate,
   dueDateFor,
   MANUAL_CHARGE_KINDS,
   periodOf,
@@ -117,10 +118,13 @@ export async function createContractAction(
   if (!user) return { success: false, message: "No autenticado" };
   const v = parsed.data;
 
+  // Solo choca un contrato activo que se superpone en fechas: el del próximo
+  // inquilino se puede cargar antes de que se vaya el actual (vacancia).
   const { data: activeContracts } = await supabase.from("rental_contracts")
-    .select("id").eq("property_id", v.property_id).eq("status", "ACTIVO");
-  if (activeContracts?.length && (!v.renewed_from_id || activeContracts.some((c) => c.id !== v.renewed_from_id))) {
-    return { success: false, message: "La propiedad ya tiene un contrato activo." };
+    .select("id, end_date").eq("property_id", v.property_id).eq("status", "ACTIVO");
+  const overlapping = (activeContracts ?? []).filter((c) => c.id !== v.renewed_from_id && c.end_date >= v.start_date);
+  if (overlapping.length) {
+    return { success: false, message: `La propiedad tiene un contrato activo hasta el ${formatDate(overlapping[0].end_date)}: el nuevo tiene que empezar después.` };
   }
   if (v.renewed_from_id) {
     const { data: previous } = await supabase.from("rental_contracts")
@@ -221,7 +225,7 @@ export async function createContractAction(
   }
 
   // La propiedad pasa a ALQUILADO (queda en status_history por trigger).
-  await supabase.from("properties").update({ status: "ALQUILADO" }).eq("id", v.property_id);
+  await supabase.from("properties").update({ status: "ALQUILADO", available_from: null }).eq("id", v.property_id);
 
   // Si vino de un PDF, queda adjunto. Un fallo acá no invalida el contrato.
   const attached = v.source_pdf_path

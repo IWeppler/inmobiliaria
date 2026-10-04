@@ -14,6 +14,7 @@ export type RentalSection = {
 export const RENTAL_SECTIONS: RentalSection[] = [
   { href: `${RENTALS_BASE}/hoy`, label: "Hoy", group: null, countKey: "rentals" },
   { href: RENTALS_BASE, label: "Contratos", group: "Cartera" },
+  { href: `${RENTALS_BASE}/vacancia`, label: "Vacancia", group: "Cartera" },
   { href: `${RENTALS_BASE}/cobranzas`, label: "Cobranzas", group: "Cobros y pagos" },
   { href: `${RENTALS_BASE}/conciliacion`, label: "Conciliación", group: "Cobros y pagos" },
   { href: `${RENTALS_BASE}/propietarios`, label: "Liquidaciones", group: "Cobros y pagos" },

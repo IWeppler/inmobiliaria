@@ -16,6 +16,7 @@ export type PropertyFullDetails = Pick<
   | "city"
   | "province"
   | "status"
+  | "available_from"
   | "price"
   | "currency"
   | "operation_type"

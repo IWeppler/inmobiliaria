@@ -9,6 +9,7 @@ import {
   adjustmentMessage, debtMessage, paymentRisk, phoneDigits, upcomingMessage,
   type RentalTask, type RiskLevel, type TaskAction, type TaskUrgency,
 } from "@/features/rentals/tasks";
+import { renewalMessage } from "@/features/rentals/vacancy";
 
 // Arma la bandeja "Hoy" desde los datos. Corre con la sesión del agente:
 // RLS limita a sus contratos (admin ve todos). Las tareas no se guardan;
@@ -16,10 +17,10 @@ import {
 
 type Contact = { id: string; full_name: string; phone: string | null };
 type Contract = {
-  id: string; status: string; end_date: string; currency: string; rent_amount: number;
-  adjustment_index: string; next_adjustment_date: string | null; renewed_from_id: string | null;
+  id: string; property_id: string; status: string; start_date: string; end_date: string; currency: string; rent_amount: number;
+  adjustment_index: string; next_adjustment_date: string | null; renewed_from_id: string | null; renewal_intent: string | null;
   deposit_amount: number; deposit_received_at: string | null; deposit_returned_at: string | null;
-  property: { title: string } | null; tenant: Contact | null; owner: Contact | null;
+  property: { title: string; status: string | null } | null; tenant: Contact | null; owner: Contact | null;
 };
 type Charge = {
   id: string; contract_id: string; period: string; due_date: string; kind: string; amount: number; currency: string;
@@ -39,7 +40,7 @@ export async function buildRentalTasks(
     { data: contractsRaw }, { data: chargesRaw }, { data: settlementsRaw }, { data: sharesRaw },
     { data: adjustmentsRaw }, { data: noticesRaw }, { data: maintenanceRaw }, { data: casaPropiaRaw }, { data: snoozesRaw },
   ] = await Promise.all([
-    supabase.from("rental_contracts").select("id, status, end_date, currency, rent_amount, adjustment_index, next_adjustment_date, renewed_from_id, deposit_amount, deposit_received_at, deposit_returned_at, property:properties(title), tenant:rental_contacts!rental_contracts_tenant_id_fkey(id, full_name, phone), owner:rental_contacts!rental_contracts_owner_id_fkey(id, full_name, phone)"),
+    supabase.from("rental_contracts").select("id, property_id, status, start_date, end_date, currency, rent_amount, adjustment_index, next_adjustment_date, renewed_from_id, renewal_intent, deposit_amount, deposit_received_at, deposit_returned_at, property:properties(title, status), tenant:rental_contacts!rental_contracts_tenant_id_fkey(id, full_name, phone), owner:rental_contacts!rental_contracts_owner_id_fkey(id, full_name, phone)"),
     supabase.from("rental_charges").select("id, contract_id, period, due_date, kind, amount, currency, entries:rental_payment_entries(amount, paid_at)").lte("period", addDays(currentPeriod, 40)),
     supabase.from("rental_settlements").select("contract_id, period"),
     supabase.from("rental_settlement_shares").select("id, amount, settlement:rental_settlements(contract_id, period, issued_at, currency), contact:rental_contacts(id, full_name)").is("paid_to_owner_at", null),
@@ -55,7 +56,10 @@ export async function buildRentalTasks(
   const charges = (chargesRaw ?? []) as unknown as Charge[];
   const balanceOf = (c: Charge) => round2(c.amount - c.entries.reduce((s, e) => s + e.amount, 0));
   const settled = new Set((settlementsRaw ?? []).map((s) => `${s.contract_id}|${s.period}`));
+  // Sucesor: renovación o un contrato activo posterior (el próximo inquilino).
   const renewed = new Set(contracts.map((c) => c.renewed_from_id).filter(Boolean));
+  const hasSuccessor = (c: Contract) => renewed.has(c.id)
+    || contracts.some((o) => o.id !== c.id && o.property_id === c.property_id && o.status === "ACTIVO" && o.start_date > c.start_date);
   const sentAdjustmentNotices = new Set((noticesRaw ?? []).map((n) => `${n.reference}|${n.contact_id}`));
   const casaPropiaPeriods = new Set((casaPropiaRaw ?? []).map((v) => v.period));
 
@@ -238,19 +242,61 @@ export async function buildRentalTasks(
     });
   }
 
-  // --- Contratos por vencer sin renovación ---
+  // --- Contratos por vencer sin sucesor (vacancia) ---
+  // Según la intención registrada: preguntar si renueva, armar la
+  // renovación o salir a publicar antes de que se desocupe.
+  const vacancyLink: TaskAction = { type: "link", label: "Ver vacancia", href: "/dashboard/alquileres/vacancia" };
   for (const contract of contracts) {
-    if (contract.status !== "ACTIVO" || renewed.has(contract.id)) continue;
+    if (contract.status !== "ACTIVO" || hasSuccessor(contract)) continue;
     const daysLeft = daysBetween(today, contract.end_date);
     if (daysLeft > alerts.expiryAlertDays) continue;
-    tasks.push({
-      key: `RENOVAR:${contract.id}`,
-      category: "contratos", urgency: daysLeft <= 30 ? "alta" : daysLeft <= 60 ? "media" : "baja",
-      score: 40 + Math.max(0, alerts.expiryAlertDays - daysLeft),
-      title: daysLeft >= 0 ? `Renovar ${title(contract)}: vence en ${daysLeft} días` : `${title(contract)} venció hace ${-daysLeft} días`,
+    const when = daysLeft >= 0 ? `vence en ${daysLeft} días` : `venció hace ${-daysLeft} días`;
+    const base = {
+      category: "contratos" as const, urgency: (daysLeft <= 30 ? "alta" : daysLeft <= 60 ? "media" : "baja") as TaskUrgency,
+      score: 40 + Math.max(0, alerts.expiryAlertDays - daysLeft), contractId: contract.id,
       detail: `Inquilino: ${contract.tenant?.full_name ?? "sin datos"} · propietario: ${contract.owner?.full_name ?? "sin datos"}`,
-      contractId: contract.id,
-      actions: [{ type: "link", label: "Renovar", href: `/dashboard/alquileres/nuevo?renovar=${contract.id}` }, contractLink(contract.id)],
+    };
+    if (contract.renewal_intent === "NO_RENUEVA") {
+      if (contract.property?.status === "EN_ALQUILER") continue; // ya publicada: se sigue en Vacancia
+      tasks.push({ ...base, key: `PUBLICAR:${contract.id}`, title: `Publicar ${title(contract)}: se desocupa el ${formatDate(contract.end_date)}`, actions: [vacancyLink] });
+    } else if (contract.renewal_intent === "RENUEVA") {
+      tasks.push({
+        ...base, key: `RENOVAR:${contract.id}`, title: `Renovar ${title(contract)}: ${when}`,
+        actions: [{ type: "link", label: "Renovar", href: `/dashboard/alquileres/nuevo?renovar=${contract.id}` }, contractLink(contract.id)],
+      });
+    } else {
+      const phone = phoneDigits(contract.tenant?.phone);
+      tasks.push({
+        ...base, key: `RENUEVA?:${contract.id}`, title: `¿Renueva ${title(contract)}? ${when[0].toUpperCase()}${when.slice(1)}`,
+        actions: [
+          ...(phone && contract.tenant ? [{
+            type: "whatsapp" as const, label: "Consultar", phone, snoozeDays: 3,
+            text: renewalMessage({ tenantName: contract.tenant.full_name, propertyTitle: title(contract), endDate: contract.end_date }),
+          }] : []),
+          vacancyLink,
+        ],
+      });
+    }
+  }
+
+  // --- Propiedades que quedaron vacías sin publicar ---
+  const lastClosed = new Map<string, Contract>();
+  for (const contract of contracts) {
+    if (contract.status === "ACTIVO") continue;
+    const current = lastClosed.get(contract.property_id);
+    if (!current || contract.end_date > current.end_date) lastClosed.set(contract.property_id, contract);
+  }
+  for (const contract of lastClosed.values()) {
+    const occupied = contracts.some((o) => o.property_id === contract.property_id && o.status === "ACTIVO");
+    const listed = contract.property?.status === "EN_ALQUILER" || contract.property?.status === "RESERVADO";
+    if (occupied || listed) continue;
+    const days = Math.max(0, daysBetween(contract.end_date, today));
+    tasks.push({
+      key: `VACANTE:${contract.property_id}`,
+      category: "contratos", urgency: days > 7 ? "alta" : "media", score: 70 + Math.min(days, 30),
+      title: `Publicar ${title(contract)}: vacante hace ${days} días`,
+      detail: `Terminó el contrato de ${contract.tenant?.full_name ?? "el inquilino"} el ${formatDate(contract.end_date)} y la propiedad no está publicada.`,
+      contractId: contract.id, actions: [vacancyLink],
     });
   }
 

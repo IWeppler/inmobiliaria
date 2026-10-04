@@ -44,6 +44,7 @@ function getCrumbs(pathname: string): Crumb[] {
       propietarios: "Liquidaciones",
       cobranzas: "Cobranzas",
       conciliacion: "Conciliación bancaria",
+      vacancia: "Vacancia",
       mantenimiento: "Mantenimiento",
       contactos: "Contactos",
       hoy: "Hoy",

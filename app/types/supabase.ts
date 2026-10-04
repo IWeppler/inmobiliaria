@@ -597,6 +597,7 @@ export type Database = {
       }
       properties: {
         Row: {
+          available_from: string | null
           agent_id: string | null
           captured_by: string | null
           antiguedad: string | null
@@ -626,6 +627,7 @@ export type Database = {
           views_count: number | null
         }
         Insert: {
+          available_from?: string | null
           agent_id?: string | null
           captured_by?: string | null
           antiguedad?: string | null
@@ -655,6 +657,7 @@ export type Database = {
           views_count?: number | null
         }
         Update: {
+          available_from?: string | null
           agent_id?: string | null
           captured_by?: string | null
           antiguedad?: string | null
@@ -845,6 +848,9 @@ export type Database = {
       }
       rental_contracts: {
         Row: {
+          renewal_intent: string | null
+          renewal_intent_at: string | null
+          renewal_intent_note: string | null
           adjustment_index: string
           adjustment_months: number
           adjustment_pct: number | null
@@ -881,6 +887,9 @@ export type Database = {
           tenant_id: string
         }
         Insert: {
+          renewal_intent?: string | null
+          renewal_intent_at?: string | null
+          renewal_intent_note?: string | null
           adjustment_index?: string
           adjustment_months?: number
           adjustment_pct?: number | null
@@ -917,6 +926,9 @@ export type Database = {
           tenant_id: string
         }
         Update: {
+          renewal_intent?: string | null
+          renewal_intent_at?: string | null
+          renewal_intent_note?: string | null
           adjustment_index?: string
           adjustment_months?: number
           adjustment_pct?: number | null
