@@ -20,6 +20,8 @@ export type StatementMovement = {
   /** Disminuye el saldo (cobro al inquilino / transferencia al propietario). */
   decrease: number;
   href?: string;
+  /** El link abre un PDF (portal): ancla común en otra pestaña, no navegación de la app. */
+  pdf?: boolean;
 };
 
 export type StatementRow = StatementMovement & { balance: number };

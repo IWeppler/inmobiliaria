@@ -1,5 +1,6 @@
 "use client";
 
+import { receiptCode } from "@/features/rentals/codes";
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { FileText, Search } from "lucide-react";
@@ -126,13 +127,13 @@ export function CollectionsView({ pending, collectedEntries, today }: {
                 </div>
                 <div className="hidden min-w-0 md:block">
                   <span className="block truncate">{entry.description}</span>
-                  <span className="block text-xs text-muted-foreground">Recibo N.º {entry.receiptNumber} · {METHOD_LABELS[entry.method] ?? entry.method}</span>
+                  <span className="block text-xs text-muted-foreground">Recibo {receiptCode(entry.receiptNumber)} · {METHOD_LABELS[entry.method] ?? entry.method}</span>
                 </div>
                 <div className="text-right">
                   <span className="block font-medium tabular-nums">{money(entry.amount, entry.currency)}</span>
                   <span className="block text-xs text-muted-foreground">{formatDate(entry.paidAt)}</span>
                 </div>
-                <Button asChild size="icon" variant="ghost" className="hidden size-8 md:inline-flex" aria-label={`Ver recibo ${entry.receiptNumber}`}>
+                <Button asChild size="icon" variant="ghost" className="hidden size-8 md:inline-flex" aria-label={`Ver recibo ${receiptCode(entry.receiptNumber)}`}>
                   <Link href={`/dashboard/alquileres/${entry.contractId}/recibo/${entry.id}`} target="_blank"><FileText className="size-4" /></Link>
                 </Button>
               </li>

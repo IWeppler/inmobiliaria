@@ -1,5 +1,6 @@
 "use server";
 
+import { receiptCode } from "@/features/rentals/codes";
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { after } from "next/server";
@@ -304,7 +305,7 @@ export async function recordRentalPaymentAction(
   // Recibo por WhatsApp (si está activado) después de responder: el cobro
   // ya quedó registrado y un fallo de envío no lo afecta.
   after(() => notifyReceipt(data.id).catch(() => {}));
-  return { success: true, message: `Cobro registrado. Recibo N.º ${data.receipt_number}.`, data };
+  return { success: true, message: `Cobro registrado. Recibo ${receiptCode(data.receipt_number)}.`, data };
 }
 
 export async function deleteRentalPaymentAction(entryId: string): Promise<ActionResult> {

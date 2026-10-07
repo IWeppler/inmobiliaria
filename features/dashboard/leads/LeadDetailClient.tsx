@@ -13,10 +13,13 @@ import Link from "next/link";
 import { Send, Mail, Phone } from "lucide-react";
 import type { User } from "@supabase/supabase-js";
 
-import { LeadWithDetails, Note } from "@/app/types";
+import { LeadWithDetails } from "@/app/types";
+import { LeadTimeline, type TimelineItem } from "@/features/dashboard/leads/LeadTimeline";
 import { statusMeta } from "@/features/dashboard/leads/leadStatus";
 import { lostReasonLabel } from "@/features/dashboard/leads/lostReasons";
 import { ScheduleVisitCard } from "@/features/dashboard/leads/ScheduleVisitCard";
+import { NextActionCard } from "@/features/dashboard/leads/NextActionCard";
+import { DealCard, type DealLinkInfo } from "@/features/dashboard/deals/DealCard";
 import { BuyerDemandCard } from "@/features/dashboard/buyers/BuyerDemandCard";
 import { LeadPropertyMatches } from "@/features/dashboard/buyers/LeadPropertyMatches";
 import type { PropertyMatch } from "@/features/dashboard/buyers/queries";
@@ -62,6 +65,10 @@ interface LeadDetailClientProps {
   allProperties: { id: string; title: string }[];
   propertyTypes: { id: number; name: string | null }[];
   propertyMatches: PropertyMatch[];
+  timeline: TimelineItem[];
+  dealLink: DealLinkInfo | null;
+  /** Tarjeta de tareas, armada en el servidor. */
+  tasksCard?: React.ReactNode;
 }
 
 export function LeadDetailClient({
@@ -72,12 +79,14 @@ export function LeadDetailClient({
   allProperties,
   propertyTypes,
   propertyMatches,
+  timeline,
+  dealLink,
+  tasksCard,
 }: LeadDetailClientProps) {
   const supabase = createClientBrowser();
   const router = useRouter();
 
   const [lead] = useState<LeadWithDetails>(initialLead);
-  const [notes, setNotes] = useState<Note[]>(initialLead.lead_notes || []);
 
   // --- ESTADOS PARA AGENTE (Expandible) ---
   const [isReassignOpen, setIsReassignOpen] = useState(false);
@@ -102,22 +111,19 @@ export function LeadDetailClient({
   const onSubmitNote = async (data: NoteForm) => {
     if (!currentUser) return;
 
-    const { error, data: newNote } = await supabase
+    const { error } = await supabase
       .from("lead_notes")
       .insert({
         content: data.content,
         lead_id: lead.id,
         user_id: currentUser.id,
-      })
-      .select("id, created_at, content, user_id")
-      .single();
+      });
 
     if (error) {
       toast.error("Error al guardar la nota");
     } else {
       toast.success("Nota agregada.");
       form.reset();
-      setNotes((prev) => [newNote as Note, ...prev]);
       router.refresh();
     }
   };
@@ -242,47 +248,27 @@ export function LeadDetailClient({
               <CardTitle>Historial</CardTitle>
             </CardHeader>
             <CardContent>
-              {/* Timeline plano: fecha a la izquierda, contenido a la derecha */}
-              <ul className="divide-y divide-border-subtle">
-                {lead.notes && (
-                  <li className="flex gap-4 py-3 first:pt-0">
-                    <span className="w-24 shrink-0 text-xs text-muted-foreground">
-                      Mensaje original
-                    </span>
-                    <p className="text-sm text-fg-secondary whitespace-pre-wrap">
-                      {lead.notes}
-                    </p>
-                  </li>
-                )}
-
-                {notes.length === 0 && !lead.notes && (
-                  <li className="py-3 text-sm text-muted-foreground">
-                    Todavía no hay notas.
-                  </li>
-                )}
-
-                {notes.map((note) => (
-                  <li
-                    key={note.id}
-                    className="flex gap-4 py-3 first:pt-0 last:pb-0"
-                  >
-                    <span className="w-24 shrink-0 text-xs text-muted-foreground">
-                      {format(new Date(note.created_at), "d MMM HH:mm", {
-                        locale: es,
-                      })}
-                    </span>
-                    <p className="text-sm text-foreground whitespace-pre-wrap">
-                      {note.content}
-                    </p>
-                  </li>
-                ))}
-              </ul>
+              {/* Notas, WhatsApp, estados, visitas y alta en una sola línea de tiempo. */}
+              <LeadTimeline items={timeline} originalMessage={initialLead.notes} />
             </CardContent>
           </Card>
         </div>
 
         {/* COLUMNA LATERAL */}
         <div className="space-y-4">
+          {/* Próximo paso: se toma de initialLead, que se actualiza al refrescar. */}
+          <NextActionCard
+            leadId={initialLead.id}
+            action={initialLead.next_action}
+            at={initialLead.next_action_at}
+            closed={initialLead.status === "CERRADO" || initialLead.status === "DESCARTADO"}
+          />
+
+          {/* Postventa: reserva → boleto → escritura. */}
+          <DealCard lead={initialLead} link={dealLink} />
+
+          {tasksCard}
+
           {/* 1. CARD: RESPONSABLE DEL LEAD (Layout Expandible) */}
           <Card>
             <CardHeader>

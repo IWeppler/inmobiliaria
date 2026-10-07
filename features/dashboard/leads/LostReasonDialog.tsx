@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useState } from "react";
+import { useId, useState } from "react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/shared/components/ui/button";
 import {
@@ -37,13 +37,17 @@ export function LostReasonDialog({
   const [note, setNote] = useState("");
   const noteId = useId();
 
-  // Cada apertura arranca limpia: el motivo es de este lead, no del anterior.
-  useEffect(() => {
+  // Cada apertura arranca limpia: el motivo es de este lead, no del
+  // anterior. Se ajusta durante el render al cambiar `open` (patrón de React
+  // para derivar estado de una prop), sin un effect que renderice dos veces.
+  const [wasOpen, setWasOpen] = useState(open);
+  if (open !== wasOpen) {
+    setWasOpen(open);
     if (open) {
       setReason(null);
       setNote("");
     }
-  }, [open]);
+  }
 
   const noteRequired = reason === "OTRO";
   const canConfirm = !!reason && (!noteRequired || note.trim().length > 0);

@@ -7,8 +7,11 @@ import { usePathname } from "next/navigation";
 type Crumb = { label: string; href?: string };
 
 const sections: Record<string, string> = {
+  hoy: "Hoy",
   propiedades: "Propiedades",
   leads: "Leads",
+  captaciones: "Captaciones",
+  operaciones: "Operaciones",
   calendario: "Calendario",
   alquileres: "Alquileres",
   reportes: "Reportes",
@@ -45,6 +48,8 @@ function getCrumbs(pathname: string): Crumb[] {
       cobranzas: "Cobranzas",
       conciliacion: "Conciliación bancaria",
       vacancia: "Vacancia",
+      mensajes: "Mensajes",
+      factura: "Factura",
       mantenimiento: "Mantenimiento",
       contactos: "Contactos",
       hoy: "Hoy",

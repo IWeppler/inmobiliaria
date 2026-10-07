@@ -2,11 +2,12 @@ import { notFound, redirect } from "next/navigation";
 import { createClientServer } from "@/lib/supabase";
 import { ymdInAppTz } from "@/lib/dates";
 import { ContractDetail, type ContractDetailData } from "@/features/rentals/ContractDetail";
+import { afipConfig } from "@/lib/afip";
 import {
   CONTRACT_TABS, computeAdjustment, indexPeriods, periodOf, usesIndexValues, type ContractTab, type SettlementExpense,
 } from "@/features/rentals/logic";
 
-const CONTACT_FIELDS = "id, full_name, document, phone, email, address, notes";
+const CONTACT_FIELDS = "id, full_name, document, phone, email, address, notes, iva_condition";
 
 export default async function ContratoPage({
   params,
@@ -27,7 +28,7 @@ export default async function ContratoPage({
   const { data: raw } = await supabase
     .from("rental_contracts")
     .select(
-      `id, status, start_date, end_date, rent_amount, currency, adjustment_index, adjustment_months,
+      `id, number, status, start_date, end_date, rent_amount, currency, adjustment_index, adjustment_months,
        adjustment_pct, base_rent_amount, base_period, next_adjustment_date, commission_pct, index_lag_months,
        last_adjustment_date, late_fee_pct_daily, late_fee_fixed, late_fee_mode, late_fee_grace_days, payment_due_day,
        guarantee_type, guarantee_detail, deposit_amount, renewed_from_id, notes,
@@ -45,7 +46,7 @@ export default async function ContratoPage({
     ...c
   } = raw as unknown as Omit<
     ContractDetailData,
-    "charges" | "settlements" | "adjustments" | "adjustmentPreview" | "parties" | "deposit" | "maintenance" | "documents" | "contacts" | "today"
+    "charges" | "settlements" | "adjustments" | "adjustmentPreview" | "parties" | "deposit" | "maintenance" | "documents" | "contacts" | "activity" | "today"
   > & {
     base_rent_amount: number; deposit_amount: number; deposit_received_at: string | null;
     deposit_returned_at: string | null; deposit_returned_amount: number | null; deposit_deductions: SettlementExpense[];
@@ -62,7 +63,7 @@ export default async function ContratoPage({
       .order("due_date", { ascending: false }),
     supabase
       .from("rental_settlements")
-      .select("id, period, net_amount, currency, issued_at, paid_to_owner_at, shares:rental_settlement_shares(id, share_pct, amount, is_primary, paid_to_owner_at, payout_method, payout_reference, contact:rental_contacts(full_name))")
+      .select("id, number, period, net_amount, commission_amount, currency, issued_at, paid_to_owner_at, invoices:rental_invoices(id, kind, cbte_tipo, pto_vta, cbte_nro, total, voided, receptor_name, share_id, environment), shares:rental_settlement_shares(id, share_pct, amount, is_primary, paid_to_owner_at, payout_method, payout_reference, contact:rental_contacts(full_name))")
       .eq("contract_id", id)
       .order("period", { ascending: false }),
     supabase.from("rental_adjustments")
@@ -86,9 +87,14 @@ export default async function ContratoPage({
       .eq("contract_id", id).order("created_at", { ascending: false }),
     supabase.from("rental_contacts").select("id, full_name, kind").order("full_name"),
   ]);
-  const { data: notices } = await supabase.from("rental_notifications")
-    .select("id, kind, status, detail, created_at, contact:rental_contacts(full_name)")
-    .eq("contract_id", id).order("created_at", { ascending: false }).limit(10);
+  const [{ data: notices }, { data: activity }] = await Promise.all([
+    supabase.from("rental_notifications")
+      .select("id, kind, status, detail, created_at, contact:rental_contacts(full_name)")
+      .eq("contract_id", id).order("created_at", { ascending: false }).limit(10),
+    supabase.from("rental_activity")
+      .select("id, at, actor_kind, action, detail, amount, currency, agent:agents(full_name), contact:rental_contacts(full_name)")
+      .eq("contract_id", id).order("at", { ascending: false }).limit(200),
+  ]);
 
   const adjustmentPreview = c.next_adjustment_date
     ? computeAdjustment(c, periodOf(c.next_adjustment_date), indexValues ?? [])
@@ -102,6 +108,7 @@ export default async function ContratoPage({
         settlements: (settlements ?? []) as unknown as ContractDetailData["settlements"],
         adjustments: (adjustments ?? []) as ContractDetailData["adjustments"],
         adjustmentPreview,
+        invoicingEnabled: afipConfig() !== null,
         parties: (parties ?? []) as unknown as ContractDetailData["parties"],
         deposit: {
           amount: deposit_amount,
@@ -114,6 +121,7 @@ export default async function ContratoPage({
         documents: (documents ?? []) as ContractDetailData["documents"],
         contacts: (contacts ?? []).map((contact) => ({ id: contact.id, label: contact.full_name, kind: contact.kind })),
         notices: (notices ?? []) as unknown as ContractDetailData["notices"],
+        activity: (activity ?? []) as unknown as ContractDetailData["activity"],
         today: ymdInAppTz(),
       }}
       initialTab={initialTab}

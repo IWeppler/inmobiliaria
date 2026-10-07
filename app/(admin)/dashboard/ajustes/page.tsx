@@ -12,6 +12,7 @@ import { RentalAlertSettings } from "@/features/dashboard/settings/RentalAlertSe
 import { RentalNoticeSettings } from "@/features/dashboard/settings/RentalNoticeSettings";
 import { getRentalAlertSettings } from "@/features/rentals/settings";
 import { ContractTemplates, type ContractTemplateRow } from "@/features/dashboard/settings/ContractTemplates";
+import { TaskRulesSettings, type TaskRuleRow } from "@/features/dashboard/settings/TaskRulesSettings";
 import { whatsappEnabled } from "@/lib/whatsapp";
 import { googleCalendarEnabled } from "@/lib/google-calendar";
 import { supabaseAdmin } from "@/lib/supabase-admin";
@@ -35,7 +36,7 @@ export default async function DashboardPage() {
       .order("match_type")
       .order("priority")
       .order("match_value"),
-    supabase.from("agents").select("id, full_name").order("full_name"),
+    supabase.from("agents").select("id, full_name, role").order("full_name"),
     supabase.from("properties").select("city").not("city", "is", null),
     supabase.from("property_types").select("name").order("name"),
     supabase.from("index_values").select("id, index_code, period, value, source, updated_at").order("period", { ascending: false }),
@@ -57,6 +58,9 @@ export default async function DashboardPage() {
   const { data: templates } = me?.role === "admin"
     ? await supabase.from("rental_contract_templates").select("id, name, body, is_default").order("name")
     : { data: null };
+  const { data: taskRules } = me?.role === "admin"
+    ? await supabase.from("task_rules").select("key, label, description, enabled, assignee_id, due_days, priority").order("sort")
+    : { data: null };
   const { data: noticeSettings } = await supabase.from("rental_settings")
     .select("notify_receipts, notify_adjustments, notify_due, notify_overdue, adjustment_notice_days, due_reminder_days, overdue_reminder_days")
     .eq("id", 1).maybeSingle();
@@ -73,7 +77,7 @@ export default async function DashboardPage() {
     <Page width="narrow">
       <PageHeader
         title="Ajustes"
-        description="Catálogos, tasa de cambio, reglas de asignación e integraciones."
+        description="Catálogos, tasa de cambio, reglas de asignación, tareas automáticas e integraciones."
       />
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <AddPropertyTypeForm />
@@ -86,6 +90,7 @@ export default async function DashboardPage() {
         cities={cities}
         propertyTypes={propertyTypes}
       />
+      {taskRules && <TaskRulesSettings rules={taskRules as TaskRuleRow[]} agents={agents ?? []} />}
       <IndexValues initial={(indexRows ?? []) as IndexValueRow[]} />
       <RentalAlertSettings initial={await getRentalAlertSettings(supabase)} />
       {noticeSettings && <RentalNoticeSettings initial={noticeSettings} whatsappConfigured={whatsappEnabled} />}

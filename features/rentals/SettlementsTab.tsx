@@ -14,15 +14,23 @@ import {
 import { collected, type LedgerCharge } from "@/features/rentals/LedgerTab";
 import { PayoutButton } from "@/features/rentals/PayoutButton";
 import { useRunAction } from "@/features/rentals/useRunAction";
+import { settlementCode } from "@/features/rentals/codes";
+import { creditInvoiceAction, issueSettlementInvoicesAction } from "@/features/rentals/invoiceActions";
+import { CBTE_LABELS, formatInvoiceNumber } from "@/features/rentals/invoicing";
 
 export type SettlementShareRow = {
   id: string; share_pct: number; amount: number; is_primary: boolean;
   paid_to_owner_at: string | null; payout_method: string | null; payout_reference: string | null;
   contact: { full_name: string } | null;
 };
+export type SettlementInvoice = {
+  id: string; kind: string; cbte_tipo: number; pto_vta: number; cbte_nro: number; total: number;
+  voided: boolean; receptor_name: string; share_id: string | null; environment: string;
+};
 export type SettlementRow = {
-  id: string; period: string; net_amount: number; currency: string; issued_at: string; paid_to_owner_at: string | null;
+  id: string; number: number; period: string; net_amount: number; commission_amount: number; currency: string; issued_at: string; paid_to_owner_at: string | null;
   shares: SettlementShareRow[];
+  invoices: SettlementInvoice[];
 };
 
 // Liquidación al propietario: solo meses completamente cobrados. Arriba se
@@ -32,10 +40,11 @@ export type SettlementRow = {
 export type OwnerMaintenance = { id: string; title: string; cost: number; resolved: boolean };
 
 export function SettlementsTab({
-  contractId, charges, settlements, commissionPct, currency, today, owners, ownerMaintenance,
+  contractId, charges, settlements, commissionPct, currency, today, owners, ownerMaintenance, invoicingEnabled,
 }: {
   contractId: string; charges: LedgerCharge[]; settlements: SettlementRow[];
   commissionPct: number; currency: string; today: string; owners: OwnerShare[]; ownerMaintenance: OwnerMaintenance[];
+  invoicingEnabled: boolean;
 }) {
   const ownerLabel = owners.length > 1 ? "los propietarios" : owners[0]?.name ?? "el propietario";
   const { busy, run } = useRunAction();
@@ -148,7 +157,7 @@ export function SettlementsTab({
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <div>
                       <p className="font-medium">{formatPeriodTitle(item.period)}</p>
-                      <p className="text-xs text-muted-foreground">Emitida {formatDate(item.issued_at)}</p>
+                      <p className="text-xs text-muted-foreground"><span className="tabular-nums">{settlementCode(item.number)}</span> · emitida {formatDate(item.issued_at)}</p>
                     </div>
                     <div className="flex items-center gap-2">
                       <span className="font-medium tabular-nums">{money(item.net_amount, item.currency)}</span>
@@ -179,12 +188,52 @@ export function SettlementsTab({
                       ))}
                     </ul>
                   )}
+                  <InvoiceStrip settlement={item} enabled={invoicingEnabled} />
                 </li>
               );
             })}
           </ul>
         )}
       </section>
+    </div>
+  );
+}
+
+// Facturas ARCA de los honorarios de la liquidación (una por titular).
+function InvoiceStrip({ settlement, enabled }: { settlement: SettlementRow; enabled: boolean }) {
+  const { busy, run } = useRunAction();
+  if (!(settlement.commission_amount > 0)) return null;
+  const active = settlement.invoices.filter((inv) => inv.kind === "FACTURA" && !inv.voided);
+  const credits = settlement.invoices.filter((inv) => inv.kind === "NOTA_CREDITO");
+  const pending = settlement.shares.filter((share) => !active.some((inv) => inv.share_id === share.id)).length;
+
+  return (
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 border-t border-border-subtle pt-2 text-xs">
+      <span className="text-muted-foreground">Honorarios {money(settlement.commission_amount, settlement.currency)}</span>
+      {[...active, ...credits].map((inv) => (
+        <span key={inv.id} className="inline-flex items-center gap-1.5">
+          <Link href={`/dashboard/alquileres/factura/${inv.id}`} target="_blank" className="font-medium underline-offset-4 hover:underline">
+            {CBTE_LABELS[inv.cbte_tipo]} {formatInvoiceNumber(inv.pto_vta, inv.cbte_nro)}
+          </Link>
+          {settlement.shares.length > 1 && <span className="text-muted-foreground">{inv.receptor_name}</span>}
+          {inv.environment === "HOMOLOGACION" && <span className="text-warning">(prueba)</span>}
+          {inv.kind === "FACTURA" && enabled && (
+            <button type="button" className="text-muted-foreground underline-offset-4 hover:text-danger hover:underline" disabled={!!busy}
+              onClick={() => window.confirm("Se emite una nota de crédito por el mismo importe. ¿Anular la factura?")
+                && run(`nc-${inv.id}`, () => creditInvoiceAction(inv.id))}>
+              {busy === `nc-${inv.id}` ? "Anulando..." : "Anular"}
+            </button>
+          )}
+        </span>
+      ))}
+      {pending > 0 && (enabled ? (
+        <Button size="sm" variant="outline" className="ml-auto h-7" disabled={!!busy}
+          onClick={() => run("invoice", () => issueSettlementInvoicesAction(settlement.id))}>
+          {busy === "invoice" && <Loader2 className="size-3.5 animate-spin" />} Facturar honorarios
+        </Button>
+      ) : (
+        <span className="ml-auto text-muted-foreground">Facturación ARCA sin configurar</span>
+      ))}
     </div>
   );
 }

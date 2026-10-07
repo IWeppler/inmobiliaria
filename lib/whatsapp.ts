@@ -108,6 +108,36 @@ export function markRead(messageId: string) {
   });
 }
 
+// Firma del webhook: Meta firma el cuerpo crudo con el App Secret
+// (X-Hub-Signature-256: sha256=<hex>). Si WHATSAPP_APP_SECRET no está
+// configurado no se puede verificar: se acepta y se avisa en el log.
+export async function verifyWebhookSignature(rawBody: string, header: string | null): Promise<boolean> {
+  const secret = process.env.WHATSAPP_APP_SECRET;
+  if (!secret) {
+    console.warn("[whatsapp] WHATSAPP_APP_SECRET sin configurar: el webhook no verifica la firma.");
+    return true;
+  }
+  if (!header?.startsWith("sha256=")) return false;
+  const { createHmac, timingSafeEqual } = await import("node:crypto");
+  const expected = Buffer.from(createHmac("sha256", secret).update(rawBody, "utf8").digest("hex"));
+  const received = Buffer.from(header.slice(7));
+  return expected.length === received.length && timingSafeEqual(expected, received);
+}
+
+// Descarga un adjunto entrante: primero se pide la URL temporal del media
+// y después el archivo, ambos con el token.
+export async function downloadMedia(mediaId: string): Promise<{ bytes: ArrayBuffer; mime: string } | null> {
+  if (!whatsappEnabled) return null;
+  const meta = await fetch(`https://graph.facebook.com/${VERSION}/${mediaId}`, {
+    headers: { Authorization: `Bearer ${TOKEN}` },
+  });
+  const info = (await meta.json().catch(() => ({}))) as { url?: string; mime_type?: string };
+  if (!meta.ok || !info.url) return null;
+  const file = await fetch(info.url, { headers: { Authorization: `Bearer ${TOKEN}` } });
+  if (!file.ok) return null;
+  return { bytes: await file.arrayBuffer(), mime: info.mime_type ?? file.headers.get("content-type") ?? "application/octet-stream" };
+}
+
 // Forma del webhook de mensajes entrantes (solo lo que usamos).
 export type InboundMessage = {
   from: string; // wa_id, E.164 sin +
@@ -115,6 +145,8 @@ export type InboundMessage = {
   timestamp: string;
   text?: string;
   profileName?: string;
+  // Imagen o documento adjunto (el texto que lo acompaña va en `text`).
+  media?: { id: string; mime: string; filename?: string };
 };
 
 export function parseInbound(payload: unknown): InboundMessage[] {
@@ -133,14 +165,18 @@ export function parseInbound(payload: unknown): InboundMessage[] {
         timestamp: string;
         type: string;
         text?: { body: string };
+        image?: { id: string; mime_type: string; caption?: string };
+        document?: { id: string; mime_type: string; caption?: string; filename?: string };
       }[];
       for (const m of messages) {
+        const attachment = m.type === "image" ? m.image : m.type === "document" ? m.document : undefined;
         out.push({
           from: m.from,
           id: m.id,
           timestamp: m.timestamp,
-          text: m.type === "text" ? m.text?.body : undefined,
+          text: m.type === "text" ? m.text?.body : attachment?.caption,
           profileName: contacts.find((c) => c.wa_id === m.from)?.profile?.name,
+          media: attachment ? { id: attachment.id, mime: attachment.mime_type, filename: m.document?.filename } : undefined,
         });
       }
     }

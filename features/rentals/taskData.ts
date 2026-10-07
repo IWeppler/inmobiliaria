@@ -50,6 +50,9 @@ export async function buildRentalTasks(
     supabase.from("index_values").select("period").eq("index_code", "CASA_PROPIA"),
     supabase.from("rental_task_snoozes").select("task_key").gt("snoozed_until", today),
   ]);
+  const { data: inboxRaw } = await supabase.from("rental_inbox")
+    .select("id, contract_id, kind, ai_summary, ai_data, received_at, contact:rental_contacts(full_name)")
+    .eq("status", "PENDIENTE").not("contract_id", "is", null);
 
   const contracts = (contractsRaw ?? []) as unknown as Contract[];
   const byId = new Map(contracts.map((c) => [c.id, c]));
@@ -297,6 +300,29 @@ export async function buildRentalTasks(
       title: `Publicar ${title(contract)}: vacante hace ${days} días`,
       detail: `Terminó el contrato de ${contract.tenant?.full_name ?? "el inquilino"} el ${formatDate(contract.end_date)} y la propiedad no está publicada.`,
       contractId: contract.id, actions: [vacancyLink],
+    });
+  }
+
+  // --- Mensajes de WhatsApp para confirmar (E4.18) ---
+  for (const msg of inboxRaw ?? []) {
+    const contract = byId.get(msg.contract_id!);
+    const who = (msg.contact as unknown as { full_name: string } | null)?.full_name ?? "Contacto";
+    const payment = (msg.ai_data as { payment?: { amount?: number | null } } | null)?.payment;
+    const hours = Math.max(0, Math.round((Date.now() - new Date(msg.received_at).getTime()) / 3_600_000));
+    const titles: Record<string, string> = {
+      COMPROBANTE: `Confirmar el pago de ${who}${payment?.amount ? `: ${money(payment.amount, contract?.currency ?? "ARS")}` : ""}`,
+      RECLAMO: `Reclamo de ${who}`,
+      CONSULTA: `Responder a ${who}`,
+    };
+    tasks.push({
+      key: `MENSAJE:${msg.id}`,
+      category: "mensajes",
+      urgency: msg.kind === "COMPROBANTE" || msg.kind === "RECLAMO" || hours > 24 ? "alta" : "media",
+      score: 90 + Math.min(hours, 48),
+      title: titles[msg.kind] ?? `Mensaje de ${who}`,
+      detail: `${title(contract)} · ${msg.ai_summary ?? "por WhatsApp"} · hace ${hours < 1 ? "menos de 1 hora" : `${hours} h`}`,
+      contractId: msg.contract_id!,
+      actions: [{ type: "link", label: "Ver mensaje", href: "/dashboard/alquileres/mensajes" }],
     });
   }
 

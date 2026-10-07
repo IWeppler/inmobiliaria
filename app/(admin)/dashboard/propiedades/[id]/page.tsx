@@ -33,6 +33,9 @@ import { PropertyFunnelCard } from "@/features/dashboard/property/PropertyFunnel
 import type { Period } from "@/features/dashboard/property/performance";
 import { getPropertyOwners } from "@/features/rentals/propertyOwners";
 import { PropertyOwnersCard } from "@/features/rentals/PropertyOwnersCard";
+import { VisitFeedbackCard } from "@/features/dashboard/property/VisitFeedbackCard";
+import { ymdInAppTz } from "@/lib/dates";
+import { EntityTasksCard } from "@/features/tasks/EntityTasksCard";
 
 export const metadata: Metadata = { title: "Propiedad" };
 
@@ -65,7 +68,7 @@ export default async function PropertyDetailPage({
     .single();
   if (!property) notFound();
 
-  const [{ data: leads }, { data: events }, { data: history }, { data: contracts }, ownersByProperty, { data: ownerContacts }] =
+  const [{ data: leads }, { data: events }, { data: history }, { data: contracts }, ownersByProperty, { data: ownerContacts }, { data: me }] =
     await Promise.all([
       supabase
         .from("leads")
@@ -74,7 +77,7 @@ export default async function PropertyDetailPage({
         .order("created_at", { ascending: false }),
       supabase
         .from("events")
-        .select("id, title, date, time, type, lead_id, created_at")
+        .select("id, title, date, time, type, lead_id, created_at, outcome, outcome_note")
         .eq("property_id", id)
         .order("date", { ascending: false }),
       supabase
@@ -90,7 +93,13 @@ export default async function PropertyDetailPage({
         .order("start_date", { ascending: false }),
       getPropertyOwners(supabase, [id]),
       supabase.from("rental_contacts").select("id, full_name").eq("kind", "owner").order("full_name"),
+      supabase.from("agents").select("role").eq("id", user.id).maybeSingle(),
     ]);
+
+  // Devoluciones: visitas con resultado cargado (más recientes primero).
+  const visitFeedback = (events ?? [])
+    .filter((e) => e.type === "visita" && e.outcome)
+    .map((e) => ({ id: e.id, day: ymdInAppTz(new Date(e.date)), outcome: e.outcome!, note: e.outcome_note }));
 
   const meta = propertyStatusMeta(property.status);
   const price = formatPrice(property.price, property.currency);
@@ -268,14 +277,25 @@ export default async function PropertyDetailPage({
 
         {/* Columna lateral: relaciones */}
         <div className="flex flex-col gap-6">
+          <EntityTasksCard
+            supabase={supabase}
+            userId={user.id}
+            isAdmin={me?.role === "admin"}
+            entity={{ property_id: property.id, label: property.title }}
+          />
+
           <PropertyOwnersCard
             propertyId={property.id}
             owners={ownersByProperty[property.id] ?? []}
             contacts={(ownerContacts ?? []).map((c) => ({ id: c.id, label: c.full_name }))}
           />
 
+          <VisitFeedbackCard visits={visitFeedback} />
+
           {property.status !== "VENDIDO" && property.status !== "ALQUILADO" && (
-            <PropertyBuyersCard supabase={supabase} property={property} />
+            <div id="compradores" className="scroll-mt-20">
+              <PropertyBuyersCard supabase={supabase} property={property} />
+            </div>
           )}
 
           <Card>

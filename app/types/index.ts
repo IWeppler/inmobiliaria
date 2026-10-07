@@ -13,6 +13,11 @@ export type LeadWithDetails = LeadRow & {
     id: string;
     title: string;
     operation_type?: string | null;
+    // Solo en el detalle del lead (postventa y cierre de venta).
+    price?: number | null;
+    currency?: string | null;
+    status?: string | null;
+    agent_id?: string | null;
   } | null;
 
   agents: {

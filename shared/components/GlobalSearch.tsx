@@ -2,18 +2,19 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Building2, FileText, Inbox, Search } from "lucide-react";
+import { Building2, FileText, Hash, Inbox, Search, Zap } from "lucide-react";
 import { createClientBrowser } from "@/lib/supabase-browser";
 import { Dialog, DialogContent, DialogTitle } from "@/shared/components/ui/dialog";
 import { SidebarMenuButton } from "@/shared/components/ui/sidebar";
 import { StatusBadge } from "@/shared/components/StatusBadge";
 import { propertyStatusMeta, formatPrice } from "@/features/dashboard/property/propertyStatus";
 import { statusMeta } from "@/features/dashboard/leads/leadStatus";
-import { CONTRACT_STATUS_LABELS, CONTRACT_STATUS_TONE } from "@/features/rentals/logic";
+import { CONTRACT_STATUS_LABELS, CONTRACT_STATUS_TONE, formatPeriod, money } from "@/features/rentals/logic";
+import { contractCode, parseCode, receiptCode, settlementCode } from "@/features/rentals/codes";
 import { cn } from "@/lib/utils";
 
 type Result = {
-  kind: "property" | "lead" | "contract";
+  kind: "action" | "code" | "property" | "lead" | "contract";
   id: string;
   title: string;
   subtitle?: string;
@@ -22,18 +23,87 @@ type Result = {
 };
 
 const GROUPS: { kind: Result["kind"]; label: string; icon: typeof Search }[] = [
+  { kind: "code", label: "Por número", icon: Hash },
+  { kind: "action", label: "Acciones", icon: Zap },
   { kind: "property", label: "Propiedades", icon: Building2 },
   { kind: "lead", label: "Leads", icon: Inbox },
   { kind: "contract", label: "Contratos", icon: FileText },
 ];
 
+// Atajos: lo que se hace a diario, a dos teclas. `words` amplía la búsqueda.
+const ACTIONS: (Result & { words: string })[] = [
+  { kind: "action", id: "hoy", title: "Ir a Hoy", subtitle: "Lo que hay que hacer hoy", href: "/dashboard/hoy", words: "tareas pendientes bandeja" },
+  { kind: "action", id: "lead", title: "Nuevo lead", subtitle: "Cargar una consulta o un cliente", href: "/dashboard/leads?nuevo=1", words: "cliente consulta comprador crear alta" },
+  { kind: "action", id: "propiedad", title: "Nueva propiedad", subtitle: "Publicar en venta o alquiler", href: "/dashboard/propiedades/nueva", words: "publicar crear alta inmueble" },
+  { kind: "action", id: "captacion", title: "Nueva captación", subtitle: "Un propietario que quiere vender o alquilar", href: "/dashboard/captaciones?nueva=1", words: "propietario tasacion autorizacion captar dueño" },
+  { kind: "action", id: "operaciones", title: "Operaciones en curso", subtitle: "Reservas, boletos y escrituras", href: "/dashboard/operaciones", words: "reserva boleto escritura postventa credito" },
+  { kind: "action", id: "visita", title: "Agendar en el calendario", subtitle: "Visitas y eventos", href: "/dashboard/calendario", words: "visita evento reunion agenda" },
+  { kind: "action", id: "contrato", title: "Nuevo contrato de alquiler", subtitle: "A mano o leyendo el PDF firmado", href: "/dashboard/alquileres/nuevo", words: "alquiler contrato pdf cargar inquilino" },
+  { kind: "action", id: "conciliacion", title: "Conciliar extracto bancario", subtitle: "Emparejar transferencias con deudas", href: "/dashboard/alquileres/conciliacion", words: "banco extracto transferencias cobros" },
+  { kind: "action", id: "mensajes", title: "Mensajes de alquileres", subtitle: "Comprobantes y reclamos para confirmar", href: "/dashboard/alquileres/mensajes", words: "whatsapp comprobante reclamo portal" },
+  { kind: "action", id: "demanda", title: "Compradores sin oferta", subtitle: "Demanda que no encuentra propiedad", href: "/dashboard/leads?vista=demanda", words: "demanda buscan compradores" },
+];
+
+const normalize = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+
+function matchActions(raw: string) {
+  const q = normalize(raw.trim());
+  if (!q) return ACTIONS;
+  return ACTIONS.filter((a) => normalize(`${a.title} ${a.subtitle} ${a.words}`).includes(q));
+}
+
+type Browser = ReturnType<typeof createClientBrowser>;
+
+// Un resultado por código: el contrato, el recibo (dentro de su contrato) o
+// la liquidación. RLS decide si el usuario lo puede ver.
+async function findByCode(supabase: Browser, code: NonNullable<ReturnType<typeof parseCode>>): Promise<Result[]> {
+  if (code.kind === "contrato") {
+    const { data } = await supabase.from("rental_contracts")
+      .select("id, number, status, property:properties(title), tenant:rental_contacts!rental_contracts_tenant_id_fkey(full_name)")
+      .eq("number", code.number).maybeSingle();
+    if (!data) return [];
+    const prop = data.property as unknown as { title: string } | null;
+    const tenant = data.tenant as unknown as { full_name: string } | null;
+    return [{
+      kind: "code", id: data.id, title: `${contractCode(data.number)} · ${prop?.title ?? "Contrato"}`, subtitle: tenant?.full_name,
+      badge: <StatusBadge tone={CONTRACT_STATUS_TONE[data.status] ?? "neutral"}>{CONTRACT_STATUS_LABELS[data.status] ?? data.status}</StatusBadge>,
+      href: `/dashboard/alquileres/${data.id}`,
+    }];
+  }
+  if (code.kind === "recibo") {
+    const { data } = await supabase.from("rental_payment_entries")
+      .select("id, receipt_number, amount, paid_at, charge:rental_charges(contract_id, description, currency, contract:rental_contracts(property:properties(title)))")
+      .eq("receipt_number", code.number).maybeSingle();
+    const charge = data?.charge as unknown as { contract_id: string; description: string; currency: string; contract: { property: { title: string } | null } | null } | null;
+    if (!data || !charge) return [];
+    return [{
+      kind: "code", id: data.id, title: `Recibo ${receiptCode(data.receipt_number)} · ${charge.description}`,
+      subtitle: charge.contract?.property?.title,
+      badge: <span className="text-xs tabular-nums text-muted-foreground">{money(data.amount, charge.currency)}</span>,
+      href: `/dashboard/alquileres/${charge.contract_id}/recibo/${data.id}`,
+    }];
+  }
+  const { data } = await supabase.from("rental_settlements")
+    .select("id, number, period, contract_id, net_amount, currency, contract:rental_contracts(property:properties(title))")
+    .eq("number", code.number).maybeSingle();
+  if (!data) return [];
+  const contract = data.contract as unknown as { property: { title: string } | null } | null;
+  return [{
+    kind: "code", id: data.id, title: `Liquidación ${settlementCode(data.number)} · ${formatPeriod(data.period)}`,
+    subtitle: contract?.property?.title,
+    badge: <span className="text-xs tabular-nums text-muted-foreground">{money(data.net_amount, data.currency)}</span>,
+    href: `/dashboard/alquileres/${data.contract_id}/liquidacion/${data.id}`,
+  }];
+}
+
 function escapeLike(q: string) {
   return q.replace(/[%_,]/g, " ").trim();
 }
 
-// Búsqueda global: un solo campo para propiedades, leads y contratos.
-// Se abre con ⌘K / Ctrl+K; navegación con flechas y Enter. Las queries
-// pasan por RLS, así que cada usuario ve lo que ya podía ver.
+// Búsqueda global y acciones rápidas: un solo campo para propiedades,
+// leads, contratos y atajos ("nuevo lead", "conciliar extracto"...). Se
+// abre con ⌘K / Ctrl+K; navegación con flechas y Enter. Las queries pasan
+// por RLS, así que cada usuario ve lo que ya podía ver.
 export function GlobalSearch() {
   const router = useRouter();
   const supabase = createClientBrowser();
@@ -66,6 +136,15 @@ export function GlobalSearch() {
 
   const search = useCallback(
     async (raw: string) => {
+      // Código legible (ALQ-12, R-62, LIQ-7): va directo al documento.
+      const code = parseCode(raw);
+      if (code) {
+        setLoading(true);
+        setResults(await findByCode(supabase, code));
+        setActive(0);
+        setLoading(false);
+        return;
+      }
       const q = escapeLike(raw);
       if (q.length < 2) {
         setResults([]);
@@ -86,7 +165,7 @@ export function GlobalSearch() {
           .limit(5),
         supabase
           .from("rental_contracts")
-          .select("id, status, properties!inner(title), tenant:rental_contacts!rental_contracts_tenant_id_fkey(full_name)")
+          .select("id, number, status, properties!inner(title), tenant:rental_contacts!rental_contracts_tenant_id_fkey(full_name)")
           .ilike("properties.title", like)
           .limit(4),
       ]);
@@ -129,7 +208,7 @@ export function GlobalSearch() {
           kind: "contract",
           id: c.id,
           title: prop?.title ?? "Contrato",
-          subtitle: tenant?.full_name,
+          subtitle: [contractCode(c.number), tenant?.full_name].filter(Boolean).join(" · "),
           badge: (
             <StatusBadge tone={CONTRACT_STATUS_TONE[c.status] ?? "neutral"}>
               {CONTRACT_STATUS_LABELS[c.status] ?? c.status}
@@ -152,9 +231,13 @@ export function GlobalSearch() {
     return () => clearTimeout(t);
   }, [query, open, search]);
 
+  // Las acciones salen sin consultar la base: con el campo vacío se ven
+  // todas; al escribir se filtran junto con los resultados.
+  const actions = useMemo(() => matchActions(query), [query]);
   const grouped = useMemo(
-    () => GROUPS.map((g) => ({ ...g, items: results.filter((r) => r.kind === g.kind) })).filter((g) => g.items.length > 0),
-    [results],
+    () => GROUPS.map((g) => ({ ...g, items: g.kind === "action" ? actions : results.filter((r) => r.kind === g.kind) }))
+      .filter((g) => g.items.length > 0),
+    [results, actions],
   );
   const flat = useMemo(() => grouped.flatMap((g) => g.items), [grouped]);
 
@@ -219,7 +302,7 @@ export function GlobalSearch() {
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               onKeyDown={onKeyDown}
-              placeholder="Propiedad, lead, contrato…"
+              placeholder="Buscar o hacer algo: propiedad, lead, ALQ-0012, R-0062…"
               className="h-full flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
               role="combobox"
               aria-expanded={flat.length > 0}
@@ -232,11 +315,7 @@ export function GlobalSearch() {
           </div>
 
           <div id="global-search-results" role="listbox" className="max-h-[60vh] overflow-y-auto py-1">
-            {query.trim().length < 2 ? (
-              <p className="px-3 py-6 text-center text-sm text-muted-foreground">
-                Escribí al menos dos letras.
-              </p>
-            ) : flat.length === 0 && !loading ? (
+            {flat.length === 0 && !loading && query.trim().length >= 2 ? (
               <p className="px-3 py-6 text-center text-sm text-muted-foreground">
                 Sin resultados para &ldquo;{query.trim()}&rdquo;.
               </p>

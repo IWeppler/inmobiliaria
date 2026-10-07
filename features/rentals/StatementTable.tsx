@@ -38,7 +38,9 @@ export function StatementTable({ statement, increaseLabel, decreaseLabel, balanc
             <tr key={row.id} className="border-b border-border-subtle align-top">
               <td className="whitespace-nowrap py-2 pr-3 tabular-nums text-muted-foreground">{formatDate(row.date)}</td>
               <td className="py-2 pr-3">
-                {row.href ? <Link href={row.href} className="hover:underline print:no-underline">{row.description}</Link> : row.description}
+                {row.href && row.pdf ? (
+                  <a href={row.href} target="_blank" rel="noopener noreferrer" className="underline-offset-4 hover:underline print:no-underline">{row.description}</a>
+                ) : row.href ? <Link href={row.href} className="hover:underline print:no-underline">{row.description}</Link> : row.description}
                 {row.detail && <span className="block text-xs text-muted-foreground">{row.detail}</span>}
               </td>
               <td className="py-2 pr-3 text-right tabular-nums">{row.increase ? money(row.increase, currency) : ""}</td>

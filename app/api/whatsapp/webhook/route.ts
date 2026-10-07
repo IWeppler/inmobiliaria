@@ -1,16 +1,22 @@
-import { NextRequest } from "next/server";
+import { after, NextRequest } from "next/server";
 import { supabaseAdmin, nextAgentForLead } from "@/lib/supabase-admin";
 import {
   markRead,
   parseInbound,
+  verifyWebhookSignature,
   whatsappEnabled,
 } from "@/lib/whatsapp";
+import { findRentalContact, intakeRentalMessage, processInboxItem } from "@/features/rentals/inboxIntake";
+
+// La clasificación con IA corre después de responder (after) y puede tardar.
+export const maxDuration = 60;
 
 // E3.3 / E3.4 — Webhook de WhatsApp Business.
 //   GET  -> verificación del webhook (Meta manda hub.challenge)
-//   POST -> mensajes entrantes: se registran como nota en el lead (se crea
-//           el lead si el teléfono no existe) y, si el agente IA está
-//           activo, se responde.
+//   POST -> mensajes entrantes. De inquilinos / propietarios: bandeja de
+//           Mensajes de alquileres (E4.18). Del resto: nota en el lead (se
+//           crea el lead si el teléfono no existe).
+// Seguridad: con WHATSAPP_APP_SECRET se verifica la firma de Meta.
 // Configurar en Meta: URL = <site>/api/whatsapp/webhook, campo "messages".
 const VERIFY_TOKEN = process.env.WHATSAPP_VERIFY_TOKEN;
 
@@ -73,15 +79,30 @@ async function notifyAgent(agentId: string | null, leadId: string, title: string
 }
 
 export async function POST(req: Request) {
-  const payload = await req.json().catch(() => null);
+  // La firma se calcula sobre el cuerpo crudo: se lee como texto antes de parsear.
+  const raw = await req.text();
+  if (!(await verifyWebhookSignature(raw, req.headers.get("x-hub-signature-256")))) {
+    return new Response("Invalid signature", { status: 401 });
+  }
+  let payload: unknown = null;
+  try { payload = JSON.parse(raw); } catch { /* cuerpo inválido */ }
   const inbound = parseInbound(payload);
   // Meta reintenta si no respondemos 200 rápido: se responde siempre 200
   // y se procesa lo que se pueda.
   if (inbound.length === 0) return new Response("ok");
 
   for (const msg of inbound) {
-    if (!msg.text) continue; // audio/imagen/etc.: por ahora no se procesan
+    if (!msg.text && !msg.media) continue; // audio, ubicación, stickers: no se procesan
     try {
+      // Inquilinos y propietarios: bandeja de Mensajes de alquileres, con
+      // clasificación por IA después de responder a Meta.
+      const rental = await findRentalContact(msg.from);
+      if (rental) {
+        const inboxId = await intakeRentalMessage(msg, rental);
+        if (inboxId) after(() => processInboxItem(inboxId, msg.media?.id).catch((e) => console.error("[inbox] IA", e)));
+        continue;
+      }
+      if (!msg.text) continue; // adjuntos de números desconocidos: no se procesan
       const { lead, created } = await findOrCreateLead(msg.from, msg.profileName);
       if (!lead) continue;
 

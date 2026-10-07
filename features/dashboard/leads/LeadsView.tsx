@@ -51,13 +51,15 @@ type LeadsViewProps = {
   /** Demanda sin oferta de toda la base (Buyer Intelligence). */
   demandGaps: DemandGap[];
   propertyTypes: { id: number; name: string | null }[];
+  /** Abre el alta de lead al entrar (?nuevo=1, desde el buscador). */
+  initialCreateOpen?: boolean;
 };
 
 // E1.1: /dashboard/leads con dos vistas sobre los mismos datos: Tablero
 // (Kanban, default) y Lista (tabla). El alta de lead vive acá, común a
 // ambas.
-export function LeadsView({ leads, userRole, initialStatus, initialView = "board", demandGaps, propertyTypes }: LeadsViewProps) {
-  const [isModalOpen, setIsModalOpen] = useState(false);
+export function LeadsView({ leads, userRole, initialStatus, initialView = "board", demandGaps, propertyTypes, initialCreateOpen = false }: LeadsViewProps) {
+  const [isModalOpen, setIsModalOpen] = useState(initialCreateOpen);
   const [activeView, setActiveView] = useState<string>(initialView);
   const [leadUpdates, setLeadUpdates] = useState<Record<string, { status: LeadStatus; changedAt: string }>>({});
   const isAdmin = userRole === "admin";

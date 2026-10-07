@@ -1,3 +1,4 @@
+import { receiptCode } from "@/features/rentals/codes";
 import "server-only";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { addDays, ymdInAppTz } from "@/lib/dates";
@@ -83,7 +84,7 @@ export async function notifyReceipt(entryId: string) {
     kind: "RECIBO", reference: row.id, contractId: row.charge.contract_id, contact: tenant,
     params: [
       tenant?.full_name ?? "", money(row.amount, row.charge.currency), row.charge.description,
-      row.charge.contract?.property?.title ?? "tu alquiler", String(row.receipt_number),
+      row.charge.contract?.property?.title ?? "tu alquiler", receiptCode(row.receipt_number),
     ],
   });
 }

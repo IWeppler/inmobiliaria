@@ -47,6 +47,8 @@ async function getDashboardData() {
     .eq("id", user.id)
     .single();
 
+  // Administración no vende: su portada es la bandeja Hoy.
+  if (agent?.role === "administracion") redirect("/dashboard/hoy");
   const isAdmin = agent?.role === "admin";
   const now = new Date();
   const today = ymdInAppTz(now);

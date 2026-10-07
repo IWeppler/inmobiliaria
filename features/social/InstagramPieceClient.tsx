@@ -20,6 +20,7 @@ import {
   type ShowKey,
   type Theme,
 } from "@/features/social/propertyCard";
+import { completeRuleTaskAction } from "@/features/tasks/actions";
 
 const FORMATS = [
   // maxW: mantiene cada formato legible sin dejar demasiado espacio vacío.
@@ -470,7 +471,12 @@ export function InstagramPieceClient({
                   {copied ? <Check /> : <Link2 />} Copiar link
                 </Button>
                 <Button asChild>
-                  <a href={`${imageUrl}&download=1`}><Download /> Descargar PNG</a>
+                  {/* Descargar la pieza cierra la tarea "Pieza de Instagram" del motor. */}
+                  <a href={`${imageUrl}&download=1`} onClick={() => {
+                    void completeRuleTaskAction({ property_id: propertyId, rule: "PROP_INSTAGRAM" })
+                      .then((r) => { if (r.success && r.message) toast.success(r.message); })
+                      .catch(() => {});
+                  }}><Download /> Descargar PNG</a>
                 </Button>
               </div>
             )}

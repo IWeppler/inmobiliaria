@@ -29,6 +29,7 @@ export async function snoozeTaskAction(input: z.input<typeof snoozeSchema>): Pro
   }, { onConflict: "task_key" });
   if (error) return { success: false, message: error.message };
   revalidatePath("/dashboard/alquileres/hoy");
+  revalidatePath("/dashboard/hoy");
   return { success: true, message: days === 1 ? "Pospuesta hasta mañana." : `Pospuesta ${days} días.` };
 }
 
@@ -39,5 +40,6 @@ export async function clearSnoozesAction(): Promise<ActionResult> {
   const { error } = await supabase.from("rental_task_snoozes").delete().gt("snoozed_until", ymdInAppTz());
   if (error) return { success: false, message: error.message };
   revalidatePath("/dashboard/alquileres/hoy");
+  revalidatePath("/dashboard/hoy");
   return { success: true, message: "Se muestran de nuevo las tareas pospuestas." };
 }

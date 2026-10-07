@@ -1,21 +1,24 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { AlertTriangle, Banknote, CalendarClock, Plus, TrendingUp, Upload, Wrench } from "lucide-react";
+import { AlertTriangle, Banknote, CalendarClock, Hand, Plus, TrendingUp, Upload, Wrench } from "lucide-react";
 import { createClientServer } from "@/lib/supabase";
-import { ymdInAppTz } from "@/lib/dates";
+import { addDays, ymdInAppTz } from "@/lib/dates";
 import { Button } from "@/shared/components/ui/button";
 import { Page, PageHeader } from "@/shared/components/PageShell";
 import {
-  ADJUSTMENT_LABELS, daysBetween, formatDate, money, periodOf,
+  ADJUSTMENT_LABELS, addMonths, daysBetween, formatDate, money, periodOf,
   type AdjustmentIndex,
 } from "@/features/rentals/logic";
+import { DUE_SOON_DAYS, portfolioKpis } from "@/features/rentals/portfolioKpis";
+import { CollectionChart } from "@/features/dashboard/charts/CollectionChart";
+import { buildCollectionSeries } from "@/features/dashboard/charts/collection";
 import { RentalsNav } from "@/features/rentals/RentalsNav";
 import { Stat, StatStrip } from "@/features/rentals/StatStrip";
 import { ContractsTable, type ContractListRow } from "@/features/rentals/ContractsTable";
 import { getRentalAlertSettings } from "@/features/rentals/settings";
 
 type ContractRow = {
-  id: string; status: string; end_date: string; rent_amount: number; currency: string;
+  id: string; number: number; property_id: string; status: string; end_date: string; rent_amount: number; currency: string;
   next_adjustment_date: string | null; adjustment_index: string; renewed_from_id: string | null;
   properties: { title: string } | null;
   owner: { full_name: string } | null;
@@ -27,12 +30,16 @@ type ChargeRow = {
 };
 
 const GROUP_LIMIT = 4;
+const CHART_MONTHS = 6;
 
 function totalsByCurrency(items: { amount: number; currency: string }[]) {
   const totals = new Map<string, number>();
   for (const item of items) totals.set(item.currency, (totals.get(item.currency) ?? 0) + item.amount);
   return [...totals.entries()].map(([currency, amount]) => money(amount, currency)).join(" + ");
 }
+
+const sumMap = (map: Map<string, number>) =>
+  [...map].filter(([, amount]) => amount > 0).map(([currency, amount]) => money(amount, currency)).join(" + ");
 
 // /dashboard/alquileres: indicadores, lo que requiere acción y la cartera de
 // contratos. RLS: agente ve los suyos, admin todos.
@@ -49,21 +56,25 @@ export default async function AlquileresPage() {
 
   const today = ymdInAppTz();
   const thisPeriod = periodOf(today);
+  const chartPeriods = Array.from({ length: CHART_MONTHS }, (_, i) => addMonths(thisPeriod, i - (CHART_MONTHS - 1)));
 
   const [
-    { data: contractsRaw }, { data: chargesRaw }, { data: isAdmin },
+    { data: contractsRaw }, { data: chargesRaw }, { data: isAdmin }, { data: isBackOffice },
     { data: openMaintenance }, { data: unpaidSettlements },
+    { data: rentalProperties }, { data: toVerifyRaw }, { data: rate },
   ] = await Promise.all([
     supabase
       .from("rental_contracts")
-      .select("id, status, end_date, rent_amount, currency, next_adjustment_date, adjustment_index, renewed_from_id, properties(title), owner:rental_contacts!rental_contracts_owner_id_fkey(full_name), tenant:rental_contacts!rental_contracts_tenant_id_fkey(full_name)")
+      .select("id, number, property_id, status, end_date, rent_amount, currency, next_adjustment_date, adjustment_index, renewed_from_id, properties(title), owner:rental_contacts!rental_contracts_owner_id_fkey(full_name), tenant:rental_contacts!rental_contracts_tenant_id_fkey(full_name)")
       .order("end_date"),
-    // Vencidos (para la mora) y los del mes en curso (para la cobranza).
+    // Vencidos y por vencer en 7 días (mora y próximos cobros) y los de los
+    // últimos meses (cobranza del período y su evolución).
     supabase
       .from("rental_charges")
       .select("contract_id, period, due_date, kind, amount, currency, rental_payment_entries(amount)")
-      .or(`due_date.lt.${today},period.eq.${thisPeriod}`),
+      .or(`due_date.lte.${addDays(today, DUE_SOON_DAYS)},period.gte.${chartPeriods[0]}`),
     supabase.rpc("is_admin"),
+    supabase.rpc("is_back_office"),
     supabase
       .from("rental_maintenance")
       .select("id, contract_id, title, priority, reported_at")
@@ -71,6 +82,11 @@ export default async function AlquileresPage() {
       .order("reported_at"),
     // Partes sin pagar: con co-propietarios una liquidación puede estar pagada a medias.
     supabase.from("rental_settlement_shares").select("id, amount, settlement:rental_settlements(currency)").is("paid_to_owner_at", null),
+    // Ocupación: las propiedades de alquiler (las vendidas ya no cuentan).
+    supabase.from("properties").select("id, status, agent_id").ilike("operation_type", "alquiler").neq("status", "VENDIDO"),
+    // Pagos informados que esperan que alguien del equipo los confirme.
+    supabase.from("rental_inbox").select("id, ai_data, contract:rental_contracts(currency)").eq("status", "PENDIENTE").eq("kind", "COMPROBANTE"),
+    supabase.from("exchange_rates").select("usd_to_ars").eq("id", 1).maybeSingle(),
   ]);
 
   const contracts = (contractsRaw ?? []) as unknown as ContractRow[];
@@ -92,17 +108,17 @@ export default async function AlquileresPage() {
   const monthRent = charges.filter((charge) => charge.period === thisPeriod && charge.kind === "ALQUILER");
   const monthPaid = monthRent.filter((charge) => charge.balance <= 0.005).length;
   const expiring = active.filter((c) => !renewedIds.has(c.id) && daysBetween(today, c.end_date) <= alerts.expiryAlertDays);
-  const adjusting = active.filter((c) => c.next_adjustment_date && daysBetween(today, c.next_adjustment_date) <= alerts.adjustmentAlertDays)
-    .sort((a, b) => (a.next_adjustment_date ?? "").localeCompare(b.next_adjustment_date ?? ""));
   // El cron aplica solo los ajustes con índice cargado: los que siguen acá
   // con fecha pasada esperan el valor del índice o un monto manual.
-  const adjustDue = adjusting.filter((c) => c.next_adjustment_date! <= today);
+  const adjusting = active.filter((c) => c.next_adjustment_date && daysBetween(today, c.next_adjustment_date) <= alerts.adjustmentAlertDays)
+    .sort((a, b) => (a.next_adjustment_date ?? "").localeCompare(b.next_adjustment_date ?? ""));
   const maintenance = openMaintenance ?? [];
   const pendingPayouts = ((unpaidSettlements ?? []) as unknown as { id: string; amount: number; settlement: { currency: string } | null }[])
     .map((share) => ({ amount: share.amount, currency: share.settlement?.currency ?? "ARS" }));
 
   const rows: ContractListRow[] = contracts.map((c) => ({
     id: c.id,
+    number: c.number,
     status: c.status,
     propertyTitle: c.properties?.title ?? "Propiedad sin título",
     tenantName: c.tenant?.full_name ?? null,
@@ -116,7 +132,24 @@ export default async function AlquileresPage() {
     renewed: renewedIds.has(c.id),
   }));
 
-  const hasActions = overdue.length + adjusting.length + expiring.length + maintenance.length + pendingPayouts.length > 0;
+  // Ocupación sobre la cartera visible: admin, toda; agente, las propiedades
+  // a su cargo o con un contrato suyo. Ocupada = con contrato activo.
+  const occupiedProps = new Set(active.map((c) => c.property_id));
+  const ownContractProps = new Set(contracts.map((c) => c.property_id));
+  const rentable = (rentalProperties ?? []).filter((p) => isBackOffice || p.agent_id === user.id || ownContractProps.has(p.id));
+  const toVerify = (toVerifyRaw ?? []).map((i) => ({
+    amount: Number((i.ai_data as { payment?: { amount?: number | null } } | null)?.payment?.amount) || null,
+    currency: (i.contract as unknown as { currency: string } | null)?.currency ?? "ARS",
+  }));
+  const usdToArs = Number(rate?.usd_to_ars ?? 0);
+  const kpis = portfolioKpis({
+    charges: charges.map((c) => ({ ...c, paid: c.amount - c.balance })),
+    today, period: thisPeriod, usdToArs, toVerify,
+    occupancy: { rentable: rentable.length, occupied: rentable.filter((p) => occupiedProps.has(p.id)).length },
+  });
+  const collection = buildCollectionSeries(charges, chartPeriods, today, usdToArs);
+
+  const hasActions = toVerify.length + overdue.length + adjusting.length + expiring.length + maintenance.length + pendingPayouts.length > 0;
 
   return (
     <Page>
@@ -130,38 +163,75 @@ export default async function AlquileresPage() {
       />
       <RentalsNav />
 
+      {/* Indicadores de cartera: plata del período, no cantidad de cuotas. */}
       <StatStrip>
         <Stat
-          label="Cobranza del mes"
-          value={monthRent.length ? `${monthPaid} de ${monthRent.length}` : "Sin cuotas"}
-          detail={monthRent.length ? `${Math.round((monthPaid / monthRent.length) * 100)} % de los alquileres cobrados` : "No hay alquileres este mes"}
+          label="Cobranza del período"
+          value={kpis.period.rate !== null ? `${kpis.period.rate} %` : "Sin cargos"}
+          detail={kpis.period.rate !== null
+            ? `${sumMap(kpis.period.collected) || money(0, "ARS")} cobrado de ${sumMap(kpis.period.issued)} · ${monthPaid} de ${monthRent.length} alquileres`
+            : "No hay cargos este mes"}
         />
         <Stat
           label="Deuda vencida"
-          value={overdue.length ? totalsByCurrency(overdue.map((c) => ({ amount: c.balance, currency: c.currency }))) : "Al día"}
-          tone={overdue.length ? "danger" : undefined}
-          detail={overdue.length ? `${overdueByContract.size} ${overdueByContract.size === 1 ? "contrato" : "contratos"} en mora` : "Ningún contrato en mora"}
+          value={kpis.overdue.contracts ? sumMap(kpis.overdue.amounts) : "Al día"}
+          tone={kpis.overdue.contracts ? "danger" : undefined}
+          detail={kpis.overdue.contracts
+            ? `${kpis.overdue.contracts} ${kpis.overdue.contracts === 1 ? "contrato" : "contratos"} en mora`
+            : "Sin obligaciones vencidas"}
         />
         <Stat
-          label={`Ajustes en ${alerts.adjustmentAlertDays} días`}
-          value={adjusting.length}
-          tone={adjustDue.length ? "warning" : adjusting.length ? "info" : undefined}
-          detail={adjustDue.length
-            ? `${adjustDue.length} ${adjustDue.length === 1 ? "vencido sin aplicar" : "vencidos sin aplicar"}`
-            : adjusting[0]?.next_adjustment_date ? `El próximo el ${formatDate(adjusting[0].next_adjustment_date)}` : "Ninguno próximo"}
+          label={`Vence en ${DUE_SOON_DAYS} días`}
+          value={kpis.dueSoon.count ? sumMap(kpis.dueSoon.amounts) : "Nada"}
+          detail={kpis.dueSoon.count
+            ? `${kpis.dueSoon.count} ${kpis.dueSoon.count === 1 ? "obligación" : "obligaciones"} · la próxima el ${formatDate(kpis.dueSoon.next)}`
+            : "Sin vencimientos próximos"}
         />
         <Stat
-          label={`Vencen en ${alerts.expiryAlertDays} días`}
-          value={expiring.length}
-          tone={expiring.length ? "warning" : undefined}
-          detail={expiring.length ? "Sin renovación cargada" : "Ninguno sin renovar"}
+          label="Ocupación"
+          value={kpis.occupancy.rate !== null ? `${kpis.occupancy.rate} %` : "-"}
+          tone={kpis.occupancy.available > 0 ? "warning" : undefined}
+          detail={kpis.occupancy.rentable ? (
+            <>
+              {kpis.occupancy.occupied} de {kpis.occupancy.rentable} alquilables
+              {kpis.occupancy.available > 0 && (
+                <> · <Link href="/dashboard/alquileres/vacancia" className="font-medium text-foreground underline-offset-4 hover:underline">
+                  {kpis.occupancy.available} {kpis.occupancy.available === 1 ? "disponible" : "disponibles"}
+                </Link></>
+              )}
+            </>
+          ) : "Sin propiedades de alquiler"}
         />
       </StatStrip>
+
+      {collection.some((point) => point.expected > 0) && (
+        <section className="overflow-hidden rounded-lg border border-border bg-card">
+          <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 border-b border-border px-4 py-3">
+            <h2 className="text-base font-semibold tracking-tight">Cobranza</h2>
+            <p className="text-xs text-muted-foreground">
+              Emitido contra cobrado confirmado · últimos {CHART_MONTHS} meses{usdToArs > 0 && " · USD a la cotización vigente"}
+            </p>
+          </div>
+          <div className="p-4"><CollectionChart data={collection} /></div>
+        </section>
+      )}
 
       {hasActions && (
         <section className="overflow-hidden rounded-lg border border-border bg-card">
           <h2 className="border-b border-border px-4 py-3 text-base font-semibold tracking-tight">Requiere acción</h2>
           <ul className="divide-y divide-border-subtle text-sm">
+            {toVerify.length > 0 && (
+              <li className="flex items-center justify-between gap-3 px-4 py-2.5">
+                <span className="flex min-w-0 items-center gap-2">
+                  <Hand className="size-4 shrink-0 text-info" />
+                  <span className="truncate">
+                    {toVerify.length} {toVerify.length === 1 ? "pago informado por verificar" : "pagos informados por verificar"}
+                    {kpis.toVerify.amounts.size > 0 && <span className="text-muted-foreground"> · {sumMap(kpis.toVerify.amounts)}</span>}
+                  </span>
+                </span>
+                <Link href="/dashboard/alquileres/mensajes" className="shrink-0 font-medium underline-offset-4 hover:underline">Verificar</Link>
+              </li>
+            )}
             {overdue.length > 0 && (
               <li className="flex items-center justify-between gap-3 px-4 py-2.5">
                 <span className="flex min-w-0 items-center gap-2">

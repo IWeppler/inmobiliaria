@@ -12,6 +12,7 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/shared/components/ui/select";
 import { updateContactAction, updateContractTermsAction } from "@/features/rentals/lifecycleActions";
 import { useRunAction } from "@/features/rentals/useRunAction";
+import { IVA_LABELS } from "@/features/rentals/invoicing";
 
 type Option = { id: string; label: string };
 type Terms = {
@@ -80,7 +81,10 @@ export function EditContractDialog({
 export type ContactData = {
   id: string; full_name: string; document: string | null; phone: string | null;
   email: string | null; address: string | null; notes: string | null;
+  iva_condition?: string | null;
 };
+
+const NO_IVA = "none";
 
 export function EditContactDialog({ contact, contractId }: { contact: ContactData; contractId?: string }) {
   const { busy, run } = useRunAction();
@@ -88,6 +92,7 @@ export function EditContactDialog({ contact, contractId }: { contact: ContactDat
   const blank = () => ({
     full_name: contact.full_name, document: contact.document ?? "", phone: contact.phone ?? "",
     email: contact.email ?? "", address: contact.address ?? "", notes: contact.notes ?? "",
+    iva_condition: contact.iva_condition ?? NO_IVA,
   });
   const [v, setV] = useState(blank);
 
@@ -104,12 +109,27 @@ export function EditContactDialog({ contact, contractId }: { contact: ContactDat
           <div className="grid gap-1.5"><Label>Teléfono</Label><Input value={v.phone} onChange={(e) => setV({ ...v, phone: e.target.value })} /></div>
           <div className="grid gap-1.5 sm:col-span-2"><Label>Email</Label><Input type="email" value={v.email} onChange={(e) => setV({ ...v, email: e.target.value })} /></div>
           <div className="grid gap-1.5 sm:col-span-2"><Label>Domicilio</Label><Input value={v.address} onChange={(e) => setV({ ...v, address: e.target.value })} /></div>
+          <div className="grid gap-1.5 sm:col-span-2">
+            <Label>Condición frente al IVA</Label>
+            <Select value={v.iva_condition} onValueChange={(value) => setV({ ...v, iva_condition: value })}>
+              <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {v.iva_condition === NO_IVA && <SelectItem value={NO_IVA}>Sin cargar</SelectItem>}
+                {(Object.keys(IVA_LABELS) as (keyof typeof IVA_LABELS)[]).map((key) => <SelectItem key={key} value={key}>{IVA_LABELS[key]}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">Necesaria para facturar honorarios (define factura A, B o C).</p>
+          </div>
           <div className="grid gap-1.5 sm:col-span-2"><Label>Notas</Label><Textarea rows={2} value={v.notes} onChange={(e) => setV({ ...v, notes: e.target.value })} /></div>
         </div>
         <DialogFooter>
           <Button variant="ghost" onClick={() => setOpen(false)}>Cancelar</Button>
           <Button disabled={!!busy || v.full_name.trim().length < 3} onClick={async () => {
-            const ok = await run("contact", () => updateContactAction({ id: contact.id, ...v }, contractId));
+            const { iva_condition, ...rest } = v;
+            const ok = await run("contact", () => updateContactAction({
+              id: contact.id, ...rest,
+              ...(iva_condition !== NO_IVA ? { iva_condition: iva_condition as keyof typeof IVA_LABELS } : {}),
+            }, contractId));
             if (ok) setOpen(false);
           }}>{busy === "contact" ? <Loader2 className="size-4 animate-spin" /> : "Guardar"}</Button>
         </DialogFooter>

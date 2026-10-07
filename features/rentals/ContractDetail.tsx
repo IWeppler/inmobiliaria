@@ -21,10 +21,12 @@ import { LedgerTab, collected, type LedgerCharge } from "@/features/rentals/Ledg
 import { SettlementsTab, type SettlementRow } from "@/features/rentals/SettlementsTab";
 import { AdjustmentCard } from "@/features/rentals/AdjustmentCard";
 import { Stat, StatStrip } from "@/features/rentals/StatStrip";
+import { contractCode } from "@/features/rentals/codes";
+import { ActivityTab, type ActivityRow } from "@/features/rentals/ActivityTab";
 import { RENTAL_TEMPLATES, type NoticeKind } from "@/features/rentals/noticeTemplates";
 
 export type ContractDetailData = {
-  id: string; status: string; start_date: string; end_date: string; rent_amount: number; currency: string;
+  id: string; number: number; status: string; start_date: string; end_date: string; rent_amount: number; currency: string;
   adjustment_index: string; adjustment_months: number; adjustment_pct: number | null; index_lag_months: number;
   base_period: string; next_adjustment_date: string | null; last_adjustment_date: string | null;
   commission_pct: number; late_fee_pct_daily: number; late_fee_fixed: number; payment_due_day: number;
@@ -36,6 +38,7 @@ export type ContractDetailData = {
   tenant: ContactData | null;
   charges: LedgerCharge[];
   settlements: SettlementRow[];
+  invoicingEnabled: boolean;
   adjustments: { id: string; effective_date: string; previous_amount: number; new_amount: number; index_code: string }[];
   adjustmentPreview: { amount: number; factor: number } | { error: string } | null;
   parties: Party[];
@@ -44,6 +47,7 @@ export type ContractDetailData = {
   documents: RentalDocument[];
   contacts: { id: string; label: string; kind: string }[];
   notices: { id: string; kind: NoticeKind; status: string; detail: string | null; created_at: string; contact: { full_name: string } | null }[];
+  activity: ActivityRow[];
   today: string;
 };
 
@@ -93,7 +97,7 @@ export function ContractDetail({ c, initialTab }: { c: ContractDetailData; initi
         backHref="/dashboard/alquileres"
         title={c.property ? <Link href={`/dashboard/propiedades/${c.property.id}`} className="hover:underline">{c.property.title}</Link> : "Contrato"}
         aside={<StatusBadge tone={CONTRACT_STATUS_TONE[c.status] ?? "neutral"}>{CONTRACT_STATUS_LABELS[c.status] ?? c.status}</StatusBadge>}
-        description={`${c.tenant?.full_name ?? "Sin inquilino"} · ${formatDate(c.start_date)} al ${formatDate(c.end_date)}`}
+        description={`${contractCode(c.number)} · ${c.tenant?.full_name ?? "Sin inquilino"} · ${formatDate(c.start_date)} al ${formatDate(c.end_date)}`}
         actions={<div className="flex flex-wrap gap-2">
           <EditContractDialog
             contractId={c.id}
@@ -148,6 +152,7 @@ export function ContractDetail({ c, initialTab }: { c: ContractDetailData; initi
             <TabsTrigger value="liquidaciones">Liquidaciones{unpaidSettlements > 0 && <span className="rounded-full bg-muted-foreground/15 px-1.5 text-xs tabular-nums">{unpaidSettlements}</span>}</TabsTrigger>
             <TabsTrigger value="mantenimiento">Mantenimiento{openMaintenance > 0 && <span className="rounded-full bg-warning/15 px-1.5 text-xs font-semibold tabular-nums text-warning">{openMaintenance}</span>}</TabsTrigger>
             <TabsTrigger value="documentos">Documentos{c.documents.length > 0 && <span className="text-xs tabular-nums text-muted-foreground">{c.documents.length}</span>}</TabsTrigger>
+            <TabsTrigger value="historial">Historial</TabsTrigger>
           </TabsList>
         </div>
 
@@ -224,7 +229,7 @@ export function ContractDetail({ c, initialTab }: { c: ContractDetailData; initi
         <TabsContent value="liquidaciones">
           <SettlementsTab
             contractId={c.id} charges={c.charges} settlements={c.settlements} commissionPct={c.commission_pct}
-            currency={c.currency} today={c.today} owners={owners}
+            currency={c.currency} today={c.today} owners={owners} invoicingEnabled={c.invoicingEnabled}
             ownerMaintenance={c.maintenance
               .filter((m) => m.payer === "PROPIETARIO" && m.status !== "CANCELADO" && (m.cost ?? 0) > 0 && !m.settlement_id)
               .map((m) => ({ id: m.id, title: m.title, cost: m.cost!, resolved: m.status === "RESUELTO" }))}
@@ -237,6 +242,10 @@ export function ContractDetail({ c, initialTab }: { c: ContractDetailData; initi
 
         <TabsContent value="documentos">
           <DocumentsCard contractId={c.id} documents={c.documents} />
+        </TabsContent>
+
+        <TabsContent value="historial">
+          <ActivityTab rows={c.activity} />
         </TabsContent>
       </Tabs>
     </Page>

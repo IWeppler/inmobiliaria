@@ -71,8 +71,11 @@ function SectionLink({ item, active, counts }: { item: RentalSection; active: bo
 function SectionCount({ counts, countKey }: { counts: Promise<NavCounts>; countKey: keyof NavCounts }) {
   const n = use(counts)[countKey];
   if (!n) return null;
+  const label = countKey === "inbox"
+    ? `${n} ${n === 1 ? "mensaje pendiente" : "mensajes pendientes"}`
+    : `${n} ${n === 1 ? "tarea urgente" : "tareas urgentes"}`;
   return (
-    <span className="text-xs font-medium tabular-nums text-danger" aria-label={`${n} ${n === 1 ? "tarea urgente" : "tareas urgentes"}`}>
+    <span className={cn("text-xs font-medium tabular-nums", countKey === "inbox" ? "text-muted-foreground" : "text-danger")} aria-label={label}>
       {n > 99 ? "99+" : n}
     </span>
   );

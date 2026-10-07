@@ -213,6 +213,9 @@ export type Database = {
       }
       events: {
         Row: {
+          outcome: string | null
+          outcome_note: string | null
+          outcome_at: string | null
           agent_id: string | null
           created_at: string
           date: string
@@ -225,6 +228,9 @@ export type Database = {
           type: string | null
         }
         Insert: {
+          outcome?: string | null
+          outcome_note?: string | null
+          outcome_at?: string | null
           agent_id?: string | null
           created_at?: string
           date: string
@@ -237,6 +243,9 @@ export type Database = {
           type?: string | null
         }
         Update: {
+          outcome?: string | null
+          outcome_note?: string | null
+          outcome_at?: string | null
           agent_id?: string | null
           created_at?: string
           date?: string
@@ -423,6 +432,24 @@ export type Database = {
       }
       leads: {
         Row: {
+          deal_stage: string | null
+          deal_price: number | null
+          deal_currency: string | null
+          reserva_at: string | null
+          reserva_amount: number | null
+          reserva_expires_at: string | null
+          boleto_at: string | null
+          deal_financing: boolean
+          deal_bank: string | null
+          deal_loan_amount: number | null
+          deal_loan_status: string | null
+          escritura_at: string | null
+          escribano: string | null
+          deal_checklist: Json
+          deal_lost_reason: string | null
+          deal_updated_at: string | null
+          next_action: string | null
+          next_action_at: string | null
           agent_id: string | null
           created_at: string
           created_by: string | null
@@ -450,6 +477,24 @@ export type Database = {
           search_urgency: string | null
         }
         Insert: {
+          deal_stage?: string | null
+          deal_price?: number | null
+          deal_currency?: string | null
+          reserva_at?: string | null
+          reserva_amount?: number | null
+          reserva_expires_at?: string | null
+          boleto_at?: string | null
+          deal_financing?: boolean
+          deal_bank?: string | null
+          deal_loan_amount?: number | null
+          deal_loan_status?: string | null
+          escritura_at?: string | null
+          escribano?: string | null
+          deal_checklist?: Json
+          deal_lost_reason?: string | null
+          deal_updated_at?: string | null
+          next_action?: string | null
+          next_action_at?: string | null
           agent_id?: string | null
           created_at?: string
           created_by?: string | null
@@ -477,6 +522,24 @@ export type Database = {
           search_urgency?: string | null
         }
         Update: {
+          deal_stage?: string | null
+          deal_price?: number | null
+          deal_currency?: string | null
+          reserva_at?: string | null
+          reserva_amount?: number | null
+          reserva_expires_at?: string | null
+          boleto_at?: string | null
+          deal_financing?: boolean
+          deal_bank?: string | null
+          deal_loan_amount?: number | null
+          deal_loan_status?: string | null
+          escritura_at?: string | null
+          escribano?: string | null
+          deal_checklist?: Json
+          deal_lost_reason?: string | null
+          deal_updated_at?: string | null
+          next_action?: string | null
+          next_action_at?: string | null
           agent_id?: string | null
           created_at?: string
           created_by?: string | null
@@ -594,6 +657,33 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      owner_prospects: {
+        Row: {
+          id: string; agent_id: string | null; owner_name: string; owner_phone: string | null; owner_email: string | null
+          contact_id: string | null; address: string | null; city: string | null; operation: string; property_type_id: number | null
+          stage: string; source: string | null; appraisal_value: number | null; owner_price: number | null; currency: string
+          commission_pct: number | null; exclusive: boolean; authorization_signed_at: string | null; authorization_expires_at: string | null
+          property_id: string | null; next_action: string | null; next_action_at: string | null; lost_reason: string | null
+          notes: string | null; stage_changed_at: string; created_at: string
+        }
+        Insert: {
+          id?: string; agent_id?: string | null; owner_name: string; owner_phone?: string | null; owner_email?: string | null
+          contact_id?: string | null; address?: string | null; city?: string | null; operation?: string; property_type_id?: number | null
+          stage?: string; source?: string | null; appraisal_value?: number | null; owner_price?: number | null; currency?: string
+          commission_pct?: number | null; exclusive?: boolean; authorization_signed_at?: string | null; authorization_expires_at?: string | null
+          property_id?: string | null; next_action?: string | null; next_action_at?: string | null; lost_reason?: string | null
+          notes?: string | null; stage_changed_at?: string; created_at?: string
+        }
+        Update: {
+          id?: string; agent_id?: string | null; owner_name?: string; owner_phone?: string | null; owner_email?: string | null
+          contact_id?: string | null; address?: string | null; city?: string | null; operation?: string; property_type_id?: number | null
+          stage?: string; source?: string | null; appraisal_value?: number | null; owner_price?: number | null; currency?: string
+          commission_pct?: number | null; exclusive?: boolean; authorization_signed_at?: string | null; authorization_expires_at?: string | null
+          property_id?: string | null; next_action?: string | null; next_action_at?: string | null; lost_reason?: string | null
+          notes?: string | null; stage_changed_at?: string; created_at?: string
+        }
+        Relationships: []
       }
       properties: {
         Row: {
@@ -797,6 +887,7 @@ export type Database = {
       }
       rental_contacts: {
         Row: {
+          iva_condition: string | null
           address: string | null
           created_at: string
           document: string | null
@@ -808,6 +899,7 @@ export type Database = {
           phone: string | null
         }
         Insert: {
+          iva_condition?: string | null
           address?: string | null
           created_at?: string
           document?: string | null
@@ -819,6 +911,7 @@ export type Database = {
           phone?: string | null
         }
         Update: {
+          iva_condition?: string | null
           address?: string | null
           created_at?: string
           document?: string | null
@@ -877,6 +970,7 @@ export type Database = {
           late_fee_pct_daily: number
           next_adjustment_date: string | null
           notes: string | null
+          number: number
           owner_id: string
           payment_due_day: number
           property_id: string
@@ -916,6 +1010,7 @@ export type Database = {
           late_fee_pct_daily?: number
           next_adjustment_date?: string | null
           notes?: string | null
+          number?: number
           owner_id: string
           payment_due_day?: number
           property_id: string
@@ -955,6 +1050,7 @@ export type Database = {
           late_fee_pct_daily?: number
           next_adjustment_date?: string | null
           notes?: string | null
+          number?: number
           owner_id?: string
           payment_due_day?: number
           property_id?: string
@@ -1165,10 +1261,106 @@ export type Database = {
         ]
       }
       rental_payment_entries: {
-        Row: { id: string; charge_id: string; paid_at: string; amount: number; method: string; account: string | null; notes: string | null; receipt_number: number; created_at: string; bank_movement_id: string | null }
-        Insert: { id?: string; charge_id: string; paid_at: string; amount: number; method: string; account?: string | null; notes?: string | null; created_at?: string; bank_movement_id?: string | null }
-        Update: { id?: string; charge_id?: string; paid_at?: string; amount?: number; method?: string; account?: string | null; notes?: string | null; created_at?: string; bank_movement_id?: string | null }
-        Relationships: [{ foreignKeyName: "rental_payment_entries_charge_id_fkey"; columns: ["charge_id"]; isOneToOne: false; referencedRelation: "rental_charges"; referencedColumns: ["id"] }]
+        Row: { id: string; charge_id: string; paid_at: string; amount: number; method: string; account: string | null; notes: string | null; receipt_number: number; created_at: string; bank_movement_id: string | null; recorded_by: string | null; inbox_id: string | null }
+        Insert: { id?: string; charge_id: string; paid_at: string; amount: number; method: string; account?: string | null; notes?: string | null; created_at?: string; bank_movement_id?: string | null; recorded_by?: string | null; inbox_id?: string | null }
+        Update: { id?: string; charge_id?: string; paid_at?: string; amount?: number; method?: string; account?: string | null; notes?: string | null; created_at?: string; bank_movement_id?: string | null; recorded_by?: string | null; inbox_id?: string | null }
+        Relationships: [
+          { foreignKeyName: "rental_payment_entries_charge_id_fkey"; columns: ["charge_id"]; isOneToOne: false; referencedRelation: "rental_charges"; referencedColumns: ["id"] },
+          { foreignKeyName: "rental_payment_entries_inbox_id_fkey"; columns: ["inbox_id"]; isOneToOne: false; referencedRelation: "rental_inbox"; referencedColumns: ["id"] },
+        ]
+      }
+      rental_activity: {
+        Row: {
+          id: string; contract_id: string; at: string; actor_kind: string; actor_agent_id: string | null; actor_contact_id: string | null
+          action: string; detail: string | null; amount: number | null; currency: string | null; ref_id: string | null
+        }
+        Insert: {
+          id?: string; contract_id: string; at?: string; actor_kind: string; actor_agent_id?: string | null; actor_contact_id?: string | null
+          action: string; detail?: string | null; amount?: number | null; currency?: string | null; ref_id?: string | null
+        }
+        Update: {
+          id?: string; contract_id?: string; at?: string; actor_kind?: string; actor_agent_id?: string | null; actor_contact_id?: string | null
+          action?: string; detail?: string | null; amount?: number | null; currency?: string | null; ref_id?: string | null
+        }
+        Relationships: [
+          { foreignKeyName: "rental_activity_actor_agent_id_fkey"; columns: ["actor_agent_id"]; isOneToOne: false; referencedRelation: "agents"; referencedColumns: ["id"] },
+          { foreignKeyName: "rental_activity_actor_contact_id_fkey"; columns: ["actor_contact_id"]; isOneToOne: false; referencedRelation: "rental_contacts"; referencedColumns: ["id"] },
+        ]
+      }
+      deal_portal_links: {
+        Row: {
+          id: string; lead_id: string; token_hash: string; expires_at: string; revoked_at: string | null
+          last_viewed_at: string | null; view_count: number; created_by: string | null; created_at: string
+        }
+        Insert: {
+          id?: string; lead_id: string; token_hash: string; expires_at?: string; revoked_at?: string | null
+          last_viewed_at?: string | null; view_count?: number; created_by?: string | null; created_at?: string
+        }
+        Update: {
+          id?: string; lead_id?: string; token_hash?: string; expires_at?: string; revoked_at?: string | null
+          last_viewed_at?: string | null; view_count?: number; created_by?: string | null; created_at?: string
+        }
+        Relationships: []
+      }
+      afip_tokens: {
+        Row: { service: string; environment: string; token: string; sign: string; expires_at: string }
+        Insert: { service: string; environment: string; token: string; sign: string; expires_at: string }
+        Update: { service?: string; environment?: string; token?: string; sign?: string; expires_at?: string }
+        Relationships: []
+      }
+      rental_invoices: {
+        Row: {
+          id: string; settlement_id: string | null; share_id: string | null; contact_id: string; kind: string
+          cbte_tipo: number; pto_vta: number; cbte_nro: number; environment: string; issued_on: string
+          receptor_name: string; receptor_doc_tipo: number; receptor_doc_nro: string; receptor_iva: string
+          description: string; currency: string; exchange_rate: number; net: number; vat: number; total: number
+          service_from: string | null; service_to: string | null; cae: string; cae_due: string
+          credited_invoice_id: string | null; voided: boolean; created_by: string | null; created_at: string
+        }
+        Insert: {
+          id?: string; settlement_id?: string | null; share_id?: string | null; contact_id: string; kind: string
+          cbte_tipo: number; pto_vta: number; cbte_nro: number; environment: string; issued_on: string
+          receptor_name: string; receptor_doc_tipo: number; receptor_doc_nro: string; receptor_iva: string
+          description: string; currency: string; exchange_rate?: number; net: number; vat?: number; total: number
+          service_from?: string | null; service_to?: string | null; cae: string; cae_due: string
+          credited_invoice_id?: string | null; voided?: boolean; created_by?: string | null; created_at?: string
+        }
+        Update: {
+          id?: string; settlement_id?: string | null; share_id?: string | null; contact_id?: string; kind?: string
+          cbte_tipo?: number; pto_vta?: number; cbte_nro?: number; environment?: string; issued_on?: string
+          receptor_name?: string; receptor_doc_tipo?: number; receptor_doc_nro?: string; receptor_iva?: string
+          description?: string; currency?: string; exchange_rate?: number; net?: number; vat?: number; total?: number
+          service_from?: string | null; service_to?: string | null; cae?: string; cae_due?: string
+          credited_invoice_id?: string | null; voided?: boolean; created_by?: string | null; created_at?: string
+        }
+        Relationships: []
+      }
+      rental_inbox: {
+        Row: {
+          id: string; wa_message_id: string; contact_id: string; contract_id: string | null; received_at: string
+          text: string | null; media_path: string | null; media_mime: string | null; kind: string
+          ai_summary: string | null; ai_data: Json | null; ai_error: string | null; status: string
+          result_note: string | null; resolved_by: string | null; resolved_at: string | null; source: string
+          reject_reason: string | null
+        }
+        Insert: {
+          id?: string; wa_message_id: string; contact_id: string; contract_id?: string | null; received_at?: string
+          text?: string | null; media_path?: string | null; media_mime?: string | null; kind?: string
+          ai_summary?: string | null; ai_data?: Json | null; ai_error?: string | null; status?: string
+          result_note?: string | null; resolved_by?: string | null; resolved_at?: string | null; source?: string
+          reject_reason?: string | null
+        }
+        Update: {
+          id?: string; wa_message_id?: string; contact_id?: string; contract_id?: string | null; received_at?: string
+          text?: string | null; media_path?: string | null; media_mime?: string | null; kind?: string
+          ai_summary?: string | null; ai_data?: Json | null; ai_error?: string | null; status?: string
+          result_note?: string | null; resolved_by?: string | null; resolved_at?: string | null; source?: string
+          reject_reason?: string | null
+        }
+        Relationships: [
+          { foreignKeyName: "rental_inbox_contact_id_fkey"; columns: ["contact_id"]; isOneToOne: false; referencedRelation: "rental_contacts"; referencedColumns: ["id"] },
+          { foreignKeyName: "rental_inbox_contract_id_fkey"; columns: ["contract_id"]; isOneToOne: false; referencedRelation: "rental_contracts"; referencedColumns: ["id"] },
+        ]
       }
       rental_contract_templates: {
         Row: { id: string; name: string; body: string; is_default: boolean; updated_by: string | null; created_at: string; updated_at: string }
@@ -1361,6 +1553,7 @@ export type Database = {
           issued_at: string
           net_amount: number
           notes: string | null
+          number: number
           other_collected_amount: number
           paid_to_owner_at: string | null
           payout_method: string | null
@@ -1379,6 +1572,7 @@ export type Database = {
           issued_at?: string
           net_amount: number
           notes?: string | null
+          number?: number
           other_collected_amount?: number
           paid_to_owner_at?: string | null
           payout_method?: string | null
@@ -1397,6 +1591,7 @@ export type Database = {
           issued_at?: string
           net_amount?: number
           notes?: string | null
+          number?: number
           other_collected_amount?: number
           paid_to_owner_at?: string | null
           payout_method?: string | null
@@ -1441,6 +1636,163 @@ export type Database = {
         }
         Relationships: []
       }
+      task_rules: {
+        Row: {
+          assignee_id: string | null
+          description: string | null
+          due_days: number
+          enabled: boolean
+          key: string
+          label: string
+          priority: string
+          sort: number
+          updated_at: string
+        }
+        Insert: {
+          assignee_id?: string | null
+          description?: string | null
+          due_days?: number
+          enabled?: boolean
+          key: string
+          label: string
+          priority?: string
+          sort?: number
+          updated_at?: string
+        }
+        Update: {
+          assignee_id?: string | null
+          description?: string | null
+          due_days?: number
+          enabled?: boolean
+          key?: string
+          label?: string
+          priority?: string
+          sort?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "task_rules_assignee_id_fkey"
+            columns: ["assignee_id"]
+            isOneToOne: false
+            referencedRelation: "agents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tasks: {
+        Row: {
+          assignee_id: string | null
+          contract_id: string | null
+          created_at: string
+          created_by: string | null
+          dedupe_key: string | null
+          done_at: string | null
+          done_by: string | null
+          due_date: string | null
+          id: string
+          lead_id: string | null
+          notes: string | null
+          priority: string
+          property_id: string | null
+          resolution: string | null
+          rule: string | null
+          status: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          assignee_id?: string | null
+          contract_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          dedupe_key?: string | null
+          done_at?: string | null
+          done_by?: string | null
+          due_date?: string | null
+          id?: string
+          lead_id?: string | null
+          notes?: string | null
+          priority?: string
+          property_id?: string | null
+          resolution?: string | null
+          rule?: string | null
+          status?: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          assignee_id?: string | null
+          contract_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          dedupe_key?: string | null
+          done_at?: string | null
+          done_by?: string | null
+          due_date?: string | null
+          id?: string
+          lead_id?: string | null
+          notes?: string | null
+          priority?: string
+          property_id?: string | null
+          resolution?: string | null
+          rule?: string | null
+          status?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tasks_assignee_id_fkey"
+            columns: ["assignee_id"]
+            isOneToOne: false
+            referencedRelation: "agents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tasks_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "agents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tasks_done_by_fkey"
+            columns: ["done_by"]
+            isOneToOne: false
+            referencedRelation: "agents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tasks_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tasks_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tasks_contract_id_fkey"
+            columns: ["contract_id"]
+            isOneToOne: false
+            referencedRelation: "rental_contracts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tasks_rule_fkey"
+            columns: ["rule"]
+            isOneToOne: false
+            referencedRelation: "task_rules"
+            referencedColumns: ["key"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -1449,6 +1801,7 @@ export type Database = {
       generate_recurring_expenses: { Args: never; Returns: number }
       increment_views: { Args: { property_id: string }; Returns: undefined }
       is_admin: { Args: never; Returns: boolean }
+      is_back_office: { Args: never; Returns: boolean }
       rental_apply_adjustment: { Args: { p_contract_id: string; p_manual_amount?: number | null }; Returns: Json }
       rental_apply_due_adjustments: { Args: never; Returns: number }
       rental_accrue_late_fees: { Args: never; Returns: number }

@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { AlarmClock, Banknote, CalendarClock, CheckCircle2, TrendingUp, Wrench, type LucideIcon } from "lucide-react";
+import { AlarmClock, Banknote, CalendarClock, CheckCircle2, Inbox, TrendingUp, Wrench, type LucideIcon } from "lucide-react";
 import { FaWhatsapp } from "react-icons/fa";
 import { Button } from "@/shared/components/ui/button";
 import {
@@ -18,6 +18,7 @@ import {
 } from "@/features/rentals/tasks";
 
 const CATEGORY_ICONS: Record<TaskCategory, LucideIcon> = {
+  mensajes: Inbox,
   cobranzas: Banknote, ajustes: TrendingUp, liquidaciones: CheckCircle2, contratos: CalendarClock, mantenimiento: Wrench,
 };
 const URGENCY_STYLE: Record<TaskUrgency, string> = {

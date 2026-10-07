@@ -24,10 +24,11 @@ function pct(part: number, total: number) {
   return total > 0 ? Math.round((part / total) * 100) : 0;
 }
 
-// Cobranza de alquileres por mes, últimos 12. Mismo lenguaje visual que
+// Cobranza de alquileres por mes (12 por defecto). Mismo lenguaje visual que
 // el resto de los gráficos del panel: columnas HTML ≤ 24px, extremo
 // redondeado, un tooltip por mes y tabla equivalente para lectores.
 export function CollectionChart({ data }: { data: CollectionPoint[] }) {
+  const months = data.length;
   const [hover, setHover] = useState<number | null>(null);
   const max = niceMax(Math.max(...data.map((d) => d.expected)));
   const ticks = [0, max / 2, max];
@@ -49,7 +50,7 @@ export function CollectionChart({ data }: { data: CollectionPoint[] }) {
           </p>
         </div>
         <div>
-          <p className="text-xs text-muted-foreground">Deuda vencida (12 meses)</p>
+          <p className="text-xs text-muted-foreground">Deuda vencida ({months} meses)</p>
           <p className={cn("text-lg font-semibold tabular-nums", totalOverdue > 0 ? "text-danger" : "text-foreground")}>
             {fullArs(totalOverdue)}
           </p>
@@ -78,7 +79,7 @@ export function CollectionChart({ data }: { data: CollectionPoint[] }) {
         </div>
 
         {/* Columnas apiladas */}
-        <div className="relative ml-14 flex h-40 items-end" role="img" aria-label="Cobranza de alquileres por mes, últimos 12 meses">
+        <div className="relative ml-14 flex h-40 items-end" role="img" aria-label={`Cobranza de alquileres por mes, últimos ${months} meses`}>
           {data.map((d, i) => {
             const isHover = hover === i;
             const rate = pct(d.collected, d.expected);

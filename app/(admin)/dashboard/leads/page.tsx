@@ -9,9 +9,9 @@ import { redirect } from "next/navigation";
 export default async function LeadsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ estado?: string; vista?: string }>;
+  searchParams: Promise<{ estado?: string; vista?: string; nuevo?: string }>;
 }) {
-  const { estado, vista } = await searchParams;
+  const { estado, vista, nuevo } = await searchParams;
   const supabase = await createClientServer();
 
   // 1. Usuario
@@ -80,6 +80,7 @@ export default async function LeadsPage({
         initialView={vista === "demanda" ? "demand" : vista === "lista" ? "list" : "board"}
         demandGaps={demandGaps}
         propertyTypes={propertyTypes ?? []}
+        initialCreateOpen={nuevo === "1"}
       />
     </Page>
   );

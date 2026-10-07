@@ -15,7 +15,7 @@ export default async function ContactosPage() {
   if (!user) redirect("/login");
 
   const [{ data: contacts }, { data: contracts }, { data: parties }] = await Promise.all([
-    supabase.from("rental_contacts").select("id, kind, full_name, document, phone, email, address, notes").order("full_name"),
+    supabase.from("rental_contacts").select("id, kind, full_name, document, phone, email, address, notes, iva_condition").order("full_name"),
     supabase.from("rental_contracts").select("id, status, owner_id, tenant_id, properties(title)"),
     supabase.from("rental_contract_parties").select("contact_id, contract_id"),
   ]);

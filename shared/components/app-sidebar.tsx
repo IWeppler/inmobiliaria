@@ -5,10 +5,13 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutDashboard,
+  ListTodo,
   Inbox,
   Settings,
   Users,
   Building2,
+  HousePlus,
+  Handshake,
   BarChart3,
   KeyRound,
   CalendarDays,
@@ -49,6 +52,7 @@ import { createClientBrowser } from "@/lib/supabase-browser";
 import { useCurrentAgent } from "@/hooks/use-current-agent";
 import { GlobalSearch } from "@/shared/components/GlobalSearch";
 import type { NavCounts } from "@/shared/components/navCounts";
+import { roleLabel } from "@/features/tasks/rules";
 
 type NavItem = {
   title: string;
@@ -56,24 +60,48 @@ type NavItem = {
   icon: LucideIcon;
   // Sección que marca activo el ítem, si difiere del destino.
   section?: string;
-  adminOnly?: boolean;
+  access?: Access;
   count?: { key: keyof NavCounts; label: (n: number) => string; urgent?: boolean };
 };
 
-type NavGroup = { label: string | null; adminOnly?: boolean; items: NavItem[] };
+// Quién ve cada destino. "comercial": admin y agentes (administración no
+// vende); "backOffice": admin y administración; "admin": solo admin. Sin
+// access, todos.
+type Access = "admin" | "backOffice" | "comercial";
+const ACCESS: Record<Access, string[]> = {
+  admin: ["admin"],
+  backOffice: ["admin", "administracion"],
+  comercial: ["admin", "agente"],
+};
+
+type NavGroup = { label: string | null; access?: Access; items: NavItem[] };
 
 // Navegación = destinos, agrupados por área. Las acciones ("Nueva
 // propiedad") viven en el header de cada pantalla, no acá.
 const NAV: NavGroup[] = [
-  { label: null, items: [{ title: "Dashboard", url: "/dashboard", icon: LayoutDashboard }] },
+  {
+    label: null,
+    items: [
+      {
+        // La bandeja del agente: ventas + alquileres, lo urgente primero.
+        title: "Hoy", url: "/dashboard/hoy", icon: ListTodo,
+        count: { key: "today", urgent: true, label: (n) => `${n} ${n === 1 ? "tarea urgente" : "tareas urgentes"} para hoy` },
+      },
+      { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard, access: "comercial" },
+    ],
+  },
   {
     label: "Comercial",
+    access: "comercial",
     items: [
+      // En el orden del negocio: captar, publicar, vender, escriturar.
+      { title: "Captaciones", url: "/dashboard/captaciones", icon: HousePlus },
       { title: "Propiedades", url: "/dashboard/propiedades", icon: Building2 },
       {
         title: "Leads", url: "/dashboard/leads", icon: Inbox,
         count: { key: "leads", label: (n) => `${n} ${n === 1 ? "lead nuevo" : "leads nuevos"} sin contactar` },
       },
+      { title: "Operaciones", url: "/dashboard/operaciones", icon: Handshake },
       { title: "Calendario", url: "/dashboard/calendario", icon: CalendarDays },
     ],
   },
@@ -90,13 +118,13 @@ const NAV: NavGroup[] = [
   {
     label: "Análisis",
     items: [
-      { title: "Reportes", url: "/dashboard/reportes", icon: BarChart3 },
-      { title: "Finanzas", url: "/dashboard/finanzas", icon: Wallet, adminOnly: true },
+      { title: "Reportes", url: "/dashboard/reportes", icon: BarChart3, access: "comercial" },
+      { title: "Finanzas", url: "/dashboard/finanzas", icon: Wallet, access: "backOffice" },
     ],
   },
   {
     label: "Administración",
-    adminOnly: true,
+    access: "admin",
     items: [
       { title: "Equipo", url: "/dashboard/agentes", icon: Users },
       { title: "Ajustes", url: "/dashboard/ajustes", icon: Settings },
@@ -114,7 +142,10 @@ export function AppSidebar({ counts }: { counts: Promise<NavCounts> }) {
   const pathname = usePathname();
   const { setOpenMobile } = useSidebar();
   const { agent, loading } = useCurrentAgent();
-  const isAdmin = agent?.role === "admin";
+  // Mientras carga el rol se muestra lo de un agente (el caso más común),
+  // sin los ítems restringidos.
+  const allowed = (access?: Access) =>
+    !access || (loading ? access === "comercial" : ACCESS[access].includes(agent?.role ?? "agente"));
 
   // En mobile el menú es un panel superpuesto: se cierra al navegar.
   useEffect(() => {
@@ -122,8 +153,8 @@ export function AppSidebar({ counts }: { counts: Promise<NavCounts> }) {
   }, [pathname, setOpenMobile]);
 
   const groups = NAV
-    .filter((g) => !g.adminOnly || (!loading && isAdmin))
-    .map((g) => ({ ...g, items: g.items.filter((i) => !i.adminOnly || (!loading && isAdmin)) }))
+    .filter((g) => allowed(g.access))
+    .map((g) => ({ ...g, items: g.items.filter((i) => allowed(i.access)) }))
     .filter((g) => g.items.length > 0);
 
   return (
@@ -251,7 +282,7 @@ function SidebarUser() {
   }
 
   const name = agent?.full_name ?? "Usuario";
-  const role = agent?.role === "admin" ? "Administrador" : "Agente";
+  const role = roleLabel(agent?.role);
   const avatar = (
     <Avatar className="size-8 rounded-md">
       <AvatarImage src={agent?.avatar_url || ""} alt="" />

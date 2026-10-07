@@ -3,7 +3,7 @@ import { daysBetween, money } from "@/features/rentals/logic";
 // Bandeja "Hoy": tipos, riesgo del inquilino y mensajes. Lógica pura (sin
 // I/O): la arma taskData.ts y la muestra TodayInbox.
 
-export type TaskCategory = "cobranzas" | "ajustes" | "liquidaciones" | "contratos" | "mantenimiento";
+export type TaskCategory = "mensajes" | "cobranzas" | "ajustes" | "liquidaciones" | "contratos" | "mantenimiento";
 export type TaskUrgency = "alta" | "media" | "baja";
 export type RiskLevel = "ALTO" | "MEDIO" | "BAJO" | "NUEVO";
 
@@ -26,6 +26,7 @@ export type RentalTask = {
 };
 
 export const CATEGORY_LABELS: Record<TaskCategory, string> = {
+  mensajes: "Mensajes",
   cobranzas: "Cobranzas",
   ajustes: "Ajustes",
   liquidaciones: "Liquidaciones",

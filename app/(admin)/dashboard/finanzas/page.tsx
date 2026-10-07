@@ -14,15 +14,15 @@ import { buildCashFlowSeries, lastPeriods, toArs } from "@/features/finances/log
 const MONTHS = 12;
 
 // Finanzas del negocio: flujo de caja mensual, gastos fijos y movimientos.
-// Solo admin (también lo exige la RLS de cash_movements).
+// Admin y administración (también lo exige la RLS de cash_movements).
 export default async function FinanzasPage() {
   const supabase = await createClientServer();
   const {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
-  const { data: isAdmin } = await supabase.rpc("is_admin");
-  if (!isAdmin) redirect("/dashboard");
+  const { data: backOffice } = await supabase.rpc("is_back_office");
+  if (!backOffice) redirect("/dashboard");
 
   // Registra los meses de gastos fijos que ya vencieron (idempotente).
   await supabase.rpc("generate_recurring_expenses");

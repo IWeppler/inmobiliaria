@@ -33,7 +33,7 @@ export const CHARGE_LABELS: Record<string, string> = {
 };
 
 // Pestañas del detalle de contrato (?tab= en la URL).
-export const CONTRACT_TABS = ["resumen", "cuenta", "liquidaciones", "mantenimiento", "documentos"] as const;
+export const CONTRACT_TABS = ["resumen", "cuenta", "liquidaciones", "mantenimiento", "documentos", "historial"] as const;
 export type ContractTab = (typeof CONTRACT_TABS)[number];
 
 // Conceptos que se cargan a mano (ALQUILER lo generan las cuotas).

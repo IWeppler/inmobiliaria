@@ -105,6 +105,8 @@ const contactUpdateSchema = z.object({
   email: z.string().email().optional().or(z.literal("")),
   address: z.string().max(200).optional(),
   notes: z.string().max(1000).optional(),
+  // Para facturar honorarios. Sin valor no se toca.
+  iva_condition: z.enum(["RI", "MONOTRIBUTO", "EXENTO", "CONSUMIDOR_FINAL"]).optional(),
 });
 
 export async function updateContactAction(
@@ -123,6 +125,7 @@ export async function updateContactAction(
     email: v.email || null,
     address: v.address || null,
     notes: v.notes || null,
+    ...(v.iva_condition ? { iva_condition: v.iva_condition } : {}),
   }).eq("id", id);
   if (error) return { success: false, message: error.message };
   if (contractId) revalidateContract(contractId);

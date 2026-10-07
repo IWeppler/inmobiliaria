@@ -139,7 +139,9 @@ export function ProfileForm({ agent }: { agent: Agent }) {
                 value={
                   agent.role === "admin"
                     ? "Administrador"
-                    : "Agente Inmobiliario"
+                    : agent.role === "administracion"
+                      ? "Administración"
+                      : "Agente Inmobiliario"
                 }
                 disabled
               />

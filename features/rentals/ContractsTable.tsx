@@ -9,9 +9,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/shared/components/ui/table";
 import { StatusBadge } from "@/shared/components/StatusBadge";
 import { CONTRACT_STATUS_LABELS, CONTRACT_STATUS_TONE, daysBetween, formatDate, money, type RentalAlertSettings } from "@/features/rentals/logic";
+import { contractCode } from "@/features/rentals/codes";
 
 export type ContractListRow = {
-  id: string; status: string; propertyTitle: string; tenantName: string | null; ownerName: string | null;
+  id: string; number: number; status: string; propertyTitle: string; tenantName: string | null; ownerName: string | null;
   rentAmount: number; currency: string; endDate: string; nextAdjustmentDate: string | null;
   overdueBalance: number; overdueCount: number; renewed: boolean;
 };
@@ -32,7 +33,7 @@ export function ContractsTable({ rows, today, alerts }: { rows: ContractListRow[
       if (focus === "MORA" && row.overdueCount === 0) return false;
       if (focus === "AJUSTE" && !(row.nextAdjustmentDate && daysBetween(today, row.nextAdjustmentDate) <= alerts.adjustmentAlertDays)) return false;
       if (focus === "VENCE" && !(row.status === "ACTIVO" && !row.renewed && daysBetween(today, row.endDate) <= alerts.expiryAlertDays)) return false;
-      if (text && ![row.propertyTitle, row.tenantName, row.ownerName].some((value) => value?.toLowerCase().includes(text))) return false;
+      if (text && ![row.propertyTitle, row.tenantName, row.ownerName, contractCode(row.number)].some((value) => value?.toLowerCase().includes(text))) return false;
       return true;
     });
   }, [rows, q, status, focus, today, alerts.adjustmentAlertDays, alerts.expiryAlertDays]);
@@ -95,7 +96,7 @@ export function ContractsTable({ rows, today, alerts }: { rows: ContractListRow[
                   <TableRow key={row.id}>
                     <TableCell className="max-w-[280px]">
                       <Link href={`/dashboard/alquileres/${row.id}`} className="block truncate font-medium hover:text-primary hover:underline">{row.propertyTitle}</Link>
-                      <span className="block truncate text-xs text-muted-foreground">{row.tenantName ?? "Sin inquilino"}</span>
+                      <span className="block truncate text-xs text-muted-foreground"><span className="tabular-nums">{contractCode(row.number)}</span> · {row.tenantName ?? "Sin inquilino"}</span>
                     </TableCell>
                     <TableCell className="hidden text-muted-foreground lg:table-cell">{row.ownerName}</TableCell>
                     <TableCell className="text-right tabular-nums">{money(row.rentAmount, row.currency)}</TableCell>

@@ -11,6 +11,7 @@ import {
   Edit,
   Camera,
   Plus,
+  Calculator,
 } from "lucide-react";
 import {
   createAgentAction,
@@ -295,6 +296,7 @@ export function AgentsClientPage({
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="agente">Agente (Vendedor)</SelectItem>
+                    <SelectItem value="administracion">Administración (alquileres y finanzas)</SelectItem>
                     <SelectItem value="admin">Administrador</SelectItem>
                   </SelectContent>
                 </Select>
@@ -410,6 +412,10 @@ export function AgentsClientPage({
                   {agent.role === "admin" ? (
                     <StatusBadge tone="accent" icon={Shield}>
                       Admin
+                    </StatusBadge>
+                  ) : agent.role === "administracion" ? (
+                    <StatusBadge tone="info" icon={Calculator}>
+                      Administración
                     </StatusBadge>
                   ) : (
                     <StatusBadge tone="neutral" icon={User}>

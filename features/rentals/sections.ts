@@ -7,12 +7,13 @@ export type RentalSection = {
   href: string;
   label: string;
   group: string | null;
-  countKey?: "rentals";
+  countKey?: "rentals" | "inbox";
 };
 
 // Orden de las pestañas en mobile.
 export const RENTAL_SECTIONS: RentalSection[] = [
   { href: `${RENTALS_BASE}/hoy`, label: "Hoy", group: null, countKey: "rentals" },
+  { href: `${RENTALS_BASE}/mensajes`, label: "Mensajes", group: null, countKey: "inbox" },
   { href: RENTALS_BASE, label: "Contratos", group: "Cartera" },
   { href: `${RENTALS_BASE}/vacancia`, label: "Vacancia", group: "Cartera" },
   { href: `${RENTALS_BASE}/cobranzas`, label: "Cobranzas", group: "Cobros y pagos" },

@@ -1,5 +1,6 @@
 "use client";
 
+import { receiptCode } from "@/features/rentals/codes";
 import { useState } from "react";
 import Link from "next/link";
 import { FileText, Undo2 } from "lucide-react";
@@ -142,15 +143,15 @@ export function LedgerTab({
                         {charge.entries.map((entry) => (
                           <li key={entry.id} className="flex flex-wrap items-center justify-between gap-2 rounded-md bg-muted/50 px-2.5 py-1.5 text-xs">
                             <span className="text-muted-foreground">
-                              Recibo N.º {entry.receipt_number} · {formatDate(entry.paid_at)} · {METHOD_LABELS[entry.method] ?? entry.method}{entry.account ? ` (${entry.account})` : ""}
+                              Recibo {receiptCode(entry.receipt_number)} · {formatDate(entry.paid_at)} · {METHOD_LABELS[entry.method] ?? entry.method}{entry.account ? ` (${entry.account})` : ""}
                             </span>
                             <span className="flex items-center gap-1">
                               <span className="font-medium tabular-nums">{money(entry.amount, currency)}</span>
-                              <Button asChild size="icon" variant="ghost" className="size-7" aria-label={`Ver recibo ${entry.receipt_number}`}>
+                              <Button asChild size="icon" variant="ghost" className="size-7" aria-label={`Ver recibo ${receiptCode(entry.receipt_number)}`}>
                                 <Link href={`/dashboard/alquileres/${contractId}/recibo/${entry.id}`} target="_blank"><FileText className="size-3.5" /></Link>
                               </Button>
                               {!isSettled && (
-                                <Button size="icon" variant="ghost" className="size-7" aria-label={`Revertir cobro ${entry.receipt_number}`} disabled={!!busy}
+                                <Button size="icon" variant="ghost" className="size-7" aria-label={`Revertir cobro ${receiptCode(entry.receipt_number)}`} disabled={!!busy}
                                   onClick={() => run(`undo-${entry.id}`, () => deleteRentalPaymentAction(entry.id))}>
                                   <Undo2 className="size-3.5" />
                                 </Button>

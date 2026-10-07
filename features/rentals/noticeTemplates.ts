@@ -10,7 +10,7 @@ export const RENTAL_TEMPLATES = {
   RECIBO: {
     name: "alquiler_recibo",
     label: "Recibo de cobro",
-    body: "Hola {{1}}, registramos tu pago de {{2}} por {{3}} de {{4}}. Recibo N.º {{5}}. ¡Gracias!",
+    body: "Hola {{1}}, registramos tu pago de {{2}} por {{3}} de {{4}}. Recibo {{5}}. ¡Gracias!",
     params: ["nombre del inquilino", "importe", "concepto", "propiedad", "n.º de recibo"],
   },
   AUMENTO: {

@@ -1,3 +1,4 @@
+import { receiptCode, settlementCode } from "@/features/rentals/codes";
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { CHARGE_LABELS, formatPeriod, round2 } from "@/features/rentals/logic";
@@ -21,7 +22,7 @@ type Charge = {
 type Share = {
   id: string; share_pct: number; amount: number; paid_to_owner_at: string | null; payout_method: string | null; payout_reference: string | null;
   settlement: {
-    id: string; period: string; issued_at: string; currency: string;
+    id: string; number: number; period: string; issued_at: string; currency: string;
     rent_amount: number; other_collected_amount: number; commission_amount: number; expenses_amount: number;
     contract: { id: string; property: { title: string } | null } | null;
   } | null;
@@ -57,10 +58,14 @@ export function totalsByCurrency(items: { amount: number; currency: string }[]):
 export async function loadContactStatement(
   supabase: SupabaseClient,
   contactId: string,
-  { today, year, internal }: { today: string; year: number | null; internal: boolean },
+  { today, year, internal, portalBase }: {
+    today: string; year: number | null; internal: boolean;
+    /** Portal: base del link (/estado/<token>) para descargar recibos y liquidaciones en PDF. */
+    portalBase?: string;
+  },
 ): Promise<ContactStatementData | null> {
   const { data: contact } = await supabase.from("rental_contacts")
-    .select("id, kind, full_name, document, phone, email, address, notes").eq("id", contactId).maybeSingle();
+    .select("id, kind, full_name, document, phone, email, address, notes, iva_condition").eq("id", contactId).maybeSingle();
   if (!contact) return null;
 
   // Contratos en los que participa: como titular o como co-titular.
@@ -87,7 +92,7 @@ export async function loadContactStatement(
         .in("contract_id", tenantContracts.map((c) => c.id))
       : Promise.resolve({ data: [] }),
     supabase.from("rental_settlement_shares")
-      .select("id, share_pct, amount, paid_to_owner_at, payout_method, payout_reference, settlement:rental_settlements(id, period, issued_at, currency, rent_amount, other_collected_amount, commission_amount, expenses_amount, contract:rental_contracts(id, property:properties(title)))")
+      .select("id, share_pct, amount, paid_to_owner_at, payout_method, payout_reference, settlement:rental_settlements(id, number, period, issued_at, currency, rent_amount, other_collected_amount, commission_amount, expenses_amount, contract:rental_contracts(id, property:properties(title)))")
       .eq("contact_id", contactId),
   ]);
   const charges = (chargesRaw ?? []) as unknown as Charge[];
@@ -107,8 +112,10 @@ export async function loadContactStatement(
     for (const entry of charge.entries) {
       tenantMovements.push({
         id: `e-${entry.id}`, date: entry.paid_at, currency: charge.currency,
-        description: `Pago · recibo N.º ${entry.receipt_number}`, detail: `${title} · ${charge.description}`,
-        increase: 0, decrease: entry.amount, href: internal ? `/dashboard/alquileres/${charge.contract_id}/recibo/${entry.id}` : undefined,
+        description: `Pago · recibo ${receiptCode(entry.receipt_number)}`, detail: `${title} · ${charge.description}`,
+        increase: 0, decrease: entry.amount,
+        href: internal ? `/dashboard/alquileres/${charge.contract_id}/recibo/${entry.id}` : portalBase ? `${portalBase}/recibo/${entry.id}` : undefined,
+        pdf: !internal && !!portalBase,
       });
     }
   }
@@ -123,9 +130,10 @@ export async function loadContactStatement(
     const title = s.contract?.property?.title ?? "Contrato";
     ownerMovements.push({
       id: `s-${share.id}`, date: s.issued_at, currency: s.currency,
-      description: `Liquidación ${formatPeriod(s.period)}`, detail: share.share_pct < 100 ? `${title} · ${share.share_pct} %` : title,
+      description: `Liquidación ${settlementCode(s.number)} · ${formatPeriod(s.period)}`, detail: share.share_pct < 100 ? `${title} · ${share.share_pct} %` : title,
       increase: share.amount, decrease: 0,
-      href: internal && s.contract ? `/dashboard/alquileres/${s.contract.id}/liquidacion/${s.id}` : undefined,
+      href: internal && s.contract ? `/dashboard/alquileres/${s.contract.id}/liquidacion/${s.id}` : portalBase ? `${portalBase}/liquidacion/${s.id}` : undefined,
+      pdf: !internal && !!portalBase,
     });
     if (share.paid_to_owner_at) {
       ownerMovements.push({
